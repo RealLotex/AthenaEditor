@@ -569,66 +569,12 @@ function generateProject(project, uploadedFiles=[]) {
     nl();
   }
 
-  // Sort UI elements by zindex — must be declared BEFORE the game loop
+  // Sort UI elements by zindex — declared BEFORE the game loop
   const sortedUI = [...(scene.uiElements||[]).filter(e=>e.visible)].sort((a,b)=>(a.zindex||0)-(b.zindex||0));
 
-  // Game loop
-  w(`// ─── Game Loop ─────────────────────────────────────────`);
-  w(`while (true) {`);
-  w(`    Screen.clear(gray);`);
-  w(`    Camera.update();`);
-  w(`    pad.update();`); nl();
-  if (scriptObjs.length) w(`    ctx.pad = pad;`); nl();
-
-  w(`    lx = ((pad.lx > 25 || pad.lx < -25) ? pad.lx : 0) / 1024.0;`);
-  w(`    ly = ((pad.ly > 25 || pad.ly < -25) ? pad.ly : 0) / 1024.0;`);
-  if (!camObj || !camObj.components.script) {
-    w(`    if (lx !== 0 || ly !== 0) { Camera.orbit(lx, ly); }`);
-    w(`    if (pad.pressed(Pads.R2)) { Camera.zoom(0.2); }`);
-    w(`    else if (pad.pressed(Pads.L2)) { Camera.zoom(-0.2); }`);
-  }
-  w(`    if (pad.justPressed(Pads.TRIANGLE)) { os.chdir(".."); std.reload("main.js"); }`); nl();
-
-  // Call update() for each scripted object, then auto-apply ctx-key → position binding.
-  // For rotation/scale/animation, scripts use ctx.RenderObjects.<name> directly — no binding needed.
-  if (scriptObjs.length) {
-    w(`    // ── Update behaviors ─────────────────────────────────`);
-    w(`    // ctx.RenderObjects / RenderDatas / textures / lights / sounds — direct refs.`);
-    w(`    // Pattern A (position shortcut): write ctx.player.x/y/z → auto-applied below.`);
-    w(`    // Pattern B (full control):      ctx.RenderObjects.player.rotation = {x,y,z};`);
-    scriptObjs.forEach(obj => {
-      const sc = obj.components.script;
-      const alias = sc.file.replace(/\W+/g,"_").replace(/\.js$/i,"").toLowerCase();
-      // ctxKey: explicit override or default to sanitized object name
-      const ctxKey = (sc.ctxKey||"").trim() || obj.name.replace(/\W+/g,"_").toLowerCase();
-      w(`    update_${alias}(ctx, pad);`);
-      // Pattern A auto-binding: position only (opt-in via ctx key)
-      if (obj.components.model && obj.components.model.file && obj._vn) {
-        w(`    if (ctx.${ctxKey} && ctx.${ctxKey}.x !== undefined)`);
-        w(`        ${obj._vn}.position = {x:ctx.${ctxKey}.x, y:ctx.${ctxKey}.y||0, z:ctx.${ctxKey}.z||0};`);
-      }
-    });
-    nl();
-  }
-
-  w(`    Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`,
-    `    Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`); nl();
-
-  modelObjs.forEach(obj => w(`    ${obj._vn || obj.name.replace(/\W+/g,"_").toLowerCase()}.render();`));
-  if (modelObjs.length) nl();
-
-  w(`    Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`); nl();
-
-  if (sortedUI && sortedUI.length) {
-    w(`    drawUI();`); nl();
-  }
-
-  // (sortedUI declared above, before the game loop)
-
-  // ── Dynamic UI objects (mutable at runtime) ────────────────
+  // ── Dynamic UI objects (mutable at runtime) — MUST be before the game loop ──
   if (sortedUI.length) {
     w(`// ── UI Objects (mutate at runtime to animate / update) ──`);
-    // Collect unique custom fonts used by UI elements
     sortedUI.forEach(el => {
       const ff = el.fontFile && el.fontFile!=="default" ? el.fontFile : null;
       const vn = (el.name||el.type).replace(/\W+/g,"_").toLowerCase();
@@ -702,8 +648,6 @@ function generateProject(project, uploadedFiles=[]) {
       if (!seenScripts.has(fname)) {
         const uploaded = uploadedFiles.find(f => f.name === fname && f.cat === 'scripts');
         seenScripts.set(fname, uploaded ? uploaded.content : `// ${fname}\nexport function init(ctx){}\nexport function update(ctx,pad){}`);
-        const alias = fname.replace(/\W+/g,"_").replace(/\.js$/i,"").toLowerCase();
-        // Will need import — inject at top (we can't go back, so we note it)
       }
     });
 
@@ -715,11 +659,8 @@ function generateProject(project, uploadedFiles=[]) {
         const vn = (el.name||el.type).replace(/\W+/g,"_").toLowerCase();
         w(`    ${vn},`);
       });
-      // fonts sub-object (Text + Button elements)
       const fontEls = sortedUI.filter(el => el.type==="Text" || el.type==="Button");
       if (fontEls.length) {
-        w(`    // fonts — Font objects; mutate .color .scale .outline ──`);
-        w(`    // ctx.ui.fonts.score_label.color = Color.new(255,0,0,128);`);
         w(`    fonts: {`);
         fontEls.forEach(el => {
           const vn = (el.name||el.type).replace(/\W+/g,"_").toLowerCase();
@@ -727,9 +668,7 @@ function generateProject(project, uploadedFiles=[]) {
         });
         w(`    },`);
       }
-      // images sub-object (Image type elements)
       if (uiImageEls.length) {
-        w(`    // images — Image objects used in UI panels ──`);
         w(`    images: {`);
         uiImageEls.forEach((el,i) => {
           const vn = (el.name||el.type).replace(/\W+/g,"_").toLowerCase();
@@ -740,6 +679,58 @@ function generateProject(project, uploadedFiles=[]) {
       w(`};`); nl();
     }
   }
+
+  // Game loop
+  w(`// ─── Game Loop ─────────────────────────────────────────`);
+  w(`while (true) {`);
+  w(`    Screen.clear(gray);`);
+  w(`    Camera.update();`);
+  w(`    pad.update();`); nl();
+  if (scriptObjs.length) w(`    ctx.pad = pad;`); nl();
+
+  w(`    lx = ((pad.lx > 25 || pad.lx < -25) ? pad.lx : 0) / 1024.0;`);
+  w(`    ly = ((pad.ly > 25 || pad.ly < -25) ? pad.ly : 0) / 1024.0;`);
+  if (!camObj || !camObj.components.script) {
+    w(`    if (lx !== 0 || ly !== 0) { Camera.orbit(lx, ly); }`);
+    w(`    if (pad.pressed(Pads.R2)) { Camera.zoom(0.2); }`);
+    w(`    else if (pad.pressed(Pads.L2)) { Camera.zoom(-0.2); }`);
+  }
+  w(`    if (pad.justPressed(Pads.TRIANGLE)) { os.chdir(".."); std.reload("main.js"); }`); nl();
+
+  // Call update() for each scripted object, then auto-apply ctx-key → position binding.
+  // For rotation/scale/animation, scripts use ctx.RenderObjects.<name> directly — no binding needed.
+  if (scriptObjs.length) {
+    w(`    // ── Update behaviors ─────────────────────────────────`);
+    w(`    // ctx.RenderObjects / RenderDatas / textures / lights / sounds — direct refs.`);
+    w(`    // Pattern A (position shortcut): write ctx.player.x/y/z → auto-applied below.`);
+    w(`    // Pattern B (full control):      ctx.RenderObjects.player.rotation = {x,y,z};`);
+    scriptObjs.forEach(obj => {
+      const sc = obj.components.script;
+      const alias = sc.file.replace(/\W+/g,"_").replace(/\.js$/i,"").toLowerCase();
+      // ctxKey: explicit override or default to sanitized object name
+      const ctxKey = (sc.ctxKey||"").trim() || obj.name.replace(/\W+/g,"_").toLowerCase();
+      w(`    update_${alias}(ctx, pad);`);
+      // Pattern A auto-binding: position only (opt-in via ctx key)
+      if (obj.components.model && obj.components.model.file && obj._vn) {
+        w(`    if (ctx.${ctxKey} && ctx.${ctxKey}.x !== undefined)`);
+        w(`        ${obj._vn}.position = {x:ctx.${ctxKey}.x, y:ctx.${ctxKey}.y||0, z:ctx.${ctxKey}.z||0};`);
+      }
+    });
+    nl();
+  }
+
+  w(`    Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`,
+    `    Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`); nl();
+
+  modelObjs.forEach(obj => w(`    ${obj._vn || obj.name.replace(/\W+/g,"_").toLowerCase()}.render();`));
+  if (modelObjs.length) nl();
+
+  w(`    Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`); nl();
+
+  if (sortedUI && sortedUI.length) {
+    w(`    drawUI();`); nl();
+  }
+
   if (scene.showDebugInfo) {
     w(`    const _rs = Render.stats();`);
     w(`    const _ei = System.getCPUInfo();`);
@@ -1794,6 +1785,8 @@ function Inspector({selObj,selUI,selObjs,selIds,onUpdComp,onAddComp,onRemComp,on
     const allKeys=['transform','model','light','camera','sound','script','animator'];
     const sharedKeys=allKeys.filter(k=>selObjs.every(o=>o.components&&o.components[k]));
     const up=(ck,fld,val)=>onUpdComp(primObj.id,ck,fld,val);
+    const anyExportOff=selObjs.some(o=>o.exportEnabled===false);
+    const anyCtxOff=selObjs.some(o=>o.ctxEnabled===false);
     return(
       <div style={{...wStyle}}>
         <div style={sPH()}>
@@ -1801,25 +1794,47 @@ function Inspector({selObj,selUI,selObjs,selIds,onUpdComp,onAddComp,onRemComp,on
           <span style={{color:T.textMuted,fontSize:9}}>batch overwrite</span>
         </div>
         <div style={{flex:1,overflowY:"auto"}}>
+          {/* Export / ctx toggles — apply to all selected */}
+          <div style={{borderBottom:`1px solid ${T.border}`,padding:"8px 10px",background:T.bg2}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <Chk checked={!anyExportOff} onChange={v=>onUpdComp("__exportEnabled",primObj.id,null,v)}/>
+              <span style={{color:T.textHi,fontSize:11,fontWeight:700}}>Include in Export</span>
+              {anyExportOff&&<span style={{color:T.err,fontSize:9}}>some excluded</span>}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <Chk checked={!anyCtxOff} onChange={v=>onUpdComp("__ctxEnabled",primObj.id,null,v)}/>
+              <span style={{color:T.text,fontSize:11}}>Include in global ctx</span>
+              {anyCtxOff&&<span style={{color:T.warn,fontSize:9}}>some excluded</span>}
+            </div>
+          </div>
           <Sec title="Selection" color={T.warn}>
             <div style={{color:T.textMuted,fontSize:9,marginBottom:4,lineHeight:1.5}}>Shift/Ctrl+click to add/remove.<br/>All changes overwrite every selected object.</div>
-            {selObjs.map(o=><div key={o.id} style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
-              <span style={{color:OC[o.type]||T.text,fontSize:10}}>{OI[o.type]||"◇"}</span>
-              <span style={{color:T.text,fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.name}</span>
-            </div>)}
+            {selObjs.map(o=>{const dt=o.components?.camera?'camera':o.components?.light?'light':o.components?.model?'model':o.components?.sound?'sound':'empty';return(
+              <div key={o.id} style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
+                <span style={{color:OC[dt]||T.text,fontSize:10}}>{OI[dt]||"◇"}</span>
+                <span style={{color:T.text,fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.name}</span>
+              </div>);})}
           </Sec>
-          {sharedKeys.includes("transform")&&<Sec title="Transform (all)" color={CC.transform}>
-            <V3 label="Position" value={primObj.components.transform.position} onChange={(a,v)=>up("transform",`position.${a}`,v)}/>
-            <V3 label="Rotation" value={primObj.components.transform.rotation} degrees={true} onChange={(a,v)=>up("transform",`rotation.${a}`,v)}/>
-            <V3 label="Scale"    value={primObj.components.transform.scale}    onChange={(a,v)=>up("transform",`scale.${a}`,v)}/>
-          </Sec>}
+          {sharedKeys.includes("transform")&&(()=>{
+            const [degMode,setDegMode]=useState(true);
+            return <Sec title="Transform (all)" color={CC.transform}>
+              <V3 label="Position" value={primObj.components.transform.position} onChange={(a,v)=>up("transform",`position.${a}`,v)} onReset={()=>up("transform","position",{x:0,y:0,z:0})}/>
+              <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
+                <span style={{color:T.textMuted,fontSize:10,flex:1}}>Rotation</span>
+                <button onClick={()=>setDegMode(v=>!v)} style={sBtn({padding:"0 5px",fontSize:9,border:`1px solid ${T.border}`,color:T.textMuted})}>{degMode?'°':'rad'}</button>
+                <button onClick={()=>up("transform","rotation",{x:0,y:0,z:0})} title="Reset rotation" style={sBtn({padding:"0 4px",fontSize:9,border:"none",background:"transparent",color:T.textMuted})}>↺</button>
+              </div>
+              <V3 label="" value={primObj.components.transform.rotation} degrees={degMode} onChange={(a,v)=>up("transform",`rotation.${a}`,v)}/>
+              <V3 label="Scale" value={primObj.components.transform.scale} onChange={(a,v)=>up("transform",`scale.${a}`,v)} onReset={()=>up("transform","scale",{x:1,y:1,z:1})}/>
+            </Sec>;
+          })()}
           {sharedKeys.includes("model")&&<Sec title="Model (all)" color={CC.model}>
-            <FR label="File"><FSel value={primObj.components.model.file} onChange={v=>up("model","file",v)} files={bycat("models")} placeholder="(choose)"/></FR>
+            <FR label="OBJ File"><FSel value={primObj.components.model.file} onChange={v=>up("model","file",v)} files={bycat("models")} placeholder="(choose OBJ)"/></FR>
             <FR label="Texture"><FSel value={primObj.components.model.textureFile||""} onChange={v=>up("model","textureFile",v)} files={bycat("textures")} placeholder="(embedded)"/></FR>
-            <FR label="Pipeline"><select value={primObj.components.model.pipeline||"PL_DEFAULT"} onChange={e=>up("model","pipeline",e.target.value)} style={sInp()}><option value="PL_NO_LIGHTS">NO_LIGHTS</option><option value="PL_DEFAULT">DEFAULT</option><option value="PL_SPECULAR">SPECULAR</option></select></FR>
-            <FR label="Culling"><select value={primObj.components.model.face_culling||"CULL_FACE_BACK"} onChange={e=>up("model","face_culling",e.target.value)} style={sInp()}><option value="CULL_FACE_NONE">NONE</option><option value="CULL_FACE_BACK">BACK</option><option value="CULL_FACE_FRONT">FRONT</option></select></FR>
-            <FR label="Shade"><select value={primObj.components.model.shade_model||"SHADE_GOURAUD"} onChange={e=>up("model","shade_model",e.target.value)} style={sInp()}><option value="SHADE_GOURAUD">GOURAUD</option><option value="SHADE_FLAT">FLAT</option></select></FR>
-            <FR label="Filter"><select value={primObj.components.model.textureFilter||"LINEAR"} onChange={e=>up("model","textureFilter",e.target.value)} style={sInp()}><option value="LINEAR">LINEAR</option><option value="NEAREST">NEAREST</option></select></FR>
+            <FR label="Pipeline"><select value={primObj.components.model.pipeline||"PL_DEFAULT"} onChange={e=>up("model","pipeline",e.target.value)} style={sInp()}><option value="PL_NO_LIGHTS">PL_NO_LIGHTS</option><option value="PL_DEFAULT">PL_DEFAULT</option><option value="PL_SPECULAR">PL_SPECULAR</option></select></FR>
+            <FR label="Face Cull"><select value={primObj.components.model.face_culling||"CULL_FACE_NONE"} onChange={e=>up("model","face_culling",e.target.value)} style={sInp()}><option>CULL_FACE_NONE</option><option>CULL_FACE_BACK</option><option>CULL_FACE_FRONT</option></select></FR>
+            <FR label="Shade"><select value={primObj.components.model.shade_model||"SHADE_GOURAUD"} onChange={e=>up("model","shade_model",e.target.value)} style={sInp()}><option>SHADE_GOURAUD</option><option>SHADE_FLAT</option></select></FR>
+            <FR label="Tex Filter"><select value={primObj.components.model.textureFilter||"LINEAR"} onChange={e=>up("model","textureFilter",e.target.value)} style={sInp()}><option value="LINEAR">LINEAR (smooth)</option><option value="NEAREST">NEAREST (pixel)</option></select></FR>
             <FR label="Tex Map"><Chk checked={primObj.components.model.texture_mapping!==false} onChange={v=>up("model","texture_mapping",v)}/></FR>
             <FR label="Acc Clip"><Chk checked={!!primObj.components.model.accurate_clipping} onChange={v=>up("model","accurate_clipping",v)}/></FR>
           </Sec>}
@@ -1829,16 +1844,24 @@ function Inspector({selObj,selUI,selObjs,selIds,onUpdComp,onAddComp,onRemComp,on
             <RGB01 label="Diffuse"  value={primObj.components.light.diffuse}  onChange={(ch,v)=>up("light",`diffuse.${ch}`,v)}/>
             <RGB01 label="Specular" value={primObj.components.light.specular} onChange={(ch,v)=>up("light",`specular.${ch}`,v)}/>
           </Sec>}
+          {sharedKeys.includes("camera")&&<Sec title="Camera (all)" color={CC.camera}>
+            <FR label="FOV"><TF type="number" min={20} max={150} value={primObj.components.camera.fov||60} onChange={v=>up("camera","fov",v)}/></FR>
+            <FR label="Near"><TF type="number" step={0.1} value={primObj.components.camera.near||1} onChange={v=>up("camera","near",v)}/></FR>
+            <FR label="Far"><TF type="number" value={primObj.components.camera.far||4000} onChange={v=>up("camera","far",v)}/></FR>
+            <V3 label="Target" value={primObj.components.camera.target||v3()} onChange={(a,vl)=>up("camera",`target.${a}`,vl)}/>
+          </Sec>}
           {sharedKeys.includes("sound")&&<Sec title="Sound (all)" color={CC.sound}>
-            <FR label="File"><FSel value={primObj.components.sound.file} onChange={v=>up("sound","file",v)} files={bycat("sounds")} placeholder="(choose)"/></FR>
-            <FR label="Volume"><TF type="number" value={primObj.components.sound.volume} onChange={v=>up("sound","volume",v)}/></FR>
+            <FR label="File"><FSel value={primObj.components.sound.file} onChange={v=>up("sound","file",v)} files={bycat("sounds")} placeholder="(choose audio)"/></FR>
+            <FR label="Volume"><TF type="number" min={0} max={100} value={primObj.components.sound.volume} onChange={v=>up("sound","volume",v)}/></FR>
             <FR label="Loop"><Chk checked={primObj.components.sound.loop} onChange={v=>up("sound","loop",v)}/></FR>
+            <FR label="Play On Start"><Chk checked={primObj.components.sound.playOnStart} onChange={v=>up("sound","playOnStart",v)}/></FR>
           </Sec>}
           {sharedKeys.includes("script")&&<Sec title="Script (all)" color={CC.script}>
-            <FR label="File"><select value={primObj.components.script.file||""} onChange={e=>up("script","file",e.target.value)} style={sInp()}><option value="">— none —</option>{bycat("scripts").map(f=><option key={f.id} value={f.name}>{f.name}</option>)}</select></FR>
+            <FR label="File"><select value={primObj.components.script.file||""} onChange={e=>up("script","file",e.target.value)} style={sInp()}><option value="">— select script —</option>{bycat("scripts").map(f=><option key={f.id} value={f.name}>{f.name}</option>)}</select></FR>
+            <FR label="ctx key"><TF value={primObj.components.script.ctxKey||""} onChange={v=>up("script","ctxKey",v)} placeholder={primObj.name.replace(/\W+/g,"_").toLowerCase()}/></FR>
           </Sec>}
           {sharedKeys.includes("animator")&&<Sec title="Animator (all)" color={CC.animator}>
-            <FR label="File"><FSel value={primObj.components.animator.file} onChange={v=>up("animator","file",v)} files={bycat("models")} placeholder="(choose GLTF)"/></FR>
+            <FR label="GLTF"><FSel value={primObj.components.animator.file} onChange={v=>up("animator","file",v)} files={bycat("models")} placeholder="(choose GLTF)"/></FR>
             <FR label="Anim"><TF value={primObj.components.animator.defaultAnim} onChange={v=>up("animator","defaultAnim",v)}/></FR>
             <FR label="Loop"><Chk checked={primObj.components.animator.loop} onChange={v=>up("animator","loop",v)}/></FR>
           </Sec>}
@@ -2043,7 +2066,7 @@ function Inspector({selObj,selUI,selObjs,selIds,onUpdComp,onAddComp,onRemComp,on
   return(
     <div style={{...wStyle}}>
       <div style={{...sPH(),gap:6}}>
-        <span style={{color:T.textHi,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{OI[obj.type]||"◇"} {obj.name}</span>
+        <span style={{color:T.textHi,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{OI[obj.components?.camera?'camera':obj.components?.light?'light':obj.components?.model?'model':obj.components?.sound?'sound':'empty']||"◇"} {obj.name}</span>
         <span style={{color:T.textMuted,fontSize:10,flexShrink:0}}>{obj.type}</span>
       </div>
       <div style={{flex:1,overflowY:"auto"}}>
@@ -6697,7 +6720,8 @@ function OItem({obj,depth,sel,selIds,onSel,onToggleSel,onRangeSel,onDel,onToggle
   const [confirmDel,setConfirmDel]=useState(false);
   const isSel=selIds&&selIds.length?selIds.includes(obj.id):obj.id===sel;
   const isPrimary=obj.id===sel;
-  const col=OC[obj.type]||T.empty;
+  const displayType=obj.components?.camera?'camera':obj.components?.light?'light':obj.components?.model?'model':obj.components?.sound?'sound':'empty';
+  const col=OC[displayType]||T.empty;
   const commit=()=>{setEd(false);if(v.trim())onRename(obj.id,v.trim());};
   return <>
     <div onClick={e=>{
@@ -6710,7 +6734,7 @@ function OItem({obj,depth,sel,selIds,onSel,onToggleSel,onRangeSel,onDel,onToggle
         background:confirmDel?T.err+"22":isSel?T.sel:"transparent",
         borderLeft:isPrimary?`2px solid ${T.accent}`:isSel?`2px solid ${T.accentDim}`:"2px solid transparent",
         color:isSel?T.textHi:T.text,fontSize:12,gap:5,userSelect:"none"}}>
-      <span style={{color:col,fontSize:12,flexShrink:0}}>{OI[obj.type]||"◇"}</span>
+      <span style={{color:col,fontSize:12,flexShrink:0}}>{OI[displayType]||"◇"}</span>
       {ed?<input autoFocus value={v} onChange={e=>setV(e.target.value)} onBlur={commit}
         onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape")setEd(false);}}
         style={{...sInp({padding:"0 2px",fontSize:12,width:"100%"})}} onClick={e=>e.stopPropagation()}/>
@@ -7011,7 +7035,7 @@ function StatusBar({activeScene,selObj,selIds,selUI,tab,uploadedFiles,clipboardC
     </>}
     {selUI&&<><span style={{color:T.textMuted}}>|</span><span style={{color:UIC[selUI.type]||T.text}}>{selUI.name||selUI.type}</span><span>x:{selUI.x} y:{selUI.y} w:{selUI.width} h:{selUI.height}</span></>}
     {clipboardCount>0&&<span style={{color:T.success}}>📋 {clipboardCount} in clipboard</span>}
-    <span style={{marginLeft:"auto",color:T.textMuted,fontSize:8,letterSpacing:"0.05em",flexShrink:0}}>v2026-03-30-21-13-GMT</span>
+    <span style={{marginLeft:"auto",color:T.textMuted,fontSize:8,letterSpacing:"0.05em",flexShrink:0}}>v2026-03-31-00-10-GMT</span>
   </div>;
 }
 
