@@ -36,6 +36,7 @@ Deno.test("the local server cannot serve files outside its workspace", () => {
       "/../outside.txt",
       "/a/../../outside.txt",
       "/..\\outside.txt",
+      "/a\\..\\..\\outside.txt",
     ]
   ) assertEquals(servedPath(root, path), null);
 });

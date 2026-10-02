@@ -54,7 +54,10 @@ const mimeOf = (path) =>
 
 export function servedPath(root, path) {
   const base = resolve(root).replace(/\\/g, "/");
-  const full = resolve(root, `.${path}`).replace(/\\/g, "/");
+  // Normalize URL separators before resolving dot segments. Doing this after
+  // resolve leaves /..\\outside as a literal filename on POSIX, then turns it
+  // into an escaping path after the workspace-prefix check has been bypassed.
+  const full = resolve(root, `.${path.replace(/\\/g, "/")}`).replace(/\\/g, "/");
   return full === base || full.startsWith(`${base}/`) ? full : null;
 }
 
