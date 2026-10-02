@@ -8,6 +8,8 @@ Its Render module does **not** export SHADE_FLAT or SHADE_GOURAUD. Assign
 `RenderData.shade_model = 0` for Flat and `= 1` for Gouraud (GS IIP values).
 Assigning an undefined constant silently selects Flat. The release exports the
 same numeric values on Draw, but numeric assignments avoid the missing Render exports.
+Live silhouette passes must also restore the numeric choice after temporarily
+selecting Flat. Restoring Render.SHADE_GOURAUD selects Flat again on every frame.
 
 The RenderData constructor resets supplied Image filters to LINEAR
 (`src/js_api/ath_render.c`, lines 373 and 405 in the release commit). Apply each

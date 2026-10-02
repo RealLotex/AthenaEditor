@@ -1,0 +1,138 @@
+{
+  "verifiedOn": "2026-10-02",
+  "environment": "PCSX2 2.6.3, hardware renderer; not real PS2",
+  "athena": {
+    "tag": "latest",
+    "releaseId": 363587511,
+    "releasePublished": "2026-08-01",
+    "elfSHA256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84"
+  },
+  "executions": [
+    {
+      "case": "exact-scene-fixed",
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "frames": 600,
+      "stayedRunning": true
+    },
+    {
+      "case": "side-scroller-16s",
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "frames": 600,
+      "stayedRunning": true
+    },
+    {
+      "case": "sky-shadow-terrain-16s",
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "frames": 600,
+      "stayedRunning": true
+    },
+    {
+      "case": "sky-shadow-terrain-32",
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 0,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 0,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "frames": 600,
+      "stayedRunning": true
+    }
+  ],
+  "persistentShadowSettings": [
+    {
+      "case": "sky-shadow-terrain-16s",
+      "frames": 600,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "data": {
+        "prototype_sphere_data": {
+          "shade": 1,
+          "filter": 0
+        },
+        "prototype_sphere_data_2": {
+          "shade": 0,
+          "filter": 0
+        },
+        "terrain_data": {
+          "shade": 1,
+          "filter": 0
+        }
+      },
+      "stayedRunning": true
+    },
+    {
+      "case": "sky-shadow-terrain-32",
+      "frames": 600,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 0,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 0,
+        "zbuffering": true,
+        "double_buffering": true
+      },
+      "data": {
+        "prototype_sphere_data": {
+          "shade": 1,
+          "filter": 0
+        },
+        "prototype_sphere_data_2": {
+          "shade": 0,
+          "filter": 0
+        },
+        "terrain_data": {
+          "shade": 1,
+          "filter": 0
+        }
+      },
+      "stayedRunning": true
+    }
+  ]
+}

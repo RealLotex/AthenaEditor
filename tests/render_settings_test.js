@@ -40,3 +40,25 @@ Deno.test("embedded filtering applies to every material texture without recreati
   assertEquals(images.map(image=>image.filter),[1,0,0]);
   assertEquals(datas.map(data=>data.shade_model),[1,0,1]);
 });
+
+Deno.test("live shadow passes restore Gouraud and Flat after every silhouette render",()=>{
+  const p=A.mkProject(),sc=p.scenes[0];
+  for(const shade of ["SHADE_GOURAUD","SHADE_FLAT"]) {
+    const obj=A.mkObject(shade);obj.components.model={...A.makeComponent("model"),file:"cube.obj",shade_model:shade};
+    obj.components.shadow=A.makeComponent("shadow");sc.objects.push(obj);
+  }
+  const ir=A.resolveScene(p,sc,[]),e=new A.Emitter();A.emitShadowPass(e,ir);
+  const names=["Screen","Camera","Draw","Color","Render"],values=[
+    {switchContext(){},setBuffer(){}},{save:()=>({}),target(){},position(){},update(){},restore(){}},
+    {rect(){}},{new:()=>0},{PL_DEFAULT:1,PL_NO_LIGHTS:0,setView(){}},
+  ];
+  const datas=[];let renders=0;
+  for(const pass of ir.shadowPasses) {
+    const data={shade_model:pass.caster.rd.model.shade_model==="SHADE_FLAT"?0:1,pipeline:1,texture_mapping:true};datas.push(data);
+    names.push(pass.rtVN,pass.caster.vn,pass.caster.rd.dataVN);
+    values.push({}, {position:{x:0,y:1,z:0},render(){assertEquals(data.shade_model,0);assertEquals(data.texture_mapping,false);renders++;}}, data);
+  }
+  new Function(...names,e.toString()+"\n_shadowPass();_shadowPass();")(...values);
+  assertEquals(renders,4);assertEquals(datas.map(d=>d.shade_model),[1,0]);
+  assertEquals(datas.map(d=>[d.pipeline,d.texture_mapping]),[[1,true],[1,true]]);
+});

@@ -170,11 +170,11 @@ function emitShadowPass(e, ir) {
       b.w(`}`);
       b.comment("Flatten the caster to a solid silhouette, then put it back");
       b.w(`${data.dataVN}.texture_mapping = false;`);
-      b.w(`${data.dataVN}.shade_model = Render.SHADE_FLAT;`);
+      b.w(`${data.dataVN}.shade_model = 0;`);
       b.w(`${data.dataVN}.pipeline = Render.PL_NO_LIGHTS;`);
       b.w(`${s.caster.vn}.render();`);
       b.w(`${data.dataVN}.texture_mapping = ${m.texture_mapping !== false};`);
-      b.w(`${data.dataVN}.shade_model = Render.${m.shade_model || "SHADE_GOURAUD"};`);
+      b.w(`${data.dataVN}.shade_model = ${m.shade_model === "SHADE_FLAT" ? 0 : 1};`);
       b.w(`${data.dataVN}.pipeline = Render.${m.pipeline || "PL_DEFAULT"};`);
       b.nl();
     }

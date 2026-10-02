@@ -7,7 +7,7 @@
 <!--
   GENERATED FILE — do not edit.
   Source lives in src/. Rebuild with:  deno task build
-  Build: v2026-10-02-22-19-GMT
+  Build: v2026-10-02-22-26-GMT
   Bundled dependencies:
 React 18.2.0 / React DOM 18.2.0
 Copyright (c) Facebook, Inc. and its affiliates.
@@ -5932,7 +5932,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 <script>
-window.__ATHENA_BUILD__ = "v2026-10-02-22-19-GMT";
+window.__ATHENA_BUILD__ = "v2026-10-02-22-26-GMT";
 
 // ══════════════════════════════════════════════════════════════════
 // src/core/util.js
@@ -13794,11 +13794,11 @@ function emitShadowPass(e, ir) {
       b.w(`}`);
       b.comment("Flatten the caster to a solid silhouette, then put it back");
       b.w(`${data.dataVN}.texture_mapping = false;`);
-      b.w(`${data.dataVN}.shade_model = Render.SHADE_FLAT;`);
+      b.w(`${data.dataVN}.shade_model = 0;`);
       b.w(`${data.dataVN}.pipeline = Render.PL_NO_LIGHTS;`);
       b.w(`${s.caster.vn}.render();`);
       b.w(`${data.dataVN}.texture_mapping = ${m.texture_mapping !== false};`);
-      b.w(`${data.dataVN}.shade_model = Render.${m.shade_model || "SHADE_GOURAUD"};`);
+      b.w(`${data.dataVN}.shade_model = ${m.shade_model === "SHADE_FLAT" ? 0 : 1};`);
       b.w(`${data.dataVN}.pipeline = Render.${m.pipeline || "PL_DEFAULT"};`);
       b.nl();
     }

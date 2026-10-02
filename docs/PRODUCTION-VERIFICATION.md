@@ -25,6 +25,7 @@ Run uses that ELF unless a custom runtime has been selected.
   shading, pipeline and texture-mapping changes without requiring another paint stroke.
 - Gouraud and Flat emit numeric GS IIP values 1 and 0. The released Render module does
   not expose the SHADE constants previously used; undefined was silently interpreted as Flat.
+  The silhouette pass restores this numeric choice after every shadow render.
 - The sky masks writes to the main depth buffer, uses DEPTH_ALWAYS, then restores
   normal writes before geometry. Sky and live shadows share one buffer initialization.
   CT16S + Z16S remains available with its original VRAM footprint.
@@ -46,8 +47,11 @@ running until the test stopped its own process:
 | Same combined scene, control format | CT32 / Z32 | Passed |
 
 Runtime probes also confirmed sphere/terrain Image.filter = 0 (NEAREST), Gouraud = 1
-and Flat = 0. Earlier comparison probes reproduced Flat = 0 for both old SHADE constant
+and Flat = 0. A further two-caster live-shadow check confirmed those values persist
+at frame 600 in both CT16S/Z16S and CT32/Z32. Earlier comparison probes reproduced Flat = 0 for both old SHADE constant
 assignments. These are emulator checks; real PS2 hardware was not tested.
+The [numeric readbacks](verification/render-settings.json) retain the modes,
+frame counts, filters and shading values without the private project or dumps.
 
 Browser checks verified HUD menu Copy, Ctrl+D, consecutive Ctrl+V without extra copies,
 and Ctrl+V within a text property without creating HUD elements. No console warnings/errors.
@@ -101,7 +105,7 @@ The actual keyboard and native Copy handlers are also exercised in the regressio
 
 ## Automated suite
 
-`deno task check`: **538 passed, 0 failed**. The suite covers project migration,
+`deno task check`: **539 passed, 0 failed**. The suite covers project migration,
 generation, hierarchy, physics/shadow math, viewport geometry/resources, fonts, terrain,
 prefabs, assets, history, folder operations, project replacement, saves, launcher isolation
 and exported bundles. The added UX tests cover creation, dialog focus, cancellation,
