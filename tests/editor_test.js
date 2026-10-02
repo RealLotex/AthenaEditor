@@ -149,12 +149,8 @@ Deno.test("system clipboard transfers objects and assets between editors as one 
   };
   const source = editor({ navigator: { clipboard } });
   source.command("add.model");
-  await source.find("Navigator").onDropAssets({
-    files: [new File(["v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"], "copy.obj")],
-  });
-  source.render();
-  const id = source.project.scenes[0].objects.at(-1).id;
-  source.find("Inspector").onUpdateComponent(id, "model", "file", "copy.obj");
+  await source.find("ModelPicker").onImport(new File(["v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"], "copy.obj"));
+  source.find("ModelPicker").onClose();
   source.render();
   await source.command("edit.copy");
   const target = editor({ navigator: { clipboard } });
@@ -317,8 +313,10 @@ Deno.test("View can reopen closed panels and workspace shortcuts expand collapse
 
 Deno.test("app texture tools commit generated files and model assignments as one undo step", () => {
   const e = editor();
-  e.command("add.model");
+  e.command("add.empty");
   const id = e.project.scenes[0].objects.at(-1).id;
+  e.find("Inspector").onAddComponent(id, "model");
+  e.render();
   e.command("tools.textures");
   const model = {
     ...e.makeComponent("model"),
@@ -353,6 +351,72 @@ Deno.test("app texture tools commit generated files and model assignments as one
     e.project.scenes[0].objects.at(-1).components.model.file,
     "generated.obj",
   );
+});
+
+Deno.test("Add model waits for a file, imports and places it as one undo step, and cancellation leaves the scene intact", async () => {
+  const e = editor(), before = JSON.stringify(e.project);
+  e.command("add.model");
+  assertEquals(JSON.stringify(e.project), before);
+  e.find("ModelPicker").onClose(); e.render();
+  assertEquals(JSON.stringify(e.project), before);
+  e.command("add.model");
+  const picker = e.find("ModelPicker");
+  await picker.onImport(new File(["v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"], "Placed.obj"));
+  picker.onClose(); e.render();
+  assertEquals(e.project.assets.length, 1);
+  assertEquals(e.find("Inspector").activeObject.components.model.file, "Placed.obj");
+  e.command("edit.undo");
+  assertEquals(JSON.stringify(e.project), before);
+  assertEquals(e.find("SceneTools").hasSelection, false);
+  e.command("edit.redo");
+  assertEquals(e.project.assets.length, 1);
+  const object = e.project.scenes[0].objects.at(-1);
+  assertEquals(object.components.model.file, "Placed.obj");
+});
+
+Deno.test("model import rejects unreadable files and cannot place a late file into a different scene", async () => {
+  const e = editor(), before = JSON.stringify(e.project);
+  e.command("add.model");
+  try { await e.find("ModelPicker").onImport(new File(["not a model"], "invalid.obj")); assert(false); }
+  catch (error) { assert(error.message.includes("could not be read")); }
+  assertEquals(JSON.stringify(e.project), before);
+  let finish;
+  const pending = e.find("ModelPicker").onImport({ name: "late.obj", text: () => new Promise(resolve => { finish = resolve; }) });
+  e.command("file.newscene");
+  const after = JSON.stringify(e.project);
+  finish("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+  assertEquals(await pending, false);
+  assertEquals(JSON.stringify(e.project), after);
+});
+
+Deno.test("placing a library model uses the drop position, selects it and preserves assets through undo", async () => {
+  const e = editor();
+  await e.find("Navigator").onDropAssets({ files: [new File(["v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"], "chair.obj")] }); e.render();
+  const before = JSON.stringify(e.project), asset = e.find("Navigator").files[0];
+  e.find("Viewport").onPlaceAsset(asset, { x: 3, y: 0, z: -2 }); e.render();
+  const obj = e.find("Inspector").activeObject;
+  assertEquals(obj.components.model.file, "chair.obj");
+  assertEquals(obj.components.transform.position, { x: 3, y: 0, z: -2 });
+  e.command("edit.undo");
+  assertEquals(JSON.stringify(e.project), before);
+  e.command("add.model");
+  e.find("ModelPicker").onChoose(asset); e.render();
+  assertEquals(e.find("Inspector").activeObject.components.model.file, "chair.obj");
+});
+
+Deno.test("standalone Run gives an actionable export route and downloaded saves have their own status", async () => {
+  const e = editor();
+  assertEquals(e.find("MenuBar").canRunLocally, false);
+  await e.command("file.play"); e.render();
+  assertEquals(e.find("PlaySettingsModal").localAvailable, false);
+  e.find("PlaySettingsModal").onExport(); e.render();
+  // Export finishes asynchronously because it checks for a linked folder.
+  await Promise.resolve(); await Promise.resolve(); e.render();
+  assert(e.find("ExportModal"));
+  await e.command("file.save"); e.render();
+  assertEquals(e.find("StatusBar").downloadedFileName, e.downloads[0].name);
+  assertEquals(e.find("StatusBar").dirty, false);
+  for (const download of e.downloads) URL.revokeObjectURL(download.href);
 });
 
 Deno.test("app script edits coalesce for undo and attachment is saved on the selected object", () => {

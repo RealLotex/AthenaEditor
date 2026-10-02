@@ -1,7 +1,9 @@
 # Production review — 2026-10-02
 
-The standalone editor is built from the committed source. The current UX review used
-Deno 2.9.2 and a Chromium browser, including Run/Stop through the local PCSX2 launcher.
+The standalone editor is built from the committed source; index.html is synchronized
+with that build. The current UX review used Deno 2.9.2 and a Chromium browser, including
+Run/Stop through the local PCSX2 launcher. The baseline was bdb36e2; the existing
+playable-start and focused-workspace redesign was reviewed and extended.
 The console execution fixtures below were recorded on October 1 with PCSX2 2.6.3
 and the bundled AthenaEnv player; those longer fixtures were not rerun for the UX changes.
 
@@ -11,7 +13,8 @@ and the bundled AthenaEnv player; those longer fixtures were not rerun for the U
   Name/Enter, busy state and cancellation preserve a predictable creation flow.
 - New projects enter Focus even after a customized layout. Selection reveals Properties;
   object/HUD creation uses a scoped picker, with seven common objects shown first.
-- Save, Export and Run remain together across tools. Scene transforms require a selection;
+- Save and Export remain available across tools; Run is primary in the local installation,
+  while Export is primary on the hosted site and standalone file. Scene transforms require a selection;
   scene options and less common properties appear when requested or needed for an error.
 - Property search follows the selection, mixed values are explicit, and changing one axis
   in a multi-selection preserves each object's other axes. Panel tabs support keyboard navigation.
@@ -35,29 +38,51 @@ and the bundled AthenaEnv player; those longer fixtures were not rerun for the U
   reduced-motion support.
 - Build replacement is atomic. Test staging refuses to replace directories it does not own.
 - CI rebuilds and tests before Pages deployment; its public artifact contains only the editor.
+- Assets starts with all files, including subfolders; folder filtering is optional and
+  search spans the library. Selecting a file retains a relevant filter.
+- Add a model chooses a real asset or imports and places one in one undo step. Cancellation,
+  invalid OBJ input, retry and an import finishing in another project/scene are handled.
+- Models can be dragged to visible scene surfaces, with ground fallback, base compensation
+  and the current snapping setting. Undo removes the placement and its transformation tools.
+- Menus close outside their task; Escape restores focus. Keyboard navigation and dialog
+  focus exclude controls inside closed disclosures, even when the browser reports their rectangles.
+- Small object/asset lists omit search. Duplicate empty-state actions and hidden-button
+  space were removed. Narrow panels retain readable object names and tab labels.
+- Download fallback status distinguishes the request from an actual saved file. Web Run
+  opens useful local-installation guidance with a direct Export action.
 
 ## Automated suite
 
-`deno task check`: **518 passed, 0 failed**. The suite covers project migration,
+`deno task check`: **528 passed, 0 failed**. The suite covers project migration,
 generation, hierarchy, physics/shadow math, viewport geometry/resources, fonts, terrain,
 prefabs, assets, history, folder operations, project replacement, saves, launcher isolation
 and exported bundles. The added UX tests cover creation, dialog focus, cancellation,
-scoped object/HUD choices, contextual actions, selection and shared properties. Editor
+scoped object/HUD choices, contextual actions, selection and shared properties. New
+regressions cover library navigation, import/placement history, scene drop positions,
+transient popovers, web Run and download status. Editor
 callback tests execute the actual command handlers; they do not emulate React effects
 or native picker dialogs.
 
 ## Browser checks
 
-Verified first run, project creation with name/Enter and the default playable template,
-Focus layout, scoped Add object, selecting an added object, contextual transforms, numeric
-edits and undo, Scene options, editing the active camera, Sky beside the scene, Run/Stop,
-export summary/details, initial dialog focus and Escape restoring the opener. Cancelling
-replacement preserved the current project and its unsaved state. The workspace was also
-checked at 1024×768 and 760×680. Final session console: **0 warnings/errors**.
+Verified first run and name/Enter creation; existing playable-start and Focus layout;
+model chooser cancellation, invalid OBJ import followed by a successful retry, immediate
+selection/properties and one-step undo; dragging an existing model onto the ground and
+undoing it; numeric editing; Scene options; File-menu arrows/Home/End and Escape focus
+restoration; local Run/Stop; export readiness with details collapsed. The service-free
+version was checked separately: Export is primary, F5 opens Run on your computer and its
+Export action reaches a ready export. No local-launch request or configuration form appears.
+
+The workspace was checked at 1280×720, 1024×768 and 760×680. A final CSS pass removed
+hidden-button space and confirmed readable object names/tabs in the narrow view. Final
+local and service-free sessions: **0 warnings/errors**. The full suite passed before
+this last CSS-only pass; the final standalone build was rebuilt afterwards.
 
 Browser backup recovery and the other production behaviours above also retain their
-October 1 evidence and automated coverage. The screenshots below are from the final
-October 2 build.
+October 1 evidence and automated coverage. Earlier October 2 checks also covered
+replacement cancellation, active-camera editing and Sky beside the scene. Workspace,
+library, responsive and export screenshots below show this final build; sky.jpg records
+the earlier October 2 review of the unchanged sky interface.
 
 The embedded browser did not expose the export download event. The ZIP's actual byte
 structure, scene entries and payloads are covered separately by automated tests. Native
@@ -65,7 +90,8 @@ file/folder dialogs were not automated; the logic after picker selection and can
 saves is covered by tests.
 
 ![Scene workspace](verification/workspace.jpg)
-![Sky selection beside its immediate preview](verification/sky.jpg)
+![All assets with contextual properties](verification/library.jpg)
+![Readable narrow workspace at 760 by 680](verification/responsive.jpg)
 ![Export with details collapsed](verification/export.jpg)
 
 ## Actual console-player execution

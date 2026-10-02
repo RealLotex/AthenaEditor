@@ -1,9 +1,10 @@
-function PlaySettingsModal({ onClose, onReady }) {
+function PlaySettingsModal({ onClose, onReady, localAvailable = true, onExport }) {
   const [settings, setSettings] = useState(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (!localAvailable) { setLoading(false); return; }
     let cancelled = false;
     editorPlayRequest("status")
       .then((next) => { if (!cancelled) setSettings(next); })
@@ -25,12 +26,15 @@ function PlaySettingsModal({ onClose, onReady }) {
   };
   return (
     <Modal
-      title="Run in PCSX2"
+      title={localAvailable ? "Run in PCSX2" : "Run on your computer"}
       onClose={onClose}
       width={530}
+      canDismiss={!busy}
       footer={
         <>
-          <button className="a-btn" onClick={onClose}>Cancel</button>
+          <span className="a-grow" />
+          <button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>{localAvailable ? "Cancel" : "Close"}</button>
+          {!localAvailable && <button className="a-btn a-btn--primary" onClick={onExport}>Export game…</button>}
           {settings && (
             <button
               className="a-btn a-btn--primary"
@@ -43,6 +47,10 @@ function PlaySettingsModal({ onClose, onReady }) {
         </>
       }
     >
+      {!localAvailable && <>
+        <p className="a-run-status">Open <strong>Start AthEditor.vbs</strong> in your editor folder to try your game in PCSX2.</p>
+        <p className="a-dim">You can keep editing and export your game here.</p>
+      </>}
       {loading && <p role="status">Checking PCSX2…</p>}
       {settings && (
         <>

@@ -3,6 +3,7 @@ import * as esbuild from "npm:esbuild@0.24.0";
 
 const source = (await Promise.all([
   "ui/modal.jsx",
+  "ui/popover.js",
   "ui/palette.jsx",
   "panels/scenetools.jsx",
 ].map(async (path) => {

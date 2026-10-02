@@ -23,6 +23,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
     gesture = useRef(null),
     current = useRef(layout);
   current.current = layout;
+  useDetailsPopovers(root, ".a-dock-options");
   const parking = useRef(null), windows = useRef(new Map()), callbacks = useRef({});
   callbacks.current = { onKeyDown, onPaste, onWindowFocus, onError };
   const [external, setExternal] = useState([]);

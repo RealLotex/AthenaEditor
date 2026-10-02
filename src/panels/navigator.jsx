@@ -48,30 +48,40 @@ function Navigator({
   }, [tree, folder]);
   useEffect(() => {
     const asset = files.find((f) => f.id === selectedAssetId);
-    if (asset) setFolder(assetLibraryFolder(asset));
+    if (asset && folder && !assetLibraryFolder(asset).startsWith(folder + "/") && assetLibraryFolder(asset) !== folder) setFolder("");
   }, [selectedAssetId]);
   useEffect(() => {
     const asset = files.find((f) => f.name === revealAssetName);
     if (asset) {
-      setFolder(assetLibraryFolder(asset));
+      setFolder("");
       setQuery("");
     }
   }, [revealAssetName]);
   const q = query.trim().toLowerCase();
   const shown = files.filter((f) =>
-    q ? f.name.toLowerCase().includes(q) : assetLibraryFolder(f) === folder
+    q ? f.name.toLowerCase().includes(q) : !folder || assetLibraryFolder(f) === folder || assetLibraryFolder(f).startsWith(folder + "/")
   ).sort((a, b) => a.name.localeCompare(b.name));
-  const children = tree.filter((f) =>
-    f.path.split("/").slice(0, -1).join("/") === folder
-  );
   const assetCard = (f) => {
     const meta = CAT_META[f.cat] || CAT_META.other;
     return (
       <button
         key={f.id}
         className={`a-asset${selectedAssetId === f.id ? " a-asset--sel" : ""}`}
+        aria-label={f.name}
+        aria-pressed={selectedAssetId === f.id}
+        draggable={f.cat === "models" && !f.error}
+        onDragStart={(e) => {
+          if (f.cat !== "models" || f.error) return;
+          e.dataTransfer.setData(MODEL_DRAG_TYPE, f.id);
+          e.dataTransfer.effectAllowed = "copy";
+        }}
         onClick={() => onSelectAsset(f.id)}
         onDoubleClick={() => onOpenAsset?.(f)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && onOpenAsset && ["models", "scripts", "textures"].includes(f.cat)) {
+            e.preventDefault(); e.stopPropagation(); onOpenAsset(f);
+          }
+        }}
         title={`${f.name}\n${fmtBytes(f.size)}${f.error ? `\n${f.error}` : ""}`}
       >
         {f.cat === "textures" && f.dataUrl
@@ -86,7 +96,7 @@ function Navigator({
           )}
         <span className="a-asset__name">{f.name}</span>
         <span className="a-asset__meta">
-          {q ? assetLibraryFolder(f) : fmtBytes(f.size)}
+          {f.error ? "Needs attention" : ASSET_CATEGORY_LABELS[f.cat] || "Other"}
         </span>
       </button>
     );
@@ -120,32 +130,7 @@ function Navigator({
       {tab === "assets"
         ? (
           <>
-            <div className="a-library-bar">
-              <nav className="a-library-breadcrumb" aria-label="Asset folder">
-                <button
-                  {...dropProps("")}
-                  onClick={() => {
-                    setFolder("");
-                    setQuery("");
-                  }}
-                >
-                  Assets
-                </button>
-                {!q &&
-                  folder.split("/").filter(Boolean).map((part, i, parts) => (
-                    <React.Fragment key={i}>
-                      <span>/</span>
-                      <button
-                        {...dropProps(parts.slice(0, i + 1).join("/"))}
-                        onClick={() =>
-                          setFolder(parts.slice(0, i + 1).join("/"))}
-                      >
-                        {part}
-                      </button>
-                    </React.Fragment>
-                  ))}
-                {q && <span className="a-dim">/ Search results</span>}
-              </nav>
+            {(files.length > 8 || query) && <div className="a-library-bar">
               <input
                 className="a-input a-library-search"
                 aria-label="Search assets"
@@ -153,71 +138,32 @@ function Navigator({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </div>
+            </div>}
+            {!!tree.length && <details className="a-library-filter a-disclosure">
+              <summary>{folder && !q ? folder : "Browse folders"}</summary>
+              <select className="a-select" aria-label="Filter assets by folder" value={folder}
+                onChange={(e) => { setFolder(e.target.value); setQuery(""); }}>
+                <option value="">All assets</option>
+                {tree.map(f => <option key={f.path} value={f.path}>{f.path}</option>)}
+              </select>
+              {!!folder && <button className="a-btn a-btn--ghost" onClick={() => { setFolder(""); setQuery(""); }}>Show all assets</button>}
+            </details>}
             <div className="a-library">
-              <nav
-                className="a-library-folders a-scroll"
-                aria-label="Asset folders"
-              >
-                <button
-                  {...dropProps("")}
-                  className={`a-folder-row${
-                    !folder ? " a-folder-row--on" : ""
-                  }`}
-                  onClick={() => {
-                    setFolder("");
-                    setQuery("");
-                  }}
-                >
-                  All assets<span>{files.length}</span>
-                </button>
-                {tree.map((f) => (
-                  <button
-                    {...dropProps(f.path)}
-                    key={f.path}
-                    className={`a-folder-row${
-                      folder === f.path ? " a-folder-row--on" : ""
-                    }`}
-                    style={{ paddingLeft: 12 + f.depth * 12 }}
-                    title={f.path}
-                    onClick={() => {
-                      setFolder(f.path);
-                      setQuery("");
-                    }}
-                  >
-                    <FolderIcon />
-                    <span className="a-folder-label">{f.label}</span>
-                    <span>{f.count}</span>
-                  </button>
-                ))}
-              </nav>
               <div className="a-scroll a-library-content">
                 {!files.length
                   ? (
                     <Empty>
-                      No assets yet. Add a primitive or import a folder.
+                      <p>Add models, images or scripts to your game.</p>
+                      <button className="a-btn" disabled={loading} onClick={onOpenFolder}>Import assets…</button>
                     </Empty>
                   )
                   : (
                     <div className="a-assets">
-                      {!q &&
-                        children.map((f) => (
-                          <button
-                            {...dropProps(f.path)}
-                            className="a-asset a-asset--folder"
-                            key={f.path}
-                            onClick={() => setFolder(f.path)}
-                          >
-                            <FolderIcon />
-                            <span className="a-asset__name">{f.label}</span>
-                            <span className="a-asset__meta">
-                              {f.count} asset{f.count === 1 ? "" : "s"}
-                            </span>
-                          </button>
-                        ))}
                       {shown.map(assetCard)}
-                      {q && !shown.length && (
-                        <Empty>No assets match “{query}”.</Empty>
+                      {!shown.length && (
+                        <Empty>{q ? `No assets match “${query}”.` : "This folder is empty."}
+                          <button className="a-btn a-btn--ghost" onClick={() => { setQuery(""); setFolder(""); }}>Show all assets</button>
+                        </Empty>
                       )}
                     </div>
                   )}
@@ -286,6 +232,33 @@ function Navigator({
       )}
     </div>
   );
+}
+
+function ModelPicker({ files, onChoose, onImport, onClose }) {
+  const models = files.filter(f => f.cat === "models");
+  const [query, setQuery] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const importing = useRef(false);
+  const input = useRef(null);
+  const shown = models.filter(f => f.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const importFile = async (file) => {
+    if (!file || importing.current) return;
+    importing.current = true; setBusy(true); setError("");
+    try { if (await onImport(file) !== false) onClose(); }
+    catch (e) { setError(e.message || "Could not add this model. Try another file."); }
+    finally { importing.current = false; setBusy(false); if (input.current) input.current.value = ""; }
+  };
+  return <Modal title="Add a model" onClose={onClose} width={480} canDismiss={!busy}
+    initialFocus={models.length ? ".a-model-choice" : ".a-btn--primary"}
+    footer={<><span className="a-grow" /><button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>Cancel</button>
+      <button className={`a-btn ${models.length ? "a-btn--ghost" : "a-btn--primary"}`} disabled={busy} onClick={() => input.current?.click()}>{busy ? "Adding…" : "Import model…"}</button></>}>
+    <input ref={input} type="file" accept=".obj,.glb,.gltf" hidden disabled={busy} onChange={e => importFile(e.target.files?.[0])} />
+    {models.length > 8 && <input className="a-input" aria-label="Find a model" placeholder="Find a model…" value={query} onChange={e => setQuery(e.target.value)} />}
+    {models.length ? <div className="a-model-choices">{shown.map(f => <button key={f.id} className="a-model-choice" disabled={busy || !!f.error}
+      onClick={() => { onChoose(f); onClose(); }}><span aria-hidden="true">◈</span><span>{f.name}</span>{f.error && <small>{f.error}</small>}</button>)}
+      {!shown.length && <Empty>No model matches “{query}”.</Empty>}</div>
+      : <p className="a-new-project__intro">Choose a model to place in your scene.</p>}
+    {error && <p className="a-error a-modal__error" role="alert">{error}</p>}
+  </Modal>;
 }
 
 function FolderIcon() {

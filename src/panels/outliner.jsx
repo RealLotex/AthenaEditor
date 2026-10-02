@@ -242,14 +242,7 @@ function Outliner({
         </PanelHeader>
       )}
 
-      <div
-        style={{
-          padding: "5px 6px",
-          borderBottom: "1px solid var(--line)",
-          display: "flex",
-          gap: 6,
-        }}
-      >
+      {(allObjects(scene?.objects || []).length > 8 || query) && <div className="a-object-search">
         <input
           className="a-input"
           placeholder="Search objects…"
@@ -263,17 +256,7 @@ function Outliner({
             }
           }}
         />
-        {compact && (
-          <button
-            className="a-btn a-btn--icon a-btn--ghost"
-            title="Add object"
-            aria-label="Add object"
-            onClick={onAdd}
-          >
-            +
-          </button>
-        )}
-      </div>
+      </div>}
 
       <div
         className="a-scroll"

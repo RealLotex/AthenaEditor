@@ -6,7 +6,7 @@ import * as esbuild from "npm:esbuild@0.24.0";
 const modules = [
   "core/util.js", "core/math.js", "core/skybox.js", "core/theme.js",
   "core/components.js", "core/project.js", "ui/primitives.jsx", "ui/dock.jsx",
-  "ui/modal.jsx", "ui/palette.jsx", "panels/inspector.jsx", "panels/inspector-components.jsx",
+  "ui/modal.jsx", "ui/popover.js", "ui/palette.jsx", "panels/inspector.jsx", "panels/inspector-components.jsx",
   "panels/skybox.jsx", "panels/inspector-scene.jsx",
 ];
 const source = (await Promise.all(modules.map(async (name) => {

@@ -16,6 +16,7 @@ const A = await load([
 ]);
 const source = (await Promise.all([
   "ui/modal.jsx",
+  "ui/popover.js",
   "panels/newproject.jsx",
 ].map(async (path) => {
   const text = await Deno.readTextFile(

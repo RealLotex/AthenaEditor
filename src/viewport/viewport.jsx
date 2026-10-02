@@ -17,6 +17,7 @@ function Viewport({
   onFrameRequest,
   onCaptureRequest,
   terrainTool, onTerrainStroke,
+  onPlaceAsset,
 }) {
   const mountRef = useRef(null);
   const G = useRef(null);          // long-lived Three state
@@ -25,6 +26,8 @@ function Viewport({
 
   const [ready, setReady] = useState(false);
   const [hoverAxis, setHoverAxis] = useState(null);
+  const [droppingModel, setDroppingModel] = useState(false);
+  const hasSelection = selectedIds.some(id => !!findObj(scene.objects, id));
   useEffect(() => {
     if (!onCaptureRequest || !ready) return;
     const capture = () => {
@@ -560,21 +563,43 @@ function Viewport({
   const empty = !scene?.objects?.length;
 
   return (
-    <div className="a-viewport" ref={mountRef} aria-label={terrainTool?"Terrain viewport":undefined}>
+    <div className="a-viewport" ref={mountRef} aria-label={terrainTool ? "Terrain viewport" : "Scene viewport"}
+      onDragOver={(e) => {
+        if (!onPlaceAsset || !ready || ![...e.dataTransfer.types].includes(MODEL_DRAG_TYPE)) return;
+        e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDroppingModel(true);
+      }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDroppingModel(false); }}
+      onDrop={(e) => {
+        setDroppingModel(false);
+        if (!onPlaceAsset || !ready || ![...e.dataTransfer.types].includes(MODEL_DRAG_TYPE)) return;
+        e.preventDefault(); e.stopPropagation();
+        const asset = files.find(f => f.id === e.dataTransfer.getData(MODEL_DRAG_TYPE) && f.cat === "models" && !f.error);
+        if (asset && G.current) onPlaceAsset(asset, viewportPlacement(G.current, e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), snap ? snapSize : 0));
+      }}>
+      {droppingModel && <div className="a-viewport__drop" role="status">Drop to place in the scene</div>}
       {empty && ready && (
         <div className="a-viewport__empty">
           <div style={{ fontSize: 26, opacity: .4 }}>◇</div>
           <div>This scene is empty.</div>
-          <div className="a-dim">Press <span className="a-kbd">Ctrl</span> <span className="a-kbd">K</span> and search for “Add”.</div>
+          <div className="a-dim">Choose Add object to start building.</div>
         </div>
       )}
       <div className="a-viewport__hud">
-        {selectedIds.length > 0 && gizmoSpace === "local" && <span className="a-viewport__chip">Relative to object</span>}
-        {selectedIds.length > 0 && snap && <span className="a-viewport__chip">Grid snap · {snapSize}</span>}
+        {hasSelection && gizmoSpace === "local" && <span className="a-viewport__chip">Relative to object</span>}
+        {hasSelection && snap && <span className="a-viewport__chip">Grid snap · {snapSize}</span>}
         {hoverAxis && <span className="a-viewport__chip">{hoverAxis.toUpperCase()}</span>}
       </div>
     </div>
   );
+}
+
+function viewportPlacement(g, x, y, rect, snapStep = 0) {
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), g.camera);
+  const hit = ray.intersectObjects(g.content.children, true).find(h => isViewportVisible(h.object));
+  const point = hit?.point || ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()) || g.controls.target;
+  const round = n => snapStep > 0 ? Math.round(n / snapStep) * snapStep : n;
+  return { x: round(point.x), y: round(point.y), z: round(point.z) };
 }
 
 // ── helpers used by the sync effect ────────────────────────────────────

@@ -8,6 +8,22 @@ const PROTOTYPE_KINDS = [
   "ramp",
 ];
 
+const MODEL_DRAG_TYPE = "application/x-athena-model";
+
+// Both the picker and direct placement create a usable object in one undo step.
+function placeModelAsset(scene, asset, position) {
+  if (asset.cat !== "models" || !asset.name || asset.error) return null;
+  const object = mkObject(uniqueName(asset.name.replace(/\.[^.]+$/, ""), scene.objects));
+  object.components.model = { ...makeComponent("model"), file: asset.name };
+  if (position) {
+    const bounds = asset.bounds;
+    const bottom = bounds ? bounds.center.y - bounds.size.y / 2 : 0;
+    object.components.transform.position = { ...position, y: position.y - (Number.isFinite(bottom) ? bottom : 0) };
+  }
+  scene.objects.push(object);
+  return object;
+}
+
 function putProjectAsset(project, asset) {
   if (!/^[^\\/]+\.[a-z0-9]+$/i.test(asset.name) || asset.name.includes("..")) {
     throw new Error("Use a filename without folders.");

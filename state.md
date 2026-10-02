@@ -4,6 +4,17 @@ _Last updated: 2026-10-02._
 
 ## October 2 UX redesign
 
+The follow-up review of bdb36e2 makes Assets show every file, moves folders behind an
+optional filter and replaces empty-model creation with choose/import-and-place. Models
+can be dragged directly onto the scene and undone in one step. Menus now close and restore
+focus consistently; hidden disclosure controls no longer intercept keyboard navigation.
+Small lists omit search, narrow rows keep their labels, and transforms disappear when an
+undone object no longer exists. The web highlights Export and guides Run to the local
+installation. Save-download feedback reports the request separately from a saved file.
+The complete suite passed: 528 tests, zero failures. Final browser checks include model
+import/error/retry, drag/undo, keyboard menus, service-free export, local Run/Stop and
+760/1024 px layouts. Existing engine fixtures retain their dated evidence below.
+
 Creation now defaults to a playable third-person game and one required name. Alternatives
 are optional. New projects enter Focus; resumed layouts remain personal. Save, Export and
 Run stay in the header, transformations follow selection, and Add opens common objects

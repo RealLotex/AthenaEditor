@@ -84,6 +84,7 @@ export const MODULES = [
 
   // ── reusable ui ───────────────────────────────────────────────────
   "ui/primitives.jsx",
+  "ui/popover.js",
   "ui/toast.jsx",
   "ui/modal.jsx",
   "ui/boundary.jsx",

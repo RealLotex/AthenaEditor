@@ -16,13 +16,17 @@ platform and top-down games, or a blank scene with a camera and light.
 
 The scene occupies the center, Objects and Assets share the left side, and Properties appear on
 the right. **Add object** offers common objects first; search or **More objects…** reveals
-other types. Select an object to see its transformation tools and properties. **Save**,
-**Export…** and **Run game** stay in the header while you work. Additional tools are available
+other types. **Add a model** lets you choose an existing file or import and place one in a
+single step. Assets shows all files; drag a model into the scene to place it where you drop
+it. Folder filters are optional. Select an object to see its transformation tools and properties.
+**Save** and **Export** stay in the header; the local installation also provides **Run game**.
+Export is the primary project action on the hosted site and standalone file. Additional tools are available
 through the menus and Ctrl+K. A new project starts in Focus; resumed projects retain their
 layout preferences. **Scene options** opens sky and scene settings beside the scene.
 
 **Save** writes a portable project file with imported assets and scripts. The browser also keeps
-a recovery copy; that backup is distinct from saving a file. Keep a file copy of your work.
+a recovery copy; that backup is distinct from saving a file. When Save falls back to a
+download, the status says **Download requested**. Keep a file copy of your work.
 Opening another project with changes offers **Save and continue**, **Discard changes** or
 **Cancel**. A cancelled or failed save keeps your current work open.
 Linking an existing project folder lets Save and Export write there, with conflict checks before

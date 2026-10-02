@@ -1,8 +1,10 @@
 function SceneTools(
   { prefs, gizmoMode, onMode, onPref, hasSelection, onAdd, onFrame, onSceneSettings },
 ) {
+  const ref = useRef(null);
+  useDetailsPopovers(ref, ".a-view-options");
   return (
-    <div className="a-scene-tools">
+    <div className="a-scene-tools" ref={ref}>
       <button className="a-btn a-btn--ghost" onClick={onAdd}>+ Add object</button>
       {hasSelection && <div className="a-transform-tools" role="group" aria-label="Transform selected objects">
       {[["translate", "Move", "W"], ["rotate", "Rotate", "E"], [

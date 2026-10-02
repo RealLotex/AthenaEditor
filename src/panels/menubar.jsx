@@ -14,11 +14,13 @@ function MenuBar(
     projectFileName,
     playBusy,
     playing,
+    canRunLocally = true,
   },
 ) {
   const [open, setOpen] = useState(null);
   const [nativeTitlebar, setNativeTitlebar] = useState(false);
   const barRef = useRef(null);
+  const focusMenu = useRef(null);
 
   useEffect(() => {
     document.title = `${project.name}${dirty ? " *" : ""} — AthEditor`;
@@ -34,11 +36,19 @@ function MenuBar(
 
   useEffect(() => {
     if (!open) return;
+    if (focusMenu.current) {
+      const controls = barRef.current ? visibleEditorControls(barRef.current, '.a-menu__pop button, .a-menu__pop summary') : [];
+      (focusMenu.current === "last" ? controls[controls.length - 1] : controls[0])?.focus();
+      focusMenu.current = null;
+    }
     const close = (e) => {
       if (!barRef.current?.contains(e.target)) setOpen(null);
     };
     const esc = (e) => {
-      if (e.key === "Escape") setOpen(null);
+      if (e.key === "Escape") {
+        e.preventDefault(); setOpen(null);
+        barRef.current?.querySelector(`[data-menu="${open}"]`)?.focus();
+      }
     };
     window.addEventListener("mousedown", close);
     window.addEventListener("keydown", esc);
@@ -63,6 +73,7 @@ function MenuBar(
   const action = (id) => commands.find((c) => c.id === id);
   const invoke = (id) => {
     const command = action(id);
+    setOpen(null);
     if (command && (!command.enabled || command.enabled())) command.run();
   };
   const item = (c) => (
@@ -72,6 +83,7 @@ function MenuBar(
       disabled={c.enabled ? !c.enabled() : false}
       onClick={() => {
         setOpen(null);
+        barRef.current?.querySelector(`[data-menu="${open}"]`)?.focus();
         c.run();
       }}
     >
@@ -150,7 +162,31 @@ function MenuBar(
   };
 
   return (
-    <div className={`a-menubar${nativeTitlebar ? " a-menubar--native" : ""}`} ref={barRef}>
+    <div className={`a-menubar${nativeTitlebar ? " a-menubar--native" : ""}`} ref={barRef}
+      onBlur={(e) => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setOpen(null); }}
+      onFocus={(e) => { if (!e.target.closest(".a-menu")) setOpen(null); }}
+      onKeyDown={(e) => {
+        const trigger = e.target.closest(".a-menu__btn");
+        if (trigger && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+          const buttons = [...barRef.current.querySelectorAll(".a-menu__btn")];
+          const next = buttons[(buttons.indexOf(trigger) + (e.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length];
+          e.preventDefault(); e.stopPropagation(); next.focus();
+          if (open) setOpen(next.dataset.menu);
+        } else if (trigger && ["ArrowDown", "ArrowUp"].includes(e.key)) {
+          e.preventDefault(); e.stopPropagation();
+          const direction = e.key === "ArrowUp" ? "last" : "first";
+          if (open === trigger.dataset.menu) {
+            const controls = visibleEditorControls(barRef.current, '.a-menu__pop button, .a-menu__pop summary');
+            (direction === "last" ? controls[controls.length - 1] : controls[0])?.focus();
+          } else { focusMenu.current = direction; setOpen(trigger.dataset.menu); }
+        } else if (e.target.closest(".a-menu__pop") && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+          const controls = visibleEditorControls(barRef.current, '.a-menu__pop button, .a-menu__pop summary');
+          const at = controls.indexOf(e.target);
+          const next = e.key === "Home" ? 0 : e.key === "End" ? controls.length - 1 :
+            (at + (e.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
+          e.preventDefault(); e.stopPropagation(); controls[next]?.focus();
+        }
+      }}>
       <div className="a-brand">
         <div>
           <div className="a-brand__name">
@@ -173,6 +209,7 @@ function MenuBar(
             }`}
             aria-expanded={open === g.name}
             aria-haspopup="true"
+            data-menu={g.name}
             onClick={(e) => {
               e.stopPropagation();
               setOpen(open === g.name ? null : g.name);
@@ -219,8 +256,8 @@ function MenuBar(
           title={projectFileName ? `Save ${projectFileName} (Ctrl+S)` : "Save a project file (Ctrl+S)"}>
           Save{dirty && <span className="a-save-dot" aria-label="Unsaved changes" />}
         </button>}
-        {action("file.export") && <button className="a-btn a-btn--ghost a-export-button" onClick={() => invoke("file.export")}>Export…</button>}
-        {action("file.play") && <button className="a-btn a-btn--primary a-run-button" onClick={() => invoke("file.play")}
+        {action("file.export") && <button className={`a-btn ${canRunLocally ? "a-btn--ghost" : "a-btn--primary"} a-export-button`} onClick={() => invoke("file.export")}>{canRunLocally ? "Export…" : "Export game…"}</button>}
+        {canRunLocally && action("file.play") && <button className="a-btn a-btn--primary a-run-button" onClick={() => invoke("file.play")}
           disabled={!!playBusy || !!(action("file.play").enabled && !action("file.play").enabled())}
           title="Try the open scene in PCSX2 (F5)">
           {playBusy ? (playing ? "Stopping…" : "Preparing…") : playing ? "Stop game" : "Run game"}

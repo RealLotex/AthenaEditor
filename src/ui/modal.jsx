@@ -10,10 +10,9 @@ function Modal({ title, onClose, width = 420, footer, children, initialFocus, ca
   dismissRef.current = canDismiss;
 
   useEffect(() => {
-    const focusableIn = (root) => [...root.querySelectorAll(
+    const focusableIn = (root) => visibleEditorControls(root,
       'button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])',
-    )].filter((el) => !el.matches(":disabled") && el.tabIndex >= 0 &&
-      !el.closest('[inert], [aria-hidden="true"]') && el.getClientRects().length);
+    );
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();

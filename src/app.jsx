@@ -37,6 +37,7 @@ const DEFAULT_PREFS = {
 
 function App() {
   const installation = useEditorInstallation();
+  const canRunLocally = !!document.querySelector?.('meta[name="athena-launch-token"]');
   const actionWindowRef = useRef(window);
   const actionWindow = () => actionWindowRef.current?.closed ? window : actionWindowRef.current;
   useEffect(() => {
@@ -85,6 +86,7 @@ function App() {
   const projectSessionRef = useRef(0);
   const savingProjectRef = useRef(false);
   const [projectFileName, setProjectFileName] = useState(null);
+  const [downloadedFileName, setDownloadedFileName] = useState(null);
   const [folderName, setFolderName] = useState(null);
   const [folderNeedsGrant, setFolderNeedsGrant] = useState(false);
   const [folderNeedsReadAccess, setFolderNeedsReadAccess] = useState(false);
@@ -110,6 +112,7 @@ function App() {
     projectSessionRef.current++;
     projectFileRef.current = null;
     setProjectFileName(null);
+    setDownloadedFileName(null);
     folderRef.current = null;
     setFolderName(null);
     setFolderNeedsGrant(false);
@@ -237,7 +240,7 @@ function App() {
     setSelectedIds([id]);setActiveId(id);setMainTab("terrain");
   };
 
-  const useAsset = useCallback((asset) => {
+  const useAsset = useCallback((asset, position) => {
     if (asset.cat === "scripts") {
       setOpenScript({ name: asset.name, key: uid() });
       setMainTab("scripts");
@@ -247,13 +250,9 @@ function App() {
     } else if (asset.cat === "models") {
       let id;
       edit((p, sc) => {
-        const obj = mkObject(
-          uniqueName(asset.name.replace(/\.[^.]+$/, ""), sc.objects),
-        );
-        obj.components.model = { ...makeComponent("model"), file: asset.name };
-        sc.objects.push(obj);
-        id = obj.id;
+        id = placeModelAsset(sc, asset, position)?.id;
       });
+      if (!id) return;
       setSelectedIds([id]);
       setActiveId(id);
       setSelectedAssetId(null);
@@ -262,6 +261,22 @@ function App() {
       setMainTab("viewport");
     }
   }, [edit, focusPanel]);
+
+  const importModel = useCallback(async (file) => {
+    const session = projectSessionRef.current, sceneId = projectRef.current.activeSceneId;
+    const { assets } = await readImportedAssets([{ file }]);
+    if (session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId) return false;
+    if (assets[0]?.cat !== "models") throw Error("This model could not be read. Choose an OBJ, GLB or glTF file.");
+    let id;
+    edit((p, sc) => {
+      const { imported } = importProjectAssets(p, assets, "", files);
+      id = placeModelAsset(sc, imported[0])?.id;
+    });
+    if (!id) return false;
+    setSelectedIds([id]); setActiveId(id); setSelectedAssetId(null); setSelectedUIId(null);
+    focusPanel("inspector"); setMainTab("viewport");
+    return true;
+  }, [edit, files, focusPanel]);
 
   const undo = useCallback(() => {
     const restored = historyUndo(historyRef.current, projectRef.current);
@@ -1039,6 +1054,8 @@ function App() {
       else downloadText(suggestedName, json);
       if (session === projectSessionRef.current) {
         setDirty(projectRef.current !== p);
+        if (!folder) { setDownloadedFileName(suggestedName); setProjectFileName(null); }
+        else { setProjectFileName(suggestedName); setDownloadedFileName(null); }
       }
       toast.ok(folder ? `Saved ${suggestedName}` : "Project downloaded", {
         sub: folder ? `in ${folder.name}/` : undefined,
@@ -1397,14 +1414,15 @@ function App() {
 
     setModal("export");
     if (errs) {
-      toast.warn(`Exported with ${errs} error${errs > 1 ? "s" : ""}`, {
-        sub: "Check the Problems panel.",
+      toast.warn(`Fix ${errs} error${errs > 1 ? "s" : ""} to export`, {
+        sub: "Choose an error to go to the affected item.",
       });
     }
   }, [files, toast, activeFolder]);
 
   const runGame = useCallback(async () => {
     if (playBusy) return;
+    if (!canRunLocally) { setModal("play"); return; }
     setPlayBusy(true);
     try {
       const status = await editorPlayRequest("status");
@@ -1441,9 +1459,10 @@ function App() {
     } finally {
       setPlayBusy(false);
     }
-  }, [files, playBusy, toast, setPref]);
+  }, [files, playBusy, toast, canRunLocally]);
 
   useEffect(() => {
+    if (!canRunLocally) return;
     let cancelled = false;
     const refresh = () =>
       editorPlayRequest("status").then((s) => {
@@ -1460,7 +1479,7 @@ function App() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [playing]);
+  }, [playing, canRunLocally]);
 
   const applyProblemFix = useCallback((p) => {
     let ok = false;
@@ -1556,7 +1575,7 @@ function App() {
       {
         id: "file.play",
         group: "File",
-        title: playing ? "Stop game" : "Run in PCSX2",
+        title: playing ? "Stop game" : "Run game…",
         keys: "F5",
         run: runGame,
         enabled: () => !playBusy,
@@ -1565,6 +1584,7 @@ function App() {
         id: "file.playSettings",
         group: "File",
         title: "Run settings…",
+        hidden: !canRunLocally,
         run: () => setModal("play"),
       },
       {
@@ -1874,7 +1894,7 @@ function App() {
         title: d.label,
         icon: d.icon,
         color: d.color,
-        run: () => addObject(key),
+        run: () => key === "model" ? setModal("model") : addObject(key),
       });
     }
     for (const t of UI_TYPES) {
@@ -2206,8 +2226,8 @@ function App() {
         <SceneTools
           onSceneSettings={() => focusPanel("sceneSettings")}
           onAdd={() => openAddPalette()}
-          onFrame={() => commands.find(c => c.id === (selectedIds.length ? "view.frame" : "view.frameall"))?.run()}
-          hasSelection={selectedIds.length > 0}
+          onFrame={() => commands.find(c => c.id === (selection.length ? "view.frame" : "view.frameall"))?.run()}
+          hasSelection={selection.length > 0}
           prefs={prefs}
           gizmoMode={gizmoMode}
           onMode={setGizmoMode}
@@ -2229,6 +2249,7 @@ function App() {
           shaded={prefs.shaded}
           onFrameRequest={frameRef}
           onCaptureRequest={captureRef}
+          onPlaceAsset={useAsset}
         />
       </>
     ),
@@ -2433,11 +2454,11 @@ function App() {
     ),
     assets: (
       <>
-        <div className="a-library-actions">
+        {files.length > 0 && <div className="a-library-actions">
           <button className="a-btn a-btn--ghost a-btn--sm" onClick={pickFolder}>
             Import assets…
           </button>
-        </div>
+        </div>}
         <Navigator
           revealAssetName={mainTab === "uv"
             ? activeObject?.components.model?.file
@@ -2591,6 +2612,7 @@ function App() {
           projectFileName={projectFileName}
           playBusy={playBusy}
           playing={playing}
+          canRunLocally={canRunLocally}
           onSwitchScene={(id) => {
             edit((p) => {
               p.activeSceneId = id;
@@ -2638,6 +2660,7 @@ function App() {
           problems={problems}
           files={files}
           autosavedAt={autosavedAt}
+          downloadedFileName={downloadedFileName}
           buildStamp={window.__ATHENA_BUILD__ || "dev"}
           onShowProblems={() => {
             setBottomTab("problems");
@@ -2677,6 +2700,8 @@ function App() {
         )}
         {modal === "play" && (
           <PlaySettingsModal
+            localAvailable={canRunLocally}
+            onExport={() => { setModal(null); runExport(); }}
             onClose={() => setModal(null)}
             onReady={() => {
               setModal(null);
@@ -2684,6 +2709,7 @@ function App() {
             }}
           />
         )}
+        {modal === "model" && <ModelPicker files={files} onChoose={useAsset} onImport={importModel} onClose={() => setModal(null)} />}
         {modal === "install" && (
           <InstallEditorModal onClose={() => setModal(null)} />
         )}

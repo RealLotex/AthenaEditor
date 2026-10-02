@@ -7,7 +7,7 @@
 <!--
   GENERATED FILE — do not edit.
   Source lives in src/. Rebuild with:  deno task build
-  Build: v2026-10-02-15-39-GMT
+  Build: v2026-10-02-16-35-GMT
   Bundled dependencies:
 React 18.2.0 / React DOM 18.2.0
 Copyright (c) Facebook, Inc. and its affiliates.
@@ -651,31 +651,20 @@ input[type=number] { -moz-appearance: textfield; }
 .a-bottom-rail {display:flex;align-items:center;flex-shrink:0;background:var(--bg-1);border-top:1px solid var(--line);height:34px;padding:0 8px;gap:4px}
 .a-bottom-rail__tab {border:0;background:transparent;color:var(--fg);font:inherit;padding:8px 12px;cursor:pointer;border-radius:4px}
 .a-bottom-rail__tab:hover {background:var(--bg-3);color:var(--fg-strong)}
-.a-library-bar {display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:1px solid var(--line);flex-shrink:0;min-height:40px}
-.a-library-breadcrumb {display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow:auto;white-space:nowrap}
-.a-library-breadcrumb button {background:none;border:0;color:var(--fg);font:inherit;cursor:pointer;padding:3px 0}
-.a-library-breadcrumb button:hover {color:var(--accent)}
-.a-library-breadcrumb button:last-child {color:var(--fg-strong);font-weight:600}
-.a-library-search {width:200px;flex-shrink:0}
+.a-library-bar {display:flex;padding:8px 12px;flex-shrink:0}
+.a-library-search {width:100%;min-width:0}
 .a-library {display:flex;flex:1;min-height:0}
-.a-library-folders {flex:0 0 180px;border-right:1px solid var(--line);padding:6px 0}
-.a-folder-row {display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 12px;border:0;background:transparent;color:var(--fg);font:inherit;cursor:pointer;text-align:left}
-.a-folder-label {flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.a-folder-row>span:last-child {font-size:10px;color:var(--fg-dim);margin-left:auto}
-.a-folder-row:hover {background:var(--bg-2)}
-.a-folder-row--on {background:var(--accent-dim);color:var(--fg-strong)}
-.a-library-content {min-width:0}
+.a-library-content {min-width:0;width:100%}
 .a-library .a-assets {gap:10px;padding:12px}
-.a-library .a-asset {width:105px;min-height:88px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--fg);font:inherit;cursor:pointer}
+.a-library .a-asset {width:100%;min-width:0;min-height:100px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--fg);font:inherit;cursor:pointer}
 .a-library .a-asset:hover {background:var(--bg-3);border-color:var(--line-strong)}
 .a-library .a-asset--sel {background:var(--accent-dim);border-color:var(--accent)}
-.a-asset--folder>svg {width:34px;height:34px;color:var(--fg-dim);margin:8px}
 .a-library .a-asset__name {font-size:11px}
 .a-setting-label {display:block;margin:12px 0;font-size:12px}
 .a-setting-label input {margin-top:6px}
 .a-lead {font-size:16px;font-weight:600;margin-bottom:10px}
 .a-run-status {padding:14px 0;color:var(--fg-strong)}
-@media (max-width:1000px) {.a-library-folders {flex-basis:145px}.a-library-search {width:150px}.a-library-breadcrumb {font-size:11px}.a-run-button {min-width:65px}}
+@media (max-width:1000px) {.a-run-button {min-width:65px}}
 .a-field__label {font-size:11px}
 .a-tab {font-size:12px;letter-spacing:0}
 .a-node__name {font-size:12px}
@@ -734,7 +723,6 @@ input[type=number] { -moz-appearance: textfield; }
 .a-panel-surface[data-panel=assets] {container-type:inline-size}
 .a-panel-surface[data-panel=uv],.a-panel-surface[data-panel=scripts] {container-type:inline-size}
 @container (max-width:520px) {.a-workspace__body {flex-direction:column}.a-workspace__options {width:auto;max-height:45%;border-right:0;border-top:1px solid var(--line);padding:12px}.a-workspace__bar {flex-wrap:wrap;gap:6px;padding:8px}.a-workspace__bar>.a-dim {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}.a-uv-stage {min-height:100px}}
-@container (max-width:450px) {.a-library {flex-direction:column}.a-library-folders {flex:0 0 105px;border-right:0;border-bottom:1px solid var(--line)}.a-library-search {width:60%;min-width:70px}.a-library-bar {gap:6px;padding:5px 8px}}
 /* Terrain: the canvas is the focus, and settings open only when needed. */
 .a-terrain-workspace { display:flex; flex-direction:column; height:100%; min-height:0; position:relative; }
 .a-terrain-stage { flex:1; position:relative; min-height:150px; }
@@ -832,11 +820,15 @@ input[type=number] { -moz-appearance: textfield; }
 .a-view-options__pop label { display:flex; align-items:center; gap:8px; }
 .a-view-options__pop select { max-width:110px; }
 .a-status { min-height:32px; background:var(--bg-1); border-color:var(--line); }
-.a-node { height:36px; padding-right:8px; }
+.a-node { height:36px; padding-right:8px; position:relative; }
 .a-node__name { font-size:13px; }
 .a-node__btn { width:24px; height:26px; }
-.a-node .a-node__btn { opacity:0; }
-.a-node:hover .a-node__btn,.a-node:focus-within .a-node__btn,.a-node--sel .a-node__btn { opacity:1; }
+.a-node .a-node__btn { position:absolute; right:32px; opacity:0; pointer-events:none; background:var(--bg-1); }
+.a-node .a-node__delete { right:6px; }
+.a-node:hover .a-node__btn,.a-node:focus-within .a-node__btn { opacity:1; pointer-events:auto; background:var(--bg-3); }
+.a-node--sel:hover .a-node__btn,.a-node--sel:focus-within .a-node__btn { background:var(--accent-dim); }
+.a-node:hover .a-node__name,.a-node:focus-within .a-node__name { padding-right:50px; }
+.a-node--hidden .a-node__btn:not(.a-node__delete) { opacity:1; pointer-events:auto; }
 .a-sec { border-bottom:0; }
 .a-sec__head { padding:7px 12px; background:transparent; }
 .a-sec__title { font-size:13px; font-weight:600; }
@@ -877,6 +869,34 @@ input[type=number] { -moz-appearance: textfield; }
 .a-modal .a-palette__list { max-height:50vh; padding:8px 0 0; }
 .a-modal .a-palette__item { min-height:36px; font-size:13px; }
 .a-palette__more { margin-top:12px; color:var(--fg-dim); }
+.a-object-search { padding:10px 12px; }
+.a-library-filter { padding:0 12px 8px; border-top:0; }
+.a-library-filter>summary { color:var(--fg-dim); font-size:12px; overflow-wrap:anywhere; }
+.a-library-filter .a-select { margin:4px 0 8px; }
+.a-library .a-asset__icon { height:44px; font-size:28px; color:var(--fg-dim) !important; }
+.a-library .a-asset__thumb { width:52px; height:44px; object-fit:contain; background:transparent; }
+.a-library .a-asset__meta { font-size:10px; color:var(--fg-dim); }
+.a-library .a-asset[draggable=true] { cursor:grab; }
+.a-library .a-asset[draggable=true]:active { cursor:grabbing; }
+.a-model-choices { display:grid; gap:4px; margin:8px 0; }
+.a-model-choice { display:flex; gap:14px; align-items:center; text-align:left; padding:14px 12px; min-width:0; background:transparent; border:0; border-radius:var(--radius); color:var(--fg-strong); font:inherit; cursor:pointer; }
+.a-model-choice>span:first-child { color:var(--fg-dim); font-size:22px; }
+.a-model-choice>span:nth-child(2) { overflow-wrap:anywhere; }
+.a-model-choice:hover,.a-model-choice:focus-visible { background:var(--accent-dim); }
+.a-model-choice:disabled { opacity:.55; cursor:default; }
+.a-model-choice small { color:var(--err); }
+.a-viewport__drop { position:absolute; inset:12px; z-index:4; border:2px solid var(--accent); border-radius:var(--radius-lg); display:grid; place-items:center; background:var(--accent-dim); color:var(--fg-strong); font-size:16px; pointer-events:none; }
+.a-status__item[role=status] { overflow:hidden; text-overflow:ellipsis; display:block; min-width:0; }
+.a-panel-surface[data-panel=viewport] { container-type:inline-size; }
+.a-dock-group { container-type:inline-size; }
+@container (max-width:200px) {
+  .a-dock-tab { padding:0 8px; font-size:12px; }
+  .a-dock-options summary { width:24px; }
+}
+@container (max-width:560px) {
+  .a-transform-tools { order:3; width:100%; border-left:0; padding-left:0; }
+  .a-scene-tools { gap:4px; padding:6px; }
+}
 .a-panel-surface[data-panel=inspector],.a-panel-surface[data-panel=sceneSettings],.a-panel-surface[data-panel=projectSettings] { container-type:inline-size; }
 @container (max-width:290px) {
   .a-field { grid-template-columns:1fr; }
@@ -5912,7 +5932,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 <script>
-window.__ATHENA_BUILD__ = "v2026-10-02-15-39-GMT";
+window.__ATHENA_BUILD__ = "v2026-10-02-16-35-GMT";
 
 // ══════════════════════════════════════════════════════════════════
 // src/core/util.js
@@ -10689,6 +10709,19 @@ const PROTOTYPE_KINDS = [
   "torus",
   "ramp"
 ];
+const MODEL_DRAG_TYPE = "application/x-athena-model";
+function placeModelAsset(scene, asset, position) {
+  if (asset.cat !== "models" || !asset.name || asset.error) return null;
+  const object = mkObject(uniqueName(asset.name.replace(/\.[^.]+$/, ""), scene.objects));
+  object.components.model = { ...makeComponent("model"), file: asset.name };
+  if (position) {
+    const bounds = asset.bounds;
+    const bottom = bounds ? bounds.center.y - bounds.size.y / 2 : 0;
+    object.components.transform.position = { ...position, y: position.y - (Number.isFinite(bottom) ? bottom : 0) };
+  }
+  scene.objects.push(object);
+  return object;
+}
 function putProjectAsset(project, asset) {
   if (!/^[^\\/]+\.[a-z0-9]+$/i.test(asset.name) || asset.name.includes("..")) {
     throw new Error("Use a filename without folders.");
@@ -14852,7 +14885,8 @@ function Viewport({
   onFrameRequest,
   onCaptureRequest,
   terrainTool,
-  onTerrainStroke
+  onTerrainStroke,
+  onPlaceAsset
 }) {
   const mountRef = useRef(null);
   const G = useRef(null);
@@ -14860,6 +14894,8 @@ function Viewport({
   propsRef.current = { scene, selectedIds, activeId, gizmoMode, gizmoSpace, snap, snapSize, onSelect, onTransform, terrainTool, onTerrainStroke };
   const [ready, setReady] = useState(false);
   const [hoverAxis, setHoverAxis] = useState(null);
+  const [droppingModel, setDroppingModel] = useState(false);
+  const hasSelection = selectedIds.some((id) => !!findObj(scene.objects, id));
   useEffect(() => {
     if (!onCaptureRequest || !ready) return;
     const capture = () => {
@@ -15397,7 +15433,43 @@ function Viewport({
     };
   }, [ready]);
   const empty = !scene?.objects?.length;
-  return /* @__PURE__ */ React.createElement("div", { className: "a-viewport", ref: mountRef, "aria-label": terrainTool ? "Terrain viewport" : void 0 }, empty && ready && /* @__PURE__ */ React.createElement("div", { className: "a-viewport__empty" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, opacity: 0.4 } }, "\u25C7"), /* @__PURE__ */ React.createElement("div", null, "This scene is empty."), /* @__PURE__ */ React.createElement("div", { className: "a-dim" }, "Press ", /* @__PURE__ */ React.createElement("span", { className: "a-kbd" }, "Ctrl"), " ", /* @__PURE__ */ React.createElement("span", { className: "a-kbd" }, "K"), " and search for \u201CAdd\u201D.")), /* @__PURE__ */ React.createElement("div", { className: "a-viewport__hud" }, selectedIds.length > 0 && gizmoSpace === "local" && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, "Relative to object"), selectedIds.length > 0 && snap && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, "Grid snap \xB7 ", snapSize), hoverAxis && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, hoverAxis.toUpperCase())));
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "a-viewport",
+      ref: mountRef,
+      "aria-label": terrainTool ? "Terrain viewport" : "Scene viewport",
+      onDragOver: (e) => {
+        if (!onPlaceAsset || !ready || ![...e.dataTransfer.types].includes(MODEL_DRAG_TYPE)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "copy";
+        setDroppingModel(true);
+      },
+      onDragLeave: (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setDroppingModel(false);
+      },
+      onDrop: (e) => {
+        setDroppingModel(false);
+        if (!onPlaceAsset || !ready || ![...e.dataTransfer.types].includes(MODEL_DRAG_TYPE)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const asset = files.find((f) => f.id === e.dataTransfer.getData(MODEL_DRAG_TYPE) && f.cat === "models" && !f.error);
+        if (asset && G.current) onPlaceAsset(asset, viewportPlacement(G.current, e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), snap ? snapSize : 0));
+      }
+    },
+    droppingModel && /* @__PURE__ */ React.createElement("div", { className: "a-viewport__drop", role: "status" }, "Drop to place in the scene"),
+    empty && ready && /* @__PURE__ */ React.createElement("div", { className: "a-viewport__empty" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, opacity: 0.4 } }, "\u25C7"), /* @__PURE__ */ React.createElement("div", null, "This scene is empty."), /* @__PURE__ */ React.createElement("div", { className: "a-dim" }, "Choose Add object to start building.")),
+    /* @__PURE__ */ React.createElement("div", { className: "a-viewport__hud" }, hasSelection && gizmoSpace === "local" && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, "Relative to object"), hasSelection && snap && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, "Grid snap \xB7 ", snapSize), hoverAxis && /* @__PURE__ */ React.createElement("span", { className: "a-viewport__chip" }, hoverAxis.toUpperCase()))
+  );
+}
+function viewportPlacement(g, x, y, rect, snapStep = 0) {
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), g.camera);
+  const hit = ray.intersectObjects(g.content.children, true).find((h) => isViewportVisible(h.object));
+  const point = hit?.point || ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()) || g.controls.target;
+  const round = (n) => snapStep > 0 ? Math.round(n / snapStep) * snapStep : n;
+  return { x: round(point.x), y: round(point.y), z: round(point.z) };
 }
 function syncVisual(g, obj, node, files, token, cancelled) {
   const m = obj.components.model;
@@ -15992,6 +16064,63 @@ function TrashIcon() {
 
 
 // ══════════════════════════════════════════════════════════════════
+// src/ui/popover.js
+// ══════════════════════════════════════════════════════════════════
+function visibleEditorControls(root, selector) {
+  return [...root.querySelectorAll(selector)].filter((el) => {
+    if (el.matches(":disabled") || el.tabIndex < 0 || !el.getClientRects().length || el.closest('[inert], [aria-hidden="true"]')) return false;
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+      if (parent.tagName === "DETAILS" && !parent.open && parent.querySelector("summary") !== el) return false;
+    }
+    return true;
+  });
+}
+function bindDetailsPopovers(root, selector) {
+  const doc = root.ownerDocument;
+  const openMenus = () => [...root.querySelectorAll(selector)].filter((el) => el.open);
+  const outside = (e) => {
+    for (const menu of openMenus()) if (!menu.contains(e.target)) menu.open = false;
+  };
+  const toggle = (e) => {
+    if (!e.target.matches(selector) || !e.target.open) return;
+    for (const menu of openMenus()) if (menu !== e.target) menu.open = false;
+  };
+  const key = (e) => {
+    const menu = openMenus().find((el) => el.contains(e.target));
+    if (!menu) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key) && e.target.matches("summary, button")) {
+      const controls = visibleEditorControls(menu, "summary, button, input, select");
+      const at = controls.indexOf(e.target);
+      const next = e.key === "Home" ? 0 : e.key === "End" ? controls.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
+      e.preventDefault();
+      e.stopPropagation();
+      controls[next]?.focus();
+    }
+  };
+  doc.addEventListener("pointerdown", outside, true);
+  doc.addEventListener("focusin", outside);
+  root.addEventListener("toggle", toggle, true);
+  root.addEventListener("keydown", key);
+  return () => {
+    doc.removeEventListener("pointerdown", outside, true);
+    doc.removeEventListener("focusin", outside);
+    root.removeEventListener("toggle", toggle, true);
+    root.removeEventListener("keydown", key);
+  };
+}
+function useDetailsPopovers(ref, selector) {
+  useEffect(() => {
+    if (ref.current) return bindDetailsPopovers(ref.current, selector);
+  }, [selector]);
+}
+
+
+// ══════════════════════════════════════════════════════════════════
 // src/ui/toast.jsx
 // ══════════════════════════════════════════════════════════════════
 let _toastSeq = 0;
@@ -16045,9 +16174,10 @@ function Modal({ title, onClose, width = 420, footer, children, initialFocus, ca
   closeRef.current = onClose;
   dismissRef.current = canDismiss;
   useEffect(() => {
-    const focusableIn = (root2) => [...root2.querySelectorAll(
+    const focusableIn = (root2) => visibleEditorControls(
+      root2,
       'button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])'
-    )].filter((el) => !el.matches(":disabled") && el.tabIndex >= 0 && !el.closest('[inert], [aria-hidden="true"]') && el.getClientRects().length);
+    );
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -16347,6 +16477,7 @@ function PanelSlot({ host, active = true }) {
 function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onPaste, onWindowFocus, onError, resetWindowsKey }) {
   const root = useRef(null), hosts = useRef(null), gesture = useRef(null), current = useRef(layout);
   current.current = layout;
+  useDetailsPopovers(root, ".a-dock-options");
   const parking = useRef(null), windows = useRef(/* @__PURE__ */ new Map()), callbacks = useRef({});
   callbacks.current = { onKeyDown, onPaste, onWindowFocus, onError };
   const [external, setExternal] = useState([]);
@@ -17181,43 +17312,22 @@ function Outliner({
       onClick: onAdd
     },
     "+"
-  )), /* @__PURE__ */ React.createElement(
-    "div",
+  )), (allObjects(scene?.objects || []).length > 8 || query) && /* @__PURE__ */ React.createElement("div", { className: "a-object-search" }, /* @__PURE__ */ React.createElement(
+    "input",
     {
-      style: {
-        padding: "5px 6px",
-        borderBottom: "1px solid var(--line)",
-        display: "flex",
-        gap: 6
-      }
-    },
-    /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        className: "a-input",
-        placeholder: "Search objects\u2026",
-        "aria-label": "Search objects",
-        value: query,
-        onChange: (e) => setQuery(e.target.value),
-        onKeyDown: (e) => {
-          if (e.key === "Escape") {
-            setQuery("");
-            e.currentTarget.blur();
-          }
+      className: "a-input",
+      placeholder: "Search objects\u2026",
+      "aria-label": "Search objects",
+      value: query,
+      onChange: (e) => setQuery(e.target.value),
+      onKeyDown: (e) => {
+        if (e.key === "Escape") {
+          setQuery("");
+          e.currentTarget.blur();
         }
       }
-    ),
-    compact && /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "a-btn a-btn--icon a-btn--ghost",
-        title: "Add object",
-        "aria-label": "Add object",
-        onClick: onAdd
-      },
-      "+"
-    )
-  ), /* @__PURE__ */ React.createElement(
+    }
+  )), /* @__PURE__ */ React.createElement(
     "div",
     {
       className: "a-scroll",
@@ -17366,7 +17476,7 @@ function Inspector({
   }
   const obj = activeObject;
   if (!obj) {
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(PanelHeader, { title: "Properties" }), /* @__PURE__ */ React.createElement(Empty, null, "Select an object in the scene."), onEditScene && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px" } }, /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--wide", onClick: onEditScene }, "Scene settings")));
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(PanelHeader, { title: "Properties" }), /* @__PURE__ */ React.createElement(Empty, null, "Select an object in the scene."));
   }
   const objProblems = (problems || []).filter((p) => p.objectId === obj.id);
   const issuesFor = (key) => objProblems.filter((p) => p.component === key).map((p) => ({
@@ -17580,6 +17690,7 @@ function AssetInspector({ asset, onUse }) {
     "button",
     {
       className: "a-btn a-btn--primary a-btn--wide",
+      disabled: !!asset.error,
       onClick: () => onUse(asset)
     },
     asset.cat === "models" ? "Add to scene" : asset.cat === "scripts" ? "Edit script" : "Texture tools\u2026"
@@ -18069,22 +18180,19 @@ function Navigator({
   }, [tree, folder]);
   useEffect(() => {
     const asset = files.find((f) => f.id === selectedAssetId);
-    if (asset) setFolder(assetLibraryFolder(asset));
+    if (asset && folder && !assetLibraryFolder(asset).startsWith(folder + "/") && assetLibraryFolder(asset) !== folder) setFolder("");
   }, [selectedAssetId]);
   useEffect(() => {
     const asset = files.find((f) => f.name === revealAssetName);
     if (asset) {
-      setFolder(assetLibraryFolder(asset));
+      setFolder("");
       setQuery("");
     }
   }, [revealAssetName]);
   const q = query.trim().toLowerCase();
   const shown = files.filter(
-    (f) => q ? f.name.toLowerCase().includes(q) : assetLibraryFolder(f) === folder
+    (f) => q ? f.name.toLowerCase().includes(q) : !folder || assetLibraryFolder(f) === folder || assetLibraryFolder(f).startsWith(folder + "/")
   ).sort((a, b) => a.name.localeCompare(b.name));
-  const children = tree.filter(
-    (f) => f.path.split("/").slice(0, -1).join("/") === folder
-  );
   const assetCard = (f) => {
     const meta = CAT_META[f.cat] || CAT_META.other;
     return /* @__PURE__ */ React.createElement(
@@ -18092,8 +18200,23 @@ function Navigator({
       {
         key: f.id,
         className: `a-asset${selectedAssetId === f.id ? " a-asset--sel" : ""}`,
+        "aria-label": f.name,
+        "aria-pressed": selectedAssetId === f.id,
+        draggable: f.cat === "models" && !f.error,
+        onDragStart: (e) => {
+          if (f.cat !== "models" || f.error) return;
+          e.dataTransfer.setData(MODEL_DRAG_TYPE, f.id);
+          e.dataTransfer.effectAllowed = "copy";
+        },
         onClick: () => onSelectAsset(f.id),
         onDoubleClick: () => onOpenAsset?.(f),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && onOpenAsset && ["models", "scripts", "textures"].includes(f.cat)) {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenAsset(f);
+          }
+        },
         title: `${f.name}
 ${fmtBytes(f.size)}${f.error ? `
 ${f.error}` : ""}`
@@ -18107,7 +18230,7 @@ ${f.error}` : ""}`
         meta.icon
       ),
       /* @__PURE__ */ React.createElement("span", { className: "a-asset__name" }, f.name),
-      /* @__PURE__ */ React.createElement("span", { className: "a-asset__meta" }, q ? assetLibraryFolder(f) : fmtBytes(f.size))
+      /* @__PURE__ */ React.createElement("span", { className: "a-asset__meta" }, f.error ? "Needs attention" : ASSET_CATEGORY_LABELS[f.cat] || "Other")
     );
   };
   return /* @__PURE__ */ React.createElement(
@@ -18128,24 +18251,7 @@ ${f.error}` : ""}`
       },
       tab === "assets" ? "Import assets\u2026" : "Save Selection"
     )),
-    tab === "assets" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "a-library-bar" }, /* @__PURE__ */ React.createElement("nav", { className: "a-library-breadcrumb", "aria-label": "Asset folder" }, /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        ...dropProps(""),
-        onClick: () => {
-          setFolder("");
-          setQuery("");
-        }
-      },
-      "Assets"
-    ), !q && folder.split("/").filter(Boolean).map((part, i, parts) => /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, /* @__PURE__ */ React.createElement("span", null, "/"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        ...dropProps(parts.slice(0, i + 1).join("/")),
-        onClick: () => setFolder(parts.slice(0, i + 1).join("/"))
-      },
-      part
-    ))), q && /* @__PURE__ */ React.createElement("span", { className: "a-dim" }, "/ Search results")), /* @__PURE__ */ React.createElement(
+    tab === "assets" ? /* @__PURE__ */ React.createElement(React.Fragment, null, (files.length > 8 || query) && /* @__PURE__ */ React.createElement("div", { className: "a-library-bar" }, /* @__PURE__ */ React.createElement(
       "input",
       {
         className: "a-input a-library-search",
@@ -18154,54 +18260,26 @@ ${f.error}` : ""}`
         value: query,
         onChange: (e) => setQuery(e.target.value)
       }
-    )), /* @__PURE__ */ React.createElement("div", { className: "a-library" }, /* @__PURE__ */ React.createElement(
-      "nav",
+    )), !!tree.length && /* @__PURE__ */ React.createElement("details", { className: "a-library-filter a-disclosure" }, /* @__PURE__ */ React.createElement("summary", null, folder && !q ? folder : "Browse folders"), /* @__PURE__ */ React.createElement(
+      "select",
       {
-        className: "a-library-folders a-scroll",
-        "aria-label": "Asset folders"
+        className: "a-select",
+        "aria-label": "Filter assets by folder",
+        value: folder,
+        onChange: (e) => {
+          setFolder(e.target.value);
+          setQuery("");
+        }
       },
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          ...dropProps(""),
-          className: `a-folder-row${!folder ? " a-folder-row--on" : ""}`,
-          onClick: () => {
-            setFolder("");
-            setQuery("");
-          }
-        },
-        "All assets",
-        /* @__PURE__ */ React.createElement("span", null, files.length)
-      ),
-      tree.map((f) => /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          ...dropProps(f.path),
-          key: f.path,
-          className: `a-folder-row${folder === f.path ? " a-folder-row--on" : ""}`,
-          style: { paddingLeft: 12 + f.depth * 12 },
-          title: f.path,
-          onClick: () => {
-            setFolder(f.path);
-            setQuery("");
-          }
-        },
-        /* @__PURE__ */ React.createElement(FolderIcon, null),
-        /* @__PURE__ */ React.createElement("span", { className: "a-folder-label" }, f.label),
-        /* @__PURE__ */ React.createElement("span", null, f.count)
-      ))
-    ), /* @__PURE__ */ React.createElement("div", { className: "a-scroll a-library-content" }, !files.length ? /* @__PURE__ */ React.createElement(Empty, null, "No assets yet. Add a primitive or import a folder.") : /* @__PURE__ */ React.createElement("div", { className: "a-assets" }, !q && children.map((f) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        ...dropProps(f.path),
-        className: "a-asset a-asset--folder",
-        key: f.path,
-        onClick: () => setFolder(f.path)
-      },
-      /* @__PURE__ */ React.createElement(FolderIcon, null),
-      /* @__PURE__ */ React.createElement("span", { className: "a-asset__name" }, f.label),
-      /* @__PURE__ */ React.createElement("span", { className: "a-asset__meta" }, f.count, " asset", f.count === 1 ? "" : "s")
-    )), shown.map(assetCard), q && !shown.length && /* @__PURE__ */ React.createElement(Empty, null, "No assets match \u201C", query, "\u201D."))))) : /* @__PURE__ */ React.createElement("div", { className: "a-scroll" }, !prefabs.length ? /* @__PURE__ */ React.createElement(Empty, null, "Select an object and choose Save Selection to reuse it.") : /* @__PURE__ */ React.createElement("div", { className: "a-assets" }, prefabs.map((p) => /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("option", { value: "" }, "All assets"),
+      tree.map((f) => /* @__PURE__ */ React.createElement("option", { key: f.path, value: f.path }, f.path))
+    ), !!folder && /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", onClick: () => {
+      setFolder("");
+      setQuery("");
+    } }, "Show all assets")), /* @__PURE__ */ React.createElement("div", { className: "a-library" }, /* @__PURE__ */ React.createElement("div", { className: "a-scroll a-library-content" }, !files.length ? /* @__PURE__ */ React.createElement(Empty, null, /* @__PURE__ */ React.createElement("p", null, "Add models, images or scripts to your game."), /* @__PURE__ */ React.createElement("button", { className: "a-btn", disabled: loading, onClick: onOpenFolder }, "Import assets\u2026")) : /* @__PURE__ */ React.createElement("div", { className: "a-assets" }, shown.map(assetCard), !shown.length && /* @__PURE__ */ React.createElement(Empty, null, q ? `No assets match \u201C${query}\u201D.` : "This folder is empty.", /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", onClick: () => {
+      setQuery("");
+      setFolder("");
+    } }, "Show all assets")))))) : /* @__PURE__ */ React.createElement("div", { className: "a-scroll" }, !prefabs.length ? /* @__PURE__ */ React.createElement(Empty, null, "Select an object and choose Save Selection to reuse it.") : /* @__PURE__ */ React.createElement("div", { className: "a-assets" }, prefabs.map((p) => /* @__PURE__ */ React.createElement(
       "div",
       {
         key: p._pid,
@@ -18243,6 +18321,57 @@ ${f.error}` : ""}`
       ))
     )))),
     dropTarget !== null && /* @__PURE__ */ React.createElement("div", { className: "a-import-hint", role: "status" }, "Drop to import into ", dropTarget || "Assets")
+  );
+}
+function ModelPicker({ files, onChoose, onImport, onClose }) {
+  const models = files.filter((f) => f.cat === "models");
+  const [query, setQuery] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const importing = useRef(false);
+  const input = useRef(null);
+  const shown = models.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const importFile = async (file) => {
+    if (!file || importing.current) return;
+    importing.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      if (await onImport(file) !== false) onClose();
+    } catch (e) {
+      setError(e.message || "Could not add this model. Try another file.");
+    } finally {
+      importing.current = false;
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+  return /* @__PURE__ */ React.createElement(
+    Modal,
+    {
+      title: "Add a model",
+      onClose,
+      width: 480,
+      canDismiss: !busy,
+      initialFocus: models.length ? ".a-model-choice" : ".a-btn--primary",
+      footer: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "a-grow" }), /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", disabled: busy, onClick: onClose }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: `a-btn ${models.length ? "a-btn--ghost" : "a-btn--primary"}`, disabled: busy, onClick: () => input.current?.click() }, busy ? "Adding\u2026" : "Import model\u2026"))
+    },
+    /* @__PURE__ */ React.createElement("input", { ref: input, type: "file", accept: ".obj,.glb,.gltf", hidden: true, disabled: busy, onChange: (e) => importFile(e.target.files?.[0]) }),
+    models.length > 8 && /* @__PURE__ */ React.createElement("input", { className: "a-input", "aria-label": "Find a model", placeholder: "Find a model\u2026", value: query, onChange: (e) => setQuery(e.target.value) }),
+    models.length ? /* @__PURE__ */ React.createElement("div", { className: "a-model-choices" }, shown.map((f) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: f.id,
+        className: "a-model-choice",
+        disabled: busy || !!f.error,
+        onClick: () => {
+          onChoose(f);
+          onClose();
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { "aria-hidden": "true" }, "\u25C8"),
+      /* @__PURE__ */ React.createElement("span", null, f.name),
+      f.error && /* @__PURE__ */ React.createElement("small", null, f.error)
+    )), !shown.length && /* @__PURE__ */ React.createElement(Empty, null, "No model matches \u201C", query, "\u201D.")) : /* @__PURE__ */ React.createElement("p", { className: "a-new-project__intro" }, "Choose a model to place in your scene."),
+    error && /* @__PURE__ */ React.createElement("p", { className: "a-error a-modal__error", role: "alert" }, error)
   );
 }
 function FolderIcon() {
@@ -18695,11 +18824,13 @@ function MenuBar({
   dirty,
   projectFileName,
   playBusy,
-  playing
+  playing,
+  canRunLocally = true
 }) {
   const [open, setOpen] = useState(null);
   const [nativeTitlebar, setNativeTitlebar] = useState(false);
   const barRef = useRef(null);
+  const focusMenu = useRef(null);
   useEffect(() => {
     document.title = `${project.name}${dirty ? " *" : ""} \u2014 AthEditor`;
   }, [project.name, dirty]);
@@ -18713,11 +18844,20 @@ function MenuBar({
   }, []);
   useEffect(() => {
     if (!open) return;
+    if (focusMenu.current) {
+      const controls = barRef.current ? visibleEditorControls(barRef.current, ".a-menu__pop button, .a-menu__pop summary") : [];
+      (focusMenu.current === "last" ? controls[controls.length - 1] : controls[0])?.focus();
+      focusMenu.current = null;
+    }
     const close = (e) => {
       if (!barRef.current?.contains(e.target)) setOpen(null);
     };
     const esc = (e) => {
-      if (e.key === "Escape") setOpen(null);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(null);
+        barRef.current?.querySelector(`[data-menu="${open}"]`)?.focus();
+      }
     };
     window.addEventListener("mousedown", close);
     window.addEventListener("keydown", esc);
@@ -18740,6 +18880,7 @@ function MenuBar({
   const action = (id) => commands.find((c) => c.id === id);
   const invoke = (id) => {
     const command = action(id);
+    setOpen(null);
     if (command && (!command.enabled || command.enabled())) command.run();
   };
   const item = (c) => /* @__PURE__ */ React.createElement(
@@ -18750,6 +18891,7 @@ function MenuBar({
       disabled: c.enabled ? !c.enabled() : false,
       onClick: () => {
         setOpen(null);
+        barRef.current?.querySelector(`[data-menu="${open}"]`)?.focus();
         c.run();
       }
     },
@@ -18820,58 +18962,104 @@ function MenuBar({
     } else take(null, () => true);
     return groups2;
   };
-  return /* @__PURE__ */ React.createElement("div", { className: `a-menubar${nativeTitlebar ? " a-menubar--native" : ""}`, ref: barRef }, /* @__PURE__ */ React.createElement("div", { className: "a-brand" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "a-brand__name" }, /* @__PURE__ */ React.createElement(
-    "input",
+  return /* @__PURE__ */ React.createElement(
+    "div",
     {
-      className: "a-input",
-      "aria-label": "Project name",
-      value: project.name,
-      onChange: (e) => onRenameProject(e.target.value),
-      title: "Project name"
-    }
-  )))), groups.map((g) => /* @__PURE__ */ React.createElement("div", { className: "a-menu", key: g.name }, /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      className: `a-menu__btn${open === g.name ? " a-menu__btn--open" : ""}`,
-      "aria-expanded": open === g.name,
-      "aria-haspopup": "true",
-      onClick: (e) => {
-        e.stopPropagation();
-        setOpen(open === g.name ? null : g.name);
+      className: `a-menubar${nativeTitlebar ? " a-menubar--native" : ""}`,
+      ref: barRef,
+      onBlur: (e) => {
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setOpen(null);
+      },
+      onFocus: (e) => {
+        if (!e.target.closest(".a-menu")) setOpen(null);
+      },
+      onKeyDown: (e) => {
+        const trigger = e.target.closest(".a-menu__btn");
+        if (trigger && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+          const buttons = [...barRef.current.querySelectorAll(".a-menu__btn")];
+          const next = buttons[(buttons.indexOf(trigger) + (e.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length];
+          e.preventDefault();
+          e.stopPropagation();
+          next.focus();
+          if (open) setOpen(next.dataset.menu);
+        } else if (trigger && ["ArrowDown", "ArrowUp"].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          const direction = e.key === "ArrowUp" ? "last" : "first";
+          if (open === trigger.dataset.menu) {
+            const controls = visibleEditorControls(barRef.current, ".a-menu__pop button, .a-menu__pop summary");
+            (direction === "last" ? controls[controls.length - 1] : controls[0])?.focus();
+          } else {
+            focusMenu.current = direction;
+            setOpen(trigger.dataset.menu);
+          }
+        } else if (e.target.closest(".a-menu__pop") && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+          const controls = visibleEditorControls(barRef.current, ".a-menu__pop button, .a-menu__pop summary");
+          const at = controls.indexOf(e.target);
+          const next = e.key === "Home" ? 0 : e.key === "End" ? controls.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + controls.length) % controls.length;
+          e.preventDefault();
+          e.stopPropagation();
+          controls[next]?.focus();
+        }
       }
     },
-    g.name
-  ), open === g.name && /* @__PURE__ */ React.createElement("div", { className: "a-menu__pop" }, sections(g).map(
-    (section, i) => section.label ? /* @__PURE__ */ React.createElement("details", { className: "a-menu-disclosure", key: section.label }, /* @__PURE__ */ React.createElement("summary", null, section.label), section.items.map(item)) : /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, section.items.map(item))
-  )))), /* @__PURE__ */ React.createElement("div", { className: "a-grow" }), /* @__PURE__ */ React.createElement("div", { className: "a-project-actions" }, project.scenes.length > 1 && /* @__PURE__ */ React.createElement(
-    "select",
-    {
-      className: "a-select",
-      value: project.activeSceneId,
-      onChange: (e) => onSwitchScene(e.target.value),
-      title: "Active scene",
-      "aria-label": "Current scene"
-    },
-    project.scenes.map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, s.name))
-  ), action("file.save") && /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      className: "a-btn a-btn--ghost",
-      onClick: () => invoke("file.save"),
-      title: projectFileName ? `Save ${projectFileName} (Ctrl+S)` : "Save a project file (Ctrl+S)"
-    },
-    "Save",
-    dirty && /* @__PURE__ */ React.createElement("span", { className: "a-save-dot", "aria-label": "Unsaved changes" })
-  ), action("file.export") && /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost a-export-button", onClick: () => invoke("file.export") }, "Export\u2026"), action("file.play") && /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      className: "a-btn a-btn--primary a-run-button",
-      onClick: () => invoke("file.play"),
-      disabled: !!playBusy || !!(action("file.play").enabled && !action("file.play").enabled()),
-      title: "Try the open scene in PCSX2 (F5)"
-    },
-    playBusy ? playing ? "Stopping\u2026" : "Preparing\u2026" : playing ? "Stop game" : "Run game"
-  )));
+    /* @__PURE__ */ React.createElement("div", { className: "a-brand" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "a-brand__name" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        className: "a-input",
+        "aria-label": "Project name",
+        value: project.name,
+        onChange: (e) => onRenameProject(e.target.value),
+        title: "Project name"
+      }
+    )))),
+    groups.map((g) => /* @__PURE__ */ React.createElement("div", { className: "a-menu", key: g.name }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: `a-menu__btn${open === g.name ? " a-menu__btn--open" : ""}`,
+        "aria-expanded": open === g.name,
+        "aria-haspopup": "true",
+        "data-menu": g.name,
+        onClick: (e) => {
+          e.stopPropagation();
+          setOpen(open === g.name ? null : g.name);
+        }
+      },
+      g.name
+    ), open === g.name && /* @__PURE__ */ React.createElement("div", { className: "a-menu__pop" }, sections(g).map(
+      (section, i) => section.label ? /* @__PURE__ */ React.createElement("details", { className: "a-menu-disclosure", key: section.label }, /* @__PURE__ */ React.createElement("summary", null, section.label), section.items.map(item)) : /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, section.items.map(item))
+    )))),
+    /* @__PURE__ */ React.createElement("div", { className: "a-grow" }),
+    /* @__PURE__ */ React.createElement("div", { className: "a-project-actions" }, project.scenes.length > 1 && /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        className: "a-select",
+        value: project.activeSceneId,
+        onChange: (e) => onSwitchScene(e.target.value),
+        title: "Active scene",
+        "aria-label": "Current scene"
+      },
+      project.scenes.map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, s.name))
+    ), action("file.save") && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "a-btn a-btn--ghost",
+        onClick: () => invoke("file.save"),
+        title: projectFileName ? `Save ${projectFileName} (Ctrl+S)` : "Save a project file (Ctrl+S)"
+      },
+      "Save",
+      dirty && /* @__PURE__ */ React.createElement("span", { className: "a-save-dot", "aria-label": "Unsaved changes" })
+    ), action("file.export") && /* @__PURE__ */ React.createElement("button", { className: `a-btn ${canRunLocally ? "a-btn--ghost" : "a-btn--primary"} a-export-button`, onClick: () => invoke("file.export") }, canRunLocally ? "Export\u2026" : "Export game\u2026"), canRunLocally && action("file.play") && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "a-btn a-btn--primary a-run-button",
+        onClick: () => invoke("file.play"),
+        disabled: !!playBusy || !!(action("file.play").enabled && !action("file.play").enabled()),
+        title: "Try the open scene in PCSX2 (F5)"
+      },
+      playBusy ? playing ? "Stopping\u2026" : "Preparing\u2026" : playing ? "Stop game" : "Run game"
+    ))
+  );
 }
 
 
@@ -18887,11 +19075,12 @@ function StatusBar({
   folderName,
   folderNeedsReadAccess,
   projectFileName,
+  downloadedFileName,
   onResumeFolder,
   dirty
 }) {
   const counts = countByLevel(problems);
-  return /* @__PURE__ */ React.createElement("footer", { className: "a-status", "aria-label": "Project status" }, /* @__PURE__ */ React.createElement("span", { className: "a-status__item" }, selection.length > 1 ? `${selection.length} objects selected` : selection[0]?.name || scene?.name), /* @__PURE__ */ React.createElement("span", { className: "a-status__spacer" }), folderName && folderNeedsReadAccess && /* @__PURE__ */ React.createElement("button", { className: "a-status__btn", onClick: onResumeFolder }, "Load project assets\u2026"), (counts.error > 0 || counts.warn > 0) && /* @__PURE__ */ React.createElement("button", { className: "a-status__btn", onClick: onShowProblems }, counts.error > 0 && /* @__PURE__ */ React.createElement("span", { className: "a-status__error" }, counts.error, " error", counts.error > 1 ? "s" : ""), counts.warn > 0 && /* @__PURE__ */ React.createElement("span", null, counts.error ? " \xB7 " : "", counts.warn, " warning", counts.warn > 1 ? "s" : "")), autosavedAt && /* @__PURE__ */ React.createElement("span", { className: "a-status__item a-dim", title: `Recovery copy updated at ${new Date(autosavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Save keeps a project file.` }, projectFileName && !dirty ? `Saved \xB7 ${projectFileName}` : "Backed up in this browser"));
+  return /* @__PURE__ */ React.createElement("footer", { className: "a-status", "aria-label": "Project status" }, /* @__PURE__ */ React.createElement("span", { className: "a-status__item" }, selection.length > 1 ? `${selection.length} objects selected` : selection[0]?.name || scene?.name), /* @__PURE__ */ React.createElement("span", { className: "a-status__spacer" }), folderName && folderNeedsReadAccess && /* @__PURE__ */ React.createElement("button", { className: "a-status__btn", onClick: onResumeFolder }, "Load project assets\u2026"), (counts.error > 0 || counts.warn > 0) && /* @__PURE__ */ React.createElement("button", { className: "a-status__btn", onClick: onShowProblems }, counts.error > 0 && /* @__PURE__ */ React.createElement("span", { className: "a-status__error" }, counts.error, " error", counts.error > 1 ? "s" : ""), counts.warn > 0 && /* @__PURE__ */ React.createElement("span", null, counts.error ? " \xB7 " : "", counts.warn, " warning", counts.warn > 1 ? "s" : "")), (autosavedAt || projectFileName || downloadedFileName) && /* @__PURE__ */ React.createElement("span", { className: "a-status__item a-dim", role: "status", title: autosavedAt ? `Recovery copy updated at ${new Date(autosavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Save keeps a project file.` : void 0 }, !dirty && projectFileName ? `Saved \xB7 ${projectFileName}` : !dirty && downloadedFileName ? `Download requested \xB7 ${downloadedFileName}` : autosavedAt ? "Backed up in this browser" : "Unsaved changes"));
 }
 
 
@@ -18899,7 +19088,9 @@ function StatusBar({
 // src/panels/scenetools.jsx
 // ══════════════════════════════════════════════════════════════════
 function SceneTools({ prefs, gizmoMode, onMode, onPref, hasSelection, onAdd, onFrame, onSceneSettings }) {
-  return /* @__PURE__ */ React.createElement("div", { className: "a-scene-tools" }, /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", onClick: onAdd }, "+ Add object"), hasSelection && /* @__PURE__ */ React.createElement("div", { className: "a-transform-tools", role: "group", "aria-label": "Transform selected objects" }, [["translate", "Move", "W"], ["rotate", "Rotate", "E"], [
+  const ref = useRef(null);
+  useDetailsPopovers(ref, ".a-view-options");
+  return /* @__PURE__ */ React.createElement("div", { className: "a-scene-tools", ref }, /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", onClick: onAdd }, "+ Add object"), hasSelection && /* @__PURE__ */ React.createElement("div", { className: "a-transform-tools", role: "group", "aria-label": "Transform selected objects" }, [["translate", "Move", "W"], ["rotate", "Rotate", "E"], [
     "scale",
     "Scale",
     "R"
@@ -19860,9 +20051,13 @@ function BakeLightingModal({ scene, files, onApply, onClose }) {
 // ══════════════════════════════════════════════════════════════════
 // src/panels/play.jsx
 // ══════════════════════════════════════════════════════════════════
-function PlaySettingsModal({ onClose, onReady }) {
+function PlaySettingsModal({ onClose, onReady, localAvailable = true, onExport }) {
   const [settings, setSettings] = useState(null), [error, setError] = useState(""), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (!localAvailable) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     editorPlayRequest("status").then((next) => {
       if (!cancelled) setSettings(next);
@@ -19890,10 +20085,11 @@ function PlaySettingsModal({ onClose, onReady }) {
   return /* @__PURE__ */ React.createElement(
     Modal,
     {
-      title: "Run in PCSX2",
+      title: localAvailable ? "Run in PCSX2" : "Run on your computer",
       onClose,
       width: 530,
-      footer: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "a-btn", onClick: onClose }, "Cancel"), settings && /* @__PURE__ */ React.createElement(
+      canDismiss: !busy,
+      footer: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "a-grow" }), /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost", disabled: busy, onClick: onClose }, localAvailable ? "Cancel" : "Close"), !localAvailable && /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--primary", onClick: onExport }, "Export game\u2026"), settings && /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "a-btn a-btn--primary",
@@ -19903,6 +20099,7 @@ function PlaySettingsModal({ onClose, onReady }) {
         busy ? "Preparing\u2026" : "Run game"
       ))
     },
+    !localAvailable && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("p", { className: "a-run-status" }, "Open ", /* @__PURE__ */ React.createElement("strong", null, "Start AthEditor.vbs"), " in your editor folder to try your game in PCSX2."), /* @__PURE__ */ React.createElement("p", { className: "a-dim" }, "You can keep editing and export your game here.")),
     loading && /* @__PURE__ */ React.createElement("p", { role: "status" }, "Checking PCSX2\u2026"),
     settings && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("p", { className: "a-run-status" }, settings.available ? "The current scene is ready to play." : "Choose PCSX2 and the console player to run your game."), /* @__PURE__ */ React.createElement("details", { className: "a-disclosure", open: !settings.available }, /* @__PURE__ */ React.createElement("summary", null, "Run settings"), /* @__PURE__ */ React.createElement("label", { className: "a-setting-label" }, "PCSX2 executable", /* @__PURE__ */ React.createElement(
       "input",
@@ -20110,6 +20307,7 @@ const DEFAULT_PREFS = {
 };
 function App() {
   const installation = useEditorInstallation();
+  const canRunLocally = !!document.querySelector?.('meta[name="athena-launch-token"]');
   const actionWindowRef = useRef(window);
   const actionWindow = () => actionWindowRef.current?.closed ? window : actionWindowRef.current;
   useEffect(() => {
@@ -20149,6 +20347,7 @@ function App() {
   const projectSessionRef = useRef(0);
   const savingProjectRef = useRef(false);
   const [projectFileName, setProjectFileName] = useState(null);
+  const [downloadedFileName, setDownloadedFileName] = useState(null);
   const [folderName, setFolderName] = useState(null);
   const [folderNeedsGrant, setFolderNeedsGrant] = useState(false);
   const [folderNeedsReadAccess, setFolderNeedsReadAccess] = useState(false);
@@ -20177,6 +20376,7 @@ function App() {
     projectSessionRef.current++;
     projectFileRef.current = null;
     setProjectFileName(null);
+    setDownloadedFileName(null);
     folderRef.current = null;
     setFolderName(null);
     setFolderNeedsGrant(false);
@@ -20283,7 +20483,7 @@ function App() {
     setActiveId(id);
     setMainTab("terrain");
   };
-  const useAsset = useCallback((asset) => {
+  const useAsset = useCallback((asset, position) => {
     if (asset.cat === "scripts") {
       setOpenScript({ name: asset.name, key: uid() });
       setMainTab("scripts");
@@ -20293,13 +20493,9 @@ function App() {
     } else if (asset.cat === "models") {
       let id;
       edit((p, sc) => {
-        const obj = mkObject(
-          uniqueName(asset.name.replace(/\.[^.]+$/, ""), sc.objects)
-        );
-        obj.components.model = { ...makeComponent("model"), file: asset.name };
-        sc.objects.push(obj);
-        id = obj.id;
+        id = placeModelAsset(sc, asset, position)?.id;
       });
+      if (!id) return;
       setSelectedIds([id]);
       setActiveId(id);
       setSelectedAssetId(null);
@@ -20308,6 +20504,25 @@ function App() {
       setMainTab("viewport");
     }
   }, [edit, focusPanel]);
+  const importModel = useCallback(async (file) => {
+    const session = projectSessionRef.current, sceneId = projectRef.current.activeSceneId;
+    const { assets } = await readImportedAssets([{ file }]);
+    if (session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId) return false;
+    if (assets[0]?.cat !== "models") throw Error("This model could not be read. Choose an OBJ, GLB or glTF file.");
+    let id;
+    edit((p, sc) => {
+      const { imported } = importProjectAssets(p, assets, "", files);
+      id = placeModelAsset(sc, imported[0])?.id;
+    });
+    if (!id) return false;
+    setSelectedIds([id]);
+    setActiveId(id);
+    setSelectedAssetId(null);
+    setSelectedUIId(null);
+    focusPanel("inspector");
+    setMainTab("viewport");
+    return true;
+  }, [edit, files, focusPanel]);
   const undo = useCallback(() => {
     const restored = historyUndo(historyRef.current, projectRef.current);
     if (!restored) {
@@ -20982,6 +21197,13 @@ function App() {
       else downloadText(suggestedName, json);
       if (session === projectSessionRef.current) {
         setDirty(projectRef.current !== p);
+        if (!folder) {
+          setDownloadedFileName(suggestedName);
+          setProjectFileName(null);
+        } else {
+          setProjectFileName(suggestedName);
+          setDownloadedFileName(null);
+        }
       }
       toast.ok(folder ? `Saved ${suggestedName}` : "Project downloaded", {
         sub: folder ? `in ${folder.name}/` : void 0
@@ -21347,13 +21569,17 @@ function App() {
     }
     setModal("export");
     if (errs) {
-      toast.warn(`Exported with ${errs} error${errs > 1 ? "s" : ""}`, {
-        sub: "Check the Problems panel."
+      toast.warn(`Fix ${errs} error${errs > 1 ? "s" : ""} to export`, {
+        sub: "Choose an error to go to the affected item."
       });
     }
   }, [files, toast, activeFolder]);
   const runGame = useCallback(async () => {
     if (playBusy) return;
+    if (!canRunLocally) {
+      setModal("play");
+      return;
+    }
     setPlayBusy(true);
     try {
       const status = await editorPlayRequest("status");
@@ -21389,8 +21615,9 @@ function App() {
     } finally {
       setPlayBusy(false);
     }
-  }, [files, playBusy, toast, setPref]);
+  }, [files, playBusy, toast, canRunLocally]);
   useEffect(() => {
+    if (!canRunLocally) return;
     let cancelled = false;
     const refresh = () => editorPlayRequest("status").then((s) => {
       if (!cancelled) setPlaying(s.running);
@@ -21407,7 +21634,7 @@ function App() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [playing]);
+  }, [playing, canRunLocally]);
   const applyProblemFix = useCallback((p) => {
     let ok = false;
     edit((draft) => {
@@ -21500,7 +21727,7 @@ function App() {
       {
         id: "file.play",
         group: "File",
-        title: playing ? "Stop game" : "Run in PCSX2",
+        title: playing ? "Stop game" : "Run game\u2026",
         keys: "F5",
         run: runGame,
         enabled: () => !playBusy
@@ -21509,6 +21736,7 @@ function App() {
         id: "file.playSettings",
         group: "File",
         title: "Run settings\u2026",
+        hidden: !canRunLocally,
         run: () => setModal("play")
       },
       {
@@ -21821,7 +22049,7 @@ function App() {
         title: d.label,
         icon: d.icon,
         color: d.color,
-        run: () => addObject(key)
+        run: () => key === "model" ? setModal("model") : addObject(key)
       });
     }
     for (const t2 of UI_TYPES) {
@@ -22129,8 +22357,8 @@ function App() {
       {
         onSceneSettings: () => focusPanel("sceneSettings"),
         onAdd: () => openAddPalette(),
-        onFrame: () => commands.find((c) => c.id === (selectedIds.length ? "view.frame" : "view.frameall"))?.run(),
-        hasSelection: selectedIds.length > 0,
+        onFrame: () => commands.find((c) => c.id === (selection.length ? "view.frame" : "view.frameall"))?.run(),
+        hasSelection: selection.length > 0,
         prefs,
         gizmoMode,
         onMode: setGizmoMode,
@@ -22153,7 +22381,8 @@ function App() {
         showOverlays: prefs.showOverlays,
         shaded: prefs.shaded,
         onFrameRequest: frameRef,
-        onCaptureRequest: captureRef
+        onCaptureRequest: captureRef,
+        onPlaceAsset: useAsset
       }
     )),
     hud: /* @__PURE__ */ React.createElement(
@@ -22347,7 +22576,7 @@ function App() {
         }
       }
     ),
-    assets: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "a-library-actions" }, /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost a-btn--sm", onClick: pickFolder }, "Import assets\u2026")), /* @__PURE__ */ React.createElement(
+    assets: /* @__PURE__ */ React.createElement(React.Fragment, null, files.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "a-library-actions" }, /* @__PURE__ */ React.createElement("button", { className: "a-btn a-btn--ghost a-btn--sm", onClick: pickFolder }, "Import assets\u2026")), /* @__PURE__ */ React.createElement(
       Navigator,
       {
         revealAssetName: mainTab === "uv" ? activeObject?.components.model?.file : null,
@@ -22486,6 +22715,7 @@ function App() {
       projectFileName,
       playBusy,
       playing,
+      canRunLocally,
       onSwitchScene: (id) => {
         edit((p) => {
           p.activeSceneId = id;
@@ -22528,6 +22758,7 @@ function App() {
       problems,
       files,
       autosavedAt,
+      downloadedFileName,
       buildStamp: window.__ATHENA_BUILD__ || "dev",
       onShowProblems: () => {
         setBottomTab("problems");
@@ -22559,13 +22790,18 @@ function App() {
   ), modal === "play" && /* @__PURE__ */ React.createElement(
     PlaySettingsModal,
     {
+      localAvailable: canRunLocally,
+      onExport: () => {
+        setModal(null);
+        runExport();
+      },
       onClose: () => setModal(null),
       onReady: () => {
         setModal(null);
         runGame();
       }
     }
-  ), modal === "install" && /* @__PURE__ */ React.createElement(InstallEditorModal, { onClose: () => setModal(null) }), modal === "shareFile" && shareFile && /* @__PURE__ */ React.createElement(ShareFileModal, { file: shareFile, onClose: () => {
+  ), modal === "model" && /* @__PURE__ */ React.createElement(ModelPicker, { files, onChoose: useAsset, onImport: importModel, onClose: () => setModal(null) }), modal === "install" && /* @__PURE__ */ React.createElement(InstallEditorModal, { onClose: () => setModal(null) }), modal === "shareFile" && shareFile && /* @__PURE__ */ React.createElement(ShareFileModal, { file: shareFile, onClose: () => {
     setModal(null);
     setShareFile(null);
   } }), modal?.kind === "confirmReplace" && /* @__PURE__ */ React.createElement(

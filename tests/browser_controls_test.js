@@ -2,7 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 import * as esbuild from "npm:esbuild@0.24.0";
 
 const source = (await Promise.all(
-  ["ui/primitives.jsx", "panels/menubar.jsx", "panels/fonts.jsx"].map(async (
+  ["ui/primitives.jsx", "ui/popover.js", "panels/menubar.jsx", "panels/fonts.jsx"].map(async (
     path,
   ) =>
     (await esbuild.transform(

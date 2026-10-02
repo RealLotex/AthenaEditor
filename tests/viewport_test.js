@@ -13,6 +13,25 @@ const A = await load([
 ]);
 const near = (a, b) => assertAlmostEquals(a, b, 1e-5);
 
+Deno.test("model drops follow the visible surface, use the ground elsewhere and honor grid snap", () => {
+  const camera = new THREE.PerspectiveCamera(55, 1, .05, 100);
+  camera.position.set(0, 10, 10); camera.lookAt(0, 0, 0); camera.updateMatrixWorld(true);
+  const content = new THREE.Group(), surface = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 4));
+  surface.position.y = 1; content.add(surface); content.updateMatrixWorld(true);
+  const g = { camera, content, controls: { target: new THREE.Vector3() } }, rect = { left: 100, top: 50, width: 600, height: 600 };
+  const onSurface = A.viewportPlacement(g, 400, 350, rect);
+  near(onSurface.y, 2);
+  surface.visible = false;
+  const onGround = A.viewportPlacement(g, 400, 350, rect);
+  near(onGround.y, 0); near(onGround.z, 0);
+  const snapped = A.viewportPlacement(g, 455, 420, rect, .5);
+  for (const value of Object.values(snapped)) near(value / .5, Math.round(value / .5));
+  // A ray above the horizon still places at the point the editor is looking at.
+  camera.lookAt(0, 20, 0); camera.updateMatrixWorld(true);
+  g.controls.target.set(3, 4, 5);
+  assertEquals(A.viewportPlacement(g, 400, 350, rect), { x: 3, y: 4, z: 5 });
+});
+
 Deno.test("texture filters defer GPU upload until the image is available", () => {
   const texture = new THREE.Texture();
   const pendingVersion = texture.version;

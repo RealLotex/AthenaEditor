@@ -72,9 +72,6 @@ function Inspector({
       <>
         <PanelHeader title="Properties" />
         <Empty>Select an object in the scene.</Empty>
-        {onEditScene && <div style={{ padding: "0 12px" }}>
-          <button className="a-btn a-btn--wide" onClick={onEditScene}>Scene settings</button>
-        </div>}
       </>
     );
   }
@@ -371,6 +368,7 @@ function AssetInspector({ asset, onUse }) {
         {onUse && ["models", "textures", "scripts"].includes(asset.cat) && (
           <button
             className="a-btn a-btn--primary a-btn--wide"
+            disabled={!!asset.error}
             onClick={() => onUse(asset)}
           >
             {asset.cat === "models"
