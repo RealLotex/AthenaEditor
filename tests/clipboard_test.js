@@ -168,3 +168,30 @@ Deno.test("clipboard ignores unrelated text and rejects malformed hierarchies/as
   );
   assertEquals(project.assets.length, 0);
 });
+
+Deno.test("HUD clipboard carries image, font and script assets across projects and repairs names without changing layout", () => {
+  const source = A.mkProject(), scene = source.scenes[0], el = A.mkUIEl("Image");
+  el.image = "Icon.png"; el.fontFile = "Face.ttf"; el.script = {file:"HUD.js",ctxKey:"display"};
+  el.x = 123; el.y = 45; el.imageFilter = "NEAREST"; el.bgColor.a = 64;
+  scene.uiElements.push(el);
+  const files = [
+    {name:"Icon.png",cat:"textures",dataUrl:"data:image/png;base64,YQ=="},
+    {name:"Face.ttf",cat:"fonts",dataUrl:"data:font/ttf;base64,Yg=="},
+    {name:"HUD.js",cat:"scripts",content:"export function update(){}"},
+  ];
+  const payload = A.parseObjectClipboard(A.HUD_CLIPBOARD_PREFIX + JSON.stringify(A.makeHUDClipboard(source,scene,[el.id],files)));
+  assertEquals(payload.assets.length,3);
+  const target = A.mkProject(), sc = target.scenes[0];
+  target.assets.push({...files[0],dataUrl:"data:image/png;base64,Yw=="});
+  sc.uiElements.push({...A.mkUIEl("Image"),name:el.name,script:{ctxKey:"display"}});
+  const ids = A.pasteHUDClipboard(target,sc,payload);
+  const copy = sc.uiElements.find(el=>el.id===ids[0]);
+  assert(copy.id!==el.id); assert(copy.name!==el.name);
+  assertEquals([copy.x,copy.y,copy.imageFilter,copy.bgColor.a],[123,45,"NEAREST",64]);
+  assertEquals(copy.image,"icon_2.png"); assertEquals(copy.script.ctxKey,"display_2");
+  assertEquals(target.assets.length,4);
+  assertEquals(scene.uiElements[0],el);
+  assertEquals(A.cloneHUDElements([el],scene.uiElements,12)[0].x,135);
+  assertThrows(()=>A.parseObjectClipboard(A.HUD_CLIPBOARD_PREFIX+JSON.stringify({...payload,elements:[{...el,x:"bad"}]})));
+  assertThrows(()=>A.parseObjectClipboard(A.HUD_CLIPBOARD_PREFIX+JSON.stringify({...payload,kind:"atheditor.objects"})));
+});

@@ -737,8 +737,8 @@ Deno.test("a mesh reused with different settings is cloned, not reloaded", () =>
   assertEquals(countOf(main, /new RenderData\(/g), 1, "the same mesh was uploaded twice");
   assertEquals(countOf(main, /\.clone\(\);$/gm), 1);
   // The clone still gets its own settings — that is the whole reason it exists.
-  assertStringIncludes(main, "shade_model = Render.SHADE_FLAT;");
-  assertStringIncludes(main, "shade_model = Render.SHADE_GOURAUD;");
+  assertStringIncludes(main, "shade_model = 0;");
+  assertStringIncludes(main, "shade_model = 1;");
 });
 
 Deno.test("identical objects still share one RenderData outright", () => {
@@ -762,7 +762,7 @@ Deno.test("a clone never re-runs the embedded-texture filter", () => {
     s.objects.push(obj("B", { model: { file: "m.glb", face_culling: "CULL_FACE_NONE" } }));
   });
   const { main } = gen(p);
-  assertEquals(countOf(main, /getTexture\(0\)/g), 1);
+  assertEquals(countOf(main, /getTexture\(_i\)/g), 1);
   assertEquals(countOf(main, /\.clone\(\)/g), 1);
 });
 

@@ -33,10 +33,16 @@ function emitSkyboxSetup(e, ir) {
 function emitSkyboxDraw(e, ir) {
   const sky = ir.skybox; if (!sky) return;
   e.comment("Draw sky before geometry; its own frustum keeps it independent of scene clipping");
-  e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
+  // Disabling comparison alone still lets the GS write sky depth. The separate
+  // sky frustum must never enter scene depth; those writes also crash PCSX2 2.6.3
+  // with CT16S + Z16S. Mask writes and use ALWAYS for a valid GS depth test.
+  e.w(`Screen.setBuffer(Screen.DEPTH_BUFFER, _mainDepth, 1);`);
+  e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
+  e.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_ALWAYS);`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, 0.01, 4.0);`);
   e.w(`${sky.objectVN}.position = Camera.save().position;`);
   e.w(`${sky.objectVN}.render();`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, ${fl(ir.camera.near)}, ${fl(ir.camera.far)});`);
+  e.w(`Screen.setBuffer(Screen.DEPTH_BUFFER, _mainDepth, 0);`);
   e.nl();
 }

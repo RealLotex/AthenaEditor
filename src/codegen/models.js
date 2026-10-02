@@ -37,16 +37,24 @@ function emitRenderDatas(e, ir) {
     }
     e.w(`${rd.dataVN}.pipeline = Render.${m.pipeline || "PL_DEFAULT"};`);
     e.w(`${rd.dataVN}.face_culling = Render.${m.face_culling || "CULL_FACE_BACK"};`);
-    e.w(`${rd.dataVN}.shade_model = Render.${m.shade_model || "SHADE_GOURAUD"};`);
+    // Render does not export SHADE_* in the release (ath_render.c render_funcs).
+    // Undefined becomes 0 in JS_ToUint32: both choices used to select Flat.
+    // render.h's GS IIP enum is Flat=0, Gouraud=1.
+    e.w(`${rd.dataVN}.shade_model = ${m.shade_model === "SHADE_FLAT" ? 0 : 1};`);
     e.w(`${rd.dataVN}.texture_mapping = ${m.texture_mapping !== false};`);
     e.w(`${rd.dataVN}.accurate_clipping = ${!!m.accurate_clipping};`);
     if (!rd.texVN && !rd.cloneOf) {
       // Meshes that carry their own embedded texture (GLTF) still want the
       // filter. A clone shares that texture, so setting it again is redundant.
-      e.w(`try { ${rd.dataVN}.getTexture(0).filter = ${m.textureFilter || "LINEAR"}; } catch (_e) {}`);
+      e.w(`for (let _i = 0, _tex; (_tex = ${rd.dataVN}.getTexture(_i)); _i++) _tex.filter = ${m.textureFilter || "LINEAR"};`);
     }
     e.nl();
   }
+
+  // Every RenderData(image) constructor forces GS_FILTER_LINEAR in ath_render.c.
+  // Restore filters after ALL constructors, including meshes sharing one Image.
+  for (const t of ir.textures) e.w(`if (${t.vn}) ${t.vn}.filter = ${t.filter};`);
+  if (ir.textures.length) e.nl();
 
   for (const a of ir.anims) e.w(`const ${a.vn} = new AnimCollection("${jsStr(a.file)}");`);
   if (ir.anims.length) e.nl();
@@ -91,7 +99,6 @@ function emitTexture(e, ir, t) {
     b.w(`}`);
   });
   e.w(`}`);
-  e.w(`if (${t.vn}) ${t.vn}.filter = ${t.filter};`);
   e.nl();
 }
 

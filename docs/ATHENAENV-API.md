@@ -1,5 +1,33 @@
 # AthenaEnv API — verified reference
 
+## Render settings and sky depth (verified 2026-10-02)
+
+The official `latest` ELF is pinned by SHA-256 in
+[the bundled player reference](../reference/AthenaEnvReleaseAndExamples/README.md).
+Its Render module does **not** export SHADE_FLAT or SHADE_GOURAUD. Assign
+`RenderData.shade_model = 0` for Flat and `= 1` for Gouraud (GS IIP values).
+Assigning an undefined constant silently selects Flat. The release exports the
+same numeric values on Draw, but numeric assignments avoid the missing Render exports.
+
+The RenderData constructor resets supplied Image filters to LINEAR
+(`src/js_api/ath_render.c`, lines 373 and 405 in the release commit). Apply each
+requested filter **after every constructor** that could share that image.
+Embedded mesh images are reached with getTexture(index); it returns undefined
+past the final texture. Filter all embedded images, rather than only index zero.
+
+For a sky drawn with its own projection, initialize buffer wrappers once with
+Screen.initBuffers and retain Screen.getBuffer(Screen.DEPTH_BUFFER). Before the
+sky render, set that buffer with mask 1, enable depth testing and select
+Screen.DEPTH_ALWAYS. Restore mask 0 before scene geometry, which uses DEPTH_GEQUAL.
+Disabling comparison alone does not protect scene depth. The unmasked sky also
+reproduces a PCSX2 2.6.3 hardware-renderer crash with CT16S + Z16S; masking the
+writes fixes the supplied scene while retaining the 16-bit buffers.
+Share this initialization with offscreen shadows: a second initBuffers call throws.
+The wrappers refer to existing buffers and allocate no additional VRAM.
+
+These settings were checked inside the released ELF in PCSX2, in addition to
+reading the [release source](https://github.com/DanielSant0s/AthenaEnv/tree/359485433f63c3b2f606a535f13aae1fdbfdb956).
+
 ## Frame lifecycle and scene changes (verified 2026-10-01)
 
 Generate frames with `Screen.clearColor(color)` and `Screen.display(callback)`.

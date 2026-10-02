@@ -67,6 +67,7 @@ function openPanelWindow(sourceWindow, sourceDocument, name, title, callbacks) {
     doc.body.append(header, slot);
     popup.addEventListener("pagehide", callbacks.onClose);
     popup.addEventListener("keydown", callbacks.onKey);
+    if (callbacks.onCopy) popup.addEventListener("copy", callbacks.onCopy);
     if (callbacks.onPaste) popup.addEventListener("paste", callbacks.onPaste);
     popup.addEventListener("focus", callbacks.onFocus);
     doc.addEventListener("pointerdown", callbacks.onFocus, true);
@@ -77,6 +78,7 @@ function openPanelWindow(sourceWindow, sourceDocument, name, title, callbacks) {
         cleanup.forEach((dispose) => dispose());
         popup.removeEventListener("pagehide", callbacks.onClose);
         popup.removeEventListener("keydown", callbacks.onKey);
+        if (callbacks.onCopy) popup.removeEventListener("copy", callbacks.onCopy);
         if (callbacks.onPaste) popup.removeEventListener("paste", callbacks.onPaste);
         popup.removeEventListener("focus", callbacks.onFocus);
         doc.removeEventListener("pointerdown", callbacks.onFocus, true);

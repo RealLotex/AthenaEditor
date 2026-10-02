@@ -220,6 +220,47 @@ Deno.test("native panel paste ignores text fields and transfers scene objects th
   assertEquals(JSON.stringify(e.project), before);
 });
 
+Deno.test("every HUD type copies, pastes and duplicates through commands with independent properties and one-step undo", async () => {
+  const e = editor();
+  for (const type of ["Text","Panel","Button","ProgressBar","Image"]) {
+    e.command(`add.ui.${type}`);
+    const original = e.project.scenes[0].uiElements.at(-1), count = e.project.scenes[0].uiElements.length;
+    assertEquals(e.find("Inspector").selection.length,0);
+    await e.command("edit.copy");
+    e.command("edit.duplicate");
+    const duplicate = e.project.scenes[0].uiElements.at(-1);
+    assert(duplicate.id!==original.id); assert(duplicate.name!==original.name);
+    assertEquals([duplicate.x,duplicate.y],[original.x+12,original.y+12]);
+    assertEquals(e.find("HUDEditor").selectedId,duplicate.id);
+    e.command("edit.undo"); assertEquals(e.project.scenes[0].uiElements.length,count);
+    e.command("edit.paste");
+    const pasted = e.project.scenes[0].uiElements.at(-1);
+    assertEquals(pasted.type,type); assert(pasted.id!==original.id);
+    assertEquals([pasted.x,pasted.y],[original.x,original.y]);
+    e.find("HUDEditor").onUpdate(pasted.id,{textColor:{r:12,g:34,b:56,a:64}});
+    e.render();
+    assertEquals(e.project.scenes[0].uiElements.find(el=>el.id===original.id).textColor,original.textColor);
+    e.command("edit.undo"); e.command("edit.undo");
+    assertEquals(e.project.scenes[0].uiElements.length,count);
+  }
+});
+
+Deno.test("Ctrl+C and Ctrl+V execute on a canvas without native clipboard events and preserve text editing", () => {
+  const e=editor(); e.command("add.ui.Text");
+  let copyPrevented=false;
+  e.find("DockWorkspace").onKeyDown({key:"c",ctrlKey:true,target:{nodeType:1,tagName:"DIV"},preventDefault(){copyPrevented=true;}});
+  assert(copyPrevented);
+  const before=e.project.scenes[0].uiElements.length;
+  let prevented=false;
+  const event={key:"v",ctrlKey:true,target:{nodeType:1,tagName:"INPUT"},preventDefault(){prevented=true;}};
+  e.find("DockWorkspace").onKeyDown(event); e.render();
+  assertEquals(prevented,false); assertEquals(e.project.scenes[0].uiElements.length,before);
+  event.target.tagName="DIV";
+  e.find("DockWorkspace").onKeyDown(event); e.render();
+  assert(prevented); assertEquals(e.project.scenes[0].uiElements.length,before+1);
+  e.command("edit.undo"); assertEquals(e.project.scenes[0].uiElements.length,before);
+});
+
 Deno.test("trusted paste supersedes pending clipboard permission so the same object is not pasted twice", async () => {
   let text, finish;
   const clipboard = {
@@ -250,6 +291,33 @@ Deno.test("trusted paste supersedes pending clipboard permission so the same obj
   assertEquals(e.project.scenes[0].objects.length, 4);
   e.command("edit.undo");
   assertEquals(e.project.scenes[0].objects.length, 3);
+});
+
+Deno.test("HUD paste uses its internal copy when clipboard permission is denied", async () => {
+  const clipboard={writeText:()=>Promise.reject(new DOMException("Denied","NotAllowedError")),readText:()=>Promise.reject(new DOMException("Denied","NotAllowedError"))};
+  const e=editor({navigator:{clipboard}});e.command("add.ui.Panel");await e.command("edit.copy");
+  await e.command("edit.paste");e.render();assertEquals(e.project.scenes[0].uiElements.length,2);
+  await e.command("edit.paste");e.render();assertEquals(e.project.scenes[0].uiElements.length,3);
+  e.command("edit.undo");assertEquals(e.project.scenes[0].uiElements.length,2);
+});
+
+Deno.test("native Copy transfers the selected HUD without clipboard API and preserves copying text fields", () => {
+  const e=editor();e.command("add.ui.Text");let text,prevented=false;
+  const event={target:{nodeType:1,tagName:"INPUT"},clipboardData:{setData(type,value){assertEquals(type,"text/plain");text=value;}},preventDefault(){prevented=true;}};
+  e.find("DockWorkspace").onCopy(event);assertEquals(prevented,false);assertEquals(text,undefined);
+  event.target.tagName="DIV";e.find("DockWorkspace").onCopy(event);assert(prevented);assert(text.startsWith("AthEditor HUD\n"));
+  e.find("DockWorkspace").onPaste({target:event.target,clipboardData:{getData:()=>text},preventDefault(){}});e.render();
+  assertEquals(e.project.scenes[0].uiElements.length,2);
+  e.command("edit.undo");assertEquals(e.project.scenes[0].uiElements.length,1);
+});
+
+Deno.test("a delayed HUD clipboard read does not paste into a newly selected scene", async () => {
+  let text,finish;
+  const clipboard={writeText:value=>{text=value;return Promise.resolve();},readText:()=>new Promise(resolve=>finish=resolve)};
+  const e=editor({navigator:{clipboard}});e.command("add.ui.Button");await e.command("edit.copy");
+  const pending=e.command("edit.paste");e.command("file.newscene");finish(text);
+  assertEquals(await pending,false);e.render();
+  assertEquals(e.project.scenes[0].uiElements.length,1);assertEquals(e.project.scenes[1].uiElements.length,0);
 });
 
 Deno.test("retrying a shared receipt acknowledges existing assets and respects undo instead of importing them twice", async () => {

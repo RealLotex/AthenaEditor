@@ -549,6 +549,15 @@ function App() {
   }, [selectedUIId, edit, toast, undo]);
 
   const duplicateSelection = useCallback(() => {
+    if (selectedUI) {
+      let id;
+      edit((p, sc) => {
+        const copies = cloneHUDElements([selectedUI], sc.uiElements, 12);
+        sc.uiElements.push(...copies); id = copies[0].id;
+      });
+      setSelectedUIId(id); setSelectedIds([]); setActiveId(null);
+      return;
+    }
     if (!selection.length) return;
     const ids = [];
     edit((p, sc) => {
@@ -563,7 +572,7 @@ function App() {
     });
     setSelectedIds(ids);
     setActiveId(ids[ids.length - 1]);
-  }, [selectedIds, edit]);
+  }, [selectedIds, selectedUI, edit]);
 
   const reparent = useCallback((srcId, targetId, where) => {
     edit((p, sc) => {
@@ -1225,30 +1234,35 @@ function App() {
 
   const pasteObjects = useCallback((payload) => {
     let ids;
-    edit((p, sc) => { ids = pasteObjectClipboard(p, sc, payload, files); });
-    if (ids.length) { setSelectedIds(ids); setActiveId(ids.at(-1)); setSelectedUIId(null); }
+    const hud = payload.kind === "atheditor.hud";
+    edit((p, sc) => { ids = hud ? pasteHUDClipboard(p, sc, payload, files) : pasteObjectClipboard(p, sc, payload, files); });
+    if (ids.length) {
+      setSelectedIds(hud ? [] : ids); setActiveId(hud ? null : ids.at(-1));
+      setSelectedUIId(hud ? ids.at(-1) : null); setSelectedAssetId(null);
+      setMainTab(hud ? "hud" : "viewport"); focusPanel("inspector");
+    }
     return !!ids.length;
-  }, [edit, files]);
+  }, [edit, files, focusPanel]);
   const pasteSystemClipboard = useCallback(async () => {
     if (clipboardReadRef.current.busy) return false;
     const version = ++clipboardReadRef.current.version;
     clipboardReadRef.current.busy = true;
-    const session = projectSessionRef.current;
+    const session = projectSessionRef.current, sceneId = projectRef.current.activeSceneId;
     try {
       const data = await readEditorClipboard(actionWindow());
-      if (session !== projectSessionRef.current || version !== clipboardReadRef.current.version) return false;
+      if (session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId || version !== clipboardReadRef.current.version) return false;
       if (data?.payload) return pasteObjects(data.payload);
       if (data?.files?.length) return importDroppedAssets({ files: data.files }, "Textures/Clipboard", { isActive: () => version === clipboardReadRef.current.version });
-      if (data) { toast.info("The clipboard has no images or AthEditor objects."); return false; }
+      if (data) { toast.info("The clipboard has no images or AthEditor elements."); return false; }
     } catch (error) {
-      if (version !== clipboardReadRef.current.version || session !== projectSessionRef.current) return false;
+      if (version !== clipboardReadRef.current.version || session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId) return false;
       // An invalid payload must not silently paste an older internal copy.
-      if (error.name !== "NotAllowedError" && error.name !== "SecurityError") { toast.error("Could not paste", { sub: error.message }); return false; }
-      toast.warn("System clipboard access is unavailable", { sub: "Use Ctrl+V, or paste the editor's last copy." });
+      if (!["NotAllowedError", "SecurityError", "NotSupportedError"].includes(error.name)) { toast.error("Could not paste", { sub: error.message }); return false; }
+      if (!clipboardItemCount(clipboardRef.current)) toast.warn("System clipboard access is unavailable", { sub: "Copy an element in the editor, or use your browser's Paste command." });
     } finally {
       if (version === clipboardReadRef.current.version) clipboardReadRef.current.busy = false;
     }
-    return clipboardRef.current?.objects?.length ? pasteObjects(clipboardRef.current) : false;
+    return clipboardItemCount(clipboardRef.current) ? pasteObjects(clipboardRef.current) : false;
   }, [pasteObjects, importDroppedAssets, toast]);
   const handleEditorPaste = useCallback((event) => {
     const el = event.target;
@@ -1256,10 +1270,10 @@ function App() {
     const transfer = event.clipboardData;
     if (!transfer) return;
     const text = transfer.getData("text/plain");
-    if (text.startsWith(EDITOR_CLIPBOARD_PREFIX)) {
+    if (isEditorClipboardText(text)) {
       clipboardReadRef.current.version++; clipboardReadRef.current.busy = false;
       event.preventDefault();
-      try { pasteObjects(parseObjectClipboard(text)); } catch (error) { toast.error("Could not paste objects", { sub: error.message }); }
+      try { pasteObjects(parseObjectClipboard(text)); } catch (error) { toast.error("Could not paste", { sub: error.message }); }
     } else if ([...(transfer.files || [])].some((file) => /^image\//.test(file.type))) {
       clipboardReadRef.current.version++; clipboardReadRef.current.busy = false;
       event.preventDefault();
@@ -1270,6 +1284,35 @@ function App() {
     window.addEventListener("paste", handleEditorPaste);
     return () => window.removeEventListener("paste", handleEditorPaste);
   }, [handleEditorPaste]);
+
+  const copySelection = useCallback((event) => {
+    if (!selectedUI && !selectedIds.length) return false;
+    const payload = selectedUI ? makeHUDClipboard(projectRef.current, scene, [selectedUI.id], files) : makeObjectClipboard(projectRef.current, scene, selectedIds, files);
+    const count = clipboardItemCount(payload), label = selectedUI ? "HUD element" : "object";
+    if (!count) return false;
+    clipboardRef.current = payload;
+    const copied = () => toast.info(`Copied ${count} ${label}${count === 1 ? "" : "s"}`);
+    // Native Copy exposes a synchronous clipboardData transfer, including when
+    // navigator.clipboard is unavailable or the browser runs its Copy command.
+    if (event?.clipboardData) {
+      event.clipboardData.setData("text/plain", (selectedUI ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX) + JSON.stringify(payload));
+      event.preventDefault(); copied(); return true;
+    }
+    let written;
+    try { written = writeObjectClipboard(payload, actionWindow()); }
+    catch (error) { toast.warn("Copied inside the editor", { sub: error.message }); return false; }
+    if (written) return written.then(copied, error => toast.warn("Copied inside the editor", { sub: error.message }));
+    copied(); return true;
+  }, [selectedUI, selectedIds, scene, files, toast]);
+  const handleEditorCopy = useCallback((event) => {
+    const el = event.target;
+    if (modalRef.current || paletteOpen || el?.nodeType === 1 && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+    if (event.clipboardData) copySelection(event);
+  }, [copySelection, paletteOpen]);
+  useEffect(() => {
+    window.addEventListener("copy", handleEditorCopy);
+    return () => window.removeEventListener("copy", handleEditorCopy);
+  }, [handleEditorCopy]);
 
   const shareReceipts = useRef(new Set()), receiveShareRef = useRef(null);
   receiveShareRef.current = async (id) => {
@@ -1663,7 +1706,7 @@ function App() {
         title: "Duplicate",
         keys: "Ctrl+D",
         sep: true,
-        enabled: () => selection.length > 0,
+        enabled: () => selection.length > 0 || !!selectedUI,
         run: duplicateSelection,
       },
       {
@@ -1671,24 +1714,16 @@ function App() {
         group: "Edit",
         title: "Copy",
         keys: "Ctrl+C",
-        enabled: () => selection.length > 0,
-        run: () => {
-          clipboardRef.current = makeObjectClipboard(projectRef.current, scene, selectedIds, files);
-          const count = clipboardRef.current.objects.length;
-          let written;
-          try { written = writeObjectClipboard(clipboardRef.current, actionWindow()); }
-          catch (error) { toast.warn("Copied inside the editor", { sub: error.message }); return; }
-          if (written) return written.then(() => toast.info(`Copied ${count} objects`), (error) => toast.warn("Copied inside the editor", { sub: error.message }));
-          toast.info(`Copied ${count} objects`);
-        },
+        enabled: () => selection.length > 0 || !!selectedUI,
+        run: () => copySelection(),
       },
       {
         id: "edit.paste",
         group: "Edit",
         title: "Paste",
         keys: "Ctrl+V",
-        enabled: () => !!actionWindow().navigator?.clipboard || clipboardRef.current?.objects?.length > 0,
-        run: () => actionWindow().navigator?.clipboard ? pasteSystemClipboard() : clipboardRef.current?.objects?.length && pasteObjects(clipboardRef.current),
+        enabled: () => !!actionWindow().navigator?.clipboard || clipboardItemCount(clipboardRef.current) > 0,
+        run: () => actionWindow().navigator?.clipboard ? pasteSystemClipboard() : clipboardItemCount(clipboardRef.current) && pasteObjects(clipboardRef.current),
       },
       {
         id: "edit.copyCapture", group: "Edit", title: "Copy scene capture", sep: true,
@@ -1913,6 +1948,7 @@ function App() {
           });
           setMainTab("hud");
           setSelectedUIId(id);
+          setSelectedIds([]); setActiveId(null); setSelectedAssetId(null);
         },
       });
     }
@@ -2123,6 +2159,7 @@ function App() {
     undo,
     redo,
     duplicateSelection,
+    copySelection,
     pasteObjects,
     pasteSystemClipboard,
     deleteSelection,
@@ -2191,8 +2228,17 @@ function App() {
       // the word. Only the chords that mean the same thing wherever you are
       // keep working from inside a field.
       if (typing && !TYPING_SAFE_CHORDS.has(combo)) return;
-      // Trusted paste events carry images and text without a permission prompt.
-      if (combo === "Ctrl+V") return;
+      // Some browsers/windows never dispatch paste to a non-editable canvas.
+      // Read during activation (or use the internal copy); do not also dispatch
+      // a native paste for the same chord. Native/context-menu paste remains handled.
+      if (combo === "Ctrl+V") {
+        const clipboard = actionWindow().navigator?.clipboard;
+        if (clipboard?.read || clipboard?.readText || clipboardItemCount(clipboardRef.current)) {
+          const paste = commandsRef.current.find(c => c.id === "edit.paste");
+          if (paste && (!paste.enabled || paste.enabled())) { e.preventDefault(); paste.run(); }
+        }
+        return;
+      }
 
       const cmd = commandsRef.current.find((c) =>
         c.keys && normalizeCombo(c.keys) === combo
@@ -2258,7 +2304,7 @@ function App() {
         scene={scene}
         files={files}
         selectedId={selectedUIId}
-        onSelect={setSelectedUIId}
+        onSelect={(id) => { setSelectedUIId(id); setSelectedIds([]); setActiveId(null); setSelectedAssetId(null); if (id) focusPanel("inspector"); }}
         onUpdate={updateUI}
         onAdd={(t) => {
           let id = null;
@@ -2268,6 +2314,7 @@ function App() {
             id = el.id;
           });
           setSelectedUIId(id);
+          setSelectedIds([]); setActiveId(null); setSelectedAssetId(null);
         }}
         onDelete={(id) => {
           edit((p, sc) => {
@@ -2631,6 +2678,7 @@ function App() {
         resetWindowsKey={windowReset}
         projectName={project.name}
         onKeyDown={handleEditorKey}
+        onCopy={handleEditorCopy}
         onPaste={handleEditorPaste}
         onWindowFocus={(view) => { actionWindowRef.current = view; }}
         onError={(error) => toast.error("Could not open the panel window", { sub: error.message })}

@@ -8,7 +8,7 @@ globalThis.THREE = module.exports;
 const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/theme.js", "core/components.js",
   "core/project.js", "core/storage.js", "viewport/loaders.js", "viewport/overlays.js",
-  "viewport/gizmos.js", "viewport/viewport.jsx",
+  "viewport/gizmos.js", "viewport/viewport.jsx", "editor/mesh.js", "editor/terrain.js",
   "core/skybox.js", "viewport/skybox.js",
 ]);
 const near = (a, b) => assertAlmostEquals(a, b, 1e-5);
@@ -42,6 +42,28 @@ Deno.test("texture filters defer GPU upload until the image is available", () =>
   A.setTextureFilter(texture, "LINEAR");
   assertEquals(texture.version, pendingVersion + 1);
   assertEquals(texture.magFilter, THREE.LinearFilter);
+});
+
+Deno.test("terrain preview applies filter, shading and pipeline edits without repainting terrain", () => {
+  const original = THREE.TextureLoader.prototype.load;
+  THREE.TextureLoader.prototype.load = function() { const texture = new THREE.Texture(); texture.image = { width: 16, height: 16 }; return texture; };
+  const obj = { components: { model: { textureFile: "atlas.png", textureFilter: "NEAREST", pipeline: "PL_DEFAULT", shade_model: "SHADE_GOURAUD", face_culling: "CULL_FACE_BACK" } }, _terrainPreview: A.makeTerrain(4,4) };
+  const node = { holder: new THREE.Group() }, files = [{name:"atlas.png",cat:"textures",dataUrl:"data:image/png;base64,AQ=="}];
+  const sync = () => { A.syncVisual({},obj,node,files,1,()=>false); return node.holder.children[0]; };
+  try {
+    let visual = sync();
+    assertEquals(visual.material.map.magFilter,THREE.NearestFilter);
+    assertEquals(visual.material.flatShading,false);
+    obj.components.model.textureFilter="LINEAR";
+    visual=sync(); assertEquals(visual.material.map.magFilter,THREE.LinearFilter);
+    obj.components.model.shade_model="SHADE_FLAT";
+    visual=sync(); assertEquals(visual.material.flatShading,true);
+    assertEquals(visual.material.map.magFilter,THREE.LinearFilter);
+    obj.components.model.pipeline="PL_NO_LIGHTS";
+    visual=sync(); assert(visual.material.isMeshBasicMaterial);
+    obj.components.model.texture_mapping=false;
+    assertEquals(sync().material.map,null);
+  } finally { THREE.TextureLoader.prototype.load=original; }
 });
 
 Deno.test("the sky stays centred on moving cameras without entering picking or depth", () => {

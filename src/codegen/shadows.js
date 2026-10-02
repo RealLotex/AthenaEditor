@@ -51,9 +51,6 @@ function emitShadowSetup(e, ir) {
       `${passes.length} offscreen target(s), ${(ir.rtBytes / 1024).toFixed(0)} KB of VRAM locked.`,
       "Context 2 is aimed at the render target; the main frame keeps context 1.",
     );
-    e.w(`Screen.initBuffers();`);
-    e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
-    e.nl();
   }
 
   for (const s of ir.shadows) {

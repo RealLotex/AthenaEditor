@@ -626,8 +626,9 @@ function syncVisual(g, obj, node, files, token, cancelled) {
   const m = obj.components.model;
   if(obj._terrainPreview && m) {
     const texture=files.find(f=>f.name===m.textureFile&&f.cat==="textures");
-    const textureKey=assetRevision(texture);
-    if(node.terrainData===obj._terrainPreview&&node.terrainTextureKey===textureKey)return;
+    const textureKey=[assetRevision(texture),m.textureFilter||"LINEAR",m.texture_mapping!==false].join("|");
+    const materialKey=[m.pipeline,m.shade_model,m.face_culling].join("|");
+    if(node.terrainData===obj._terrainPreview&&node.terrainTextureKey===textureKey&&node.terrainMaterialKey===materialKey)return;
     const mesh=terrainMesh(obj._terrainPreview),positions=[],uvs=[],normals=[];
     for(const face of mesh.faces)for(const c of face){positions.push(...mesh.positions[c.v]);uvs.push(...mesh.uvs[c.uv]);normals.push(...mesh.normals[c.n]);}
     const geometry=new THREE.BufferGeometry();
@@ -641,8 +642,14 @@ function syncVisual(g, obj, node, files, token, cancelled) {
       visual.castShadow=true;visual.receiveShadow=true;
       visual.userData.terrainPreview=true;node.holder.add(visual);
     }else{visual.geometry.dispose();visual.geometry=geometry;}
-    if(node.terrainTextureKey!==textureKey){visual.material.map?.dispose();visual.material.map=texture?.dataUrl?makeTexture(texture.dataUrl,"NEAREST"):null;if(visual.material.map)visual.material.map.encoding=THREE.sRGBEncoding;visual.material.needsUpdate=true;}
-    node.terrainData=obj._terrainPreview;node.terrainTextureKey=textureKey;node.modelKey="__terrainPreview";return;
+    if(node.terrainMaterialKey!==materialKey) {
+      visual.material.map?.dispose(); visual.material.dispose();
+      visual.material=m.pipeline==="PL_NO_LIGHTS"?new THREE.MeshBasicMaterial({color:0xffffff}):new THREE.MeshStandardMaterial({color:0xffffff,roughness:1});
+      visual.material.flatShading=m.shade_model==="SHADE_FLAT";
+      visual.material.side=m.face_culling==="CULL_FACE_NONE"?THREE.DoubleSide:m.face_culling==="CULL_FACE_FRONT"?THREE.BackSide:THREE.FrontSide;
+    }
+    if(node.terrainTextureKey!==textureKey||node.terrainMaterialKey!==materialKey){visual.material.map?.dispose();visual.material.map=m.texture_mapping!==false&&texture?.dataUrl?makeTexture(texture.dataUrl,m.textureFilter):null;if(visual.material.map)visual.material.map.encoding=THREE.sRGBEncoding;visual.material.needsUpdate=true;}
+    node.terrainData=obj._terrainPreview;node.terrainTextureKey=textureKey;node.terrainMaterialKey=materialKey;node.modelKey="__terrainPreview";return;
   }
   const assetKey = (name, cat) => {
     if (!name) return "";

@@ -76,7 +76,7 @@ Deno.test("native panel windows retain editor styles and forward focus, keys and
   style.textContent = "editor styles";
   source.document.querySelectorAll = () => [style];
   source.document.documentElement.setAttribute("data-theme", "light");
-  let closed = 0, keys = 0, focused = 0;
+  let closed = 0, keys = 0, focused = 0, copies = 0, pastes = 0;
   source.window.open = (url, name, options) => {
     assertEquals(url, "about:blank");
     assertEquals(name, "atheditor-panel-assets");
@@ -95,6 +95,8 @@ Deno.test("native panel windows retain editor styles and forward focus, keys and
       onKey: () => {
         keys++;
       },
+      onCopy: () => { copies++; },
+      onPaste: () => { pastes++; },
       onFocus: () => {
         focused++;
       },
@@ -108,9 +110,12 @@ Deno.test("native panel windows retain editor styles and forward focus, keys and
   assertEquals(child.document.head.children[0].textContent, style.textContent);
   assertEquals(frame.slot, child.document.body.children[1]);
   child.handlers.get("keydown")();
+  child.handlers.get("copy")();
+  child.handlers.get("paste")();
   child.docHandlers.get("pointerdown")();
   child.handlers.get("pagehide")();
   assertEquals([closed, keys, focused], [1, 1, 1]);
+  assertEquals([copies,pastes],[1,1]);
   frame.dispose();
   assertEquals(child.window.closed, true);
   assertEquals(child.handlers.size, 0);

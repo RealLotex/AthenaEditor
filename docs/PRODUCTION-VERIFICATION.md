@@ -7,6 +7,54 @@ playable-start and focused-workspace redesign was reviewed and extended.
 The console execution fixtures below were recorded on October 1 with PCSX2 2.6.3
 and the bundled AthenaEnv player; those longer fixtures were not rerun for the UX changes.
 
+## Clipboard and rendering corrections — October 2
+
+The bundled player was updated to the official August 1 `latest` release; the
+downloaded archive matched GitHub's SHA-256 digest. The extracted ELF hash and
+release commit are recorded in [the runtime reference](../reference/AthenaEnvReleaseAndExamples/README.md).
+Run uses that ELF unless a custom runtime has been selected.
+
+- Ctrl+V invokes the clipboard reader during the keyboard gesture, with a fallback
+  to the editor's last copy when access is denied. Native paste cancels a pending
+  read to prevent duplicate imports. A delayed read cannot paste into another scene.
+- All five HUD element types support Copy, Paste and Duplicate, independent values,
+  unique IDs/names/script context keys, referenced image/font/script assets and one-step undo.
+  Native Copy/Paste also works in detached panels; inputs retain normal text editing.
+- NEAREST is assigned after all RenderData constructors, which otherwise reset shared
+  Images to LINEAR. Embedded images are all updated. Terrain preview reacts to filter,
+  shading, pipeline and texture-mapping changes without requiring another paint stroke.
+- Gouraud and Flat emit numeric GS IIP values 1 and 0. The released Render module does
+  not expose the SHADE constants previously used; undefined was silently interpreted as Flat.
+- The sky masks writes to the main depth buffer, uses DEPTH_ALWAYS, then restores
+  normal writes before geometry. Sky and live shadows share one buffer initialization.
+  CT16S + Z16S remains available with its original VRAM footprint.
+
+The eight supplied PCSX2 dumps had the same access violation at GSRendererHW::Draw
+while resizing a target (official 2.6.3 symbols, GSRendererHW.cpp:4387). A private copy
+of the staged game corresponding to a dump reproduced the crash with both the old and
+latest Athena ELF. Disabling the sky avoided it; masking its depth writes fixed it.
+Raw dumps and the user's staged game remain private and are not included in the repository.
+
+Final PCSX2 2.6.3 hardware-renderer checks each reached **600 frames** and remained
+running until the test stopped its own process:
+
+| Execution | Color / depth | Result |
+| --- | --- | --- |
+| Copy of the supplied failing scene, corrected sky pass | CT16S / Z16S | Passed |
+| Fresh side-scroller with desert sky, current generator | CT16S / Z16S | Passed |
+| Sphere, terrain, desert sky and live shadow, current generator | CT16S / Z16S | Passed |
+| Same combined scene, control format | CT32 / Z32 | Passed |
+
+Runtime probes also confirmed sphere/terrain Image.filter = 0 (NEAREST), Gouraud = 1
+and Flat = 0. Earlier comparison probes reproduced Flat = 0 for both old SHADE constant
+assignments. These are emulator checks; real PS2 hardware was not tested.
+
+Browser checks verified HUD menu Copy, Ctrl+D, consecutive Ctrl+V without extra copies,
+and Ctrl+V within a text property without creating HUD elements. No console warnings/errors.
+The actual keyboard and native Copy handlers are also exercised in the regression suite.
+
+![Independent HUD copies and normal text paste](verification/clipboard-hud.png)
+
 ## Changes verified
 
 - A third-person game is the initial project; alternate starting points are optional.
@@ -53,7 +101,7 @@ and the bundled AthenaEnv player; those longer fixtures were not rerun for the U
 
 ## Automated suite
 
-`deno task check`: **528 passed, 0 failed**. The suite covers project migration,
+`deno task check`: **538 passed, 0 failed**. The suite covers project migration,
 generation, hierarchy, physics/shadow math, viewport geometry/resources, fonts, terrain,
 prefabs, assets, history, folder operations, project replacement, saves, launcher isolation
 and exported bundles. The added UX tests cover creation, dialog focus, cancellation,

@@ -2,6 +2,10 @@
 
 AthEditor is the editor's name. AthenaEnv is the target runtime by DanielSantos;
 its ELF, configuration names and runtime references retain their original names.
+The bundled ELF is the official AthenaEnv `latest` release published August 1, 2026.
+[The player reference](../reference/AthenaEnvReleaseAndExamples/README.md) records
+its verified hashes. Updating the local repository updates this player. If Run
+settings points at a custom ELF, select reference/AthenaEnvReleaseAndExamples/athena.elf to use it.
 
 ## Start and install
 

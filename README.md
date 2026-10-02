@@ -51,6 +51,9 @@ deno task app
 
 The editor opens at a fixed local address. **Run** discovers the included console player and
 PCSX2's standard installation. If necessary, Run settings lets you select their locations.
+The bundled player is the official AthenaEnv `latest` release published August 1, 2026;
+[its verified version and hashes](reference/AthenaEnvReleaseAndExamples/README.md) identify
+the exact binary. Update the local checkout to receive it; a custom Run runtime takes precedence.
 PCSX2 needs a working BIOS and HostFS enabled. Run stages the open scene in a fresh temporary
 folder; Stop controls only the emulator process started by this editor.
 The standalone file and the hosted site provide export; native Run requires the local service.

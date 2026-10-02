@@ -1,5 +1,42 @@
 const EDITOR_CLIPBOARD_TYPE = "web application/x.atheditor.objects+json";
 const EDITOR_CLIPBOARD_PREFIX = "AthEditor objects\n";
+const HUD_CLIPBOARD_TYPE = "web application/x.atheditor.hud+json";
+const HUD_CLIPBOARD_PREFIX = "AthEditor HUD\n";
+
+const clipboardItemCount = payload => payload?.objects?.length || payload?.elements?.length || 0;
+const isEditorClipboardText = text => text?.startsWith(EDITOR_CLIPBOARD_PREFIX) || text?.startsWith(HUD_CLIPBOARD_PREFIX);
+
+function hudAssetReferences(elements, visit) {
+  for (const element of elements) {
+    if (element.image) visit(element, "image", "textures");
+    if (element.fontFile && element.fontFile !== "default") visit(element, "fontFile", "fonts");
+    if (element.script?.file) visit(element.script, "file", "scripts");
+  }
+}
+
+function makeHUDClipboard(project, scene, selectedIds, files) {
+  const elements = deepClone(scene.uiElements.filter(el => selectedIds.includes(el.id)));
+  const references = new Set();
+  hudAssetReferences(elements, (holder, key, cat) => references.add(`${cat}/${holder[key]}`));
+  const assets = files.filter(file => references.has(`${file.cat}/${file.name}`) && (file.content !== undefined || file.dataUrl)).map(deepClone);
+  return { kind: "atheditor.hud", version: 1, projectId: project.id, elements, assets };
+}
+
+function cloneHUDElements(elements, existing, offset = 0) {
+  const copies = [];
+  for (const element of elements) {
+    const copy = deepClone(element);
+    copy.id = uid(); copy.name = uniqueName(copy.name, [...existing, ...copies]);
+    copy.x += offset; copy.y += offset;
+    if (copy.script?.ctxKey) {
+      const used = new Set([...existing, ...copies].map(el => el.script?.ctxKey));
+      const base = copy.script.ctxKey;
+      for (let n = 2; used.has(copy.script.ctxKey); n++) copy.script.ctxKey = `${base}_${n}`;
+    }
+    copies.push(copy);
+  }
+  return copies;
+}
 
 function objectAssetReferences(objects, visit) {
   walk(objects, (object) => {
@@ -25,13 +62,15 @@ function makeObjectClipboard(project, scene, selectedIds, files) {
 }
 
 function parseObjectClipboard(text) {
-  if (!text?.startsWith(EDITOR_CLIPBOARD_PREFIX)) return null;
+  if (!isEditorClipboardText(text)) return null;
   if (text.length > 64 * 1024 * 1024) throw Error("The copied objects are too large to paste.");
-  const payload = JSON.parse(text.slice(EDITOR_CLIPBOARD_PREFIX.length), (key, value) => {
+  const hud = text.startsWith(HUD_CLIPBOARD_PREFIX);
+  const payload = JSON.parse(text.slice((hud ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX).length), (key, value) => {
     if (["__proto__", "prototype", "constructor"].includes(key)) throw Error("Invalid object clipboard data.");
     return value;
   });
-  if (payload?.kind !== "atheditor.objects" || payload.version !== 1 || !Array.isArray(payload.objects) || !payload.objects.length || !Array.isArray(payload.assets)) throw Error("Unsupported object clipboard data.");
+  if (payload?.kind !== (hud ? "atheditor.hud" : "atheditor.objects") || payload.version !== 1 ||
+      !Array.isArray(hud ? payload.elements : payload.objects) || !clipboardItemCount(payload) || !Array.isArray(payload.assets)) throw Error("Unsupported editor clipboard data.");
   let count = 0;
   const check = (objects, depth) => {
     if (depth > 32) throw Error("The copied hierarchy is nested too deeply.");
@@ -41,7 +80,15 @@ function parseObjectClipboard(text) {
       check(object.children, depth + 1);
     }
   };
-  check(payload.objects, 0);
+  if (hud) {
+    if (payload.elements.length > 10000) throw Error("Too many copied HUD elements.");
+    for (const el of payload.elements) {
+      if (!el || typeof el.name !== "string" || typeof el.id !== "string" ||
+          !["Text", "Panel", "Button", "ProgressBar", "Image"].includes(el.type) ||
+          ![el.x, el.y, el.width, el.height].every(Number.isFinite) || el.width < 0 || el.height < 0 ||
+          el.script && (typeof el.script !== "object" || Array.isArray(el.script))) throw Error("Invalid copied HUD element.");
+    }
+  } else check(payload.objects, 0);
   for (const asset of payload.assets) {
     if (!asset || !Object.hasOwn(ASSET_CATEGORY_LABELS, asset.cat) || !/^[^\\/]+\.[a-z0-9]+$/i.test(asset.name) || asset.name.includes("..") ||
         !(typeof asset.content === "string" || typeof asset.dataUrl === "string" && /^data:[^,]*;base64,/.test(asset.dataUrl))) throw Error("Invalid copied asset.");
@@ -49,8 +96,8 @@ function parseObjectClipboard(text) {
   return payload;
 }
 
-function pasteObjectClipboard(project, scene, payload, external = []) {
-  const objects = deepClone(payload.objects), names = new Map();
+function importClipboardAssets(project, payload, external) {
+  const names = new Map();
   for (const asset of payload.assets) {
     const files = editorAssets(project, external);
     const same = files.find((file) => file.cat === asset.cat && file.name === asset.name && file.content === asset.content && file.dataUrl === asset.dataUrl);
@@ -58,6 +105,21 @@ function pasteObjectClipboard(project, scene, payload, external = []) {
     if (!same) putProjectAsset(project, { ...asset, id: uid(), name, libraryFolder: asset.libraryFolder || "Clipboard" });
     names.set(`${asset.cat}/${asset.name}`, name);
   }
+  return names;
+}
+
+function pasteHUDClipboard(project, scene, payload, external = []) {
+  const elements = deepClone(payload.elements), names = importClipboardAssets(project, payload, external);
+  hudAssetReferences(elements, (holder, key, cat) => {
+    if (names.has(`${cat}/${holder[key]}`)) holder[key] = names.get(`${cat}/${holder[key]}`);
+  });
+  const copies = cloneHUDElements(elements, scene.uiElements);
+  scene.uiElements.push(...copies);
+  return copies.map(el => el.id);
+}
+
+function pasteObjectClipboard(project, scene, payload, external = []) {
+  const objects = deepClone(payload.objects), names = importClipboardAssets(project, payload, external);
   objectAssetReferences(objects, (component, key, cat) => {
     const name = names.get(`${cat}/${component[key]}`);
     if (name) component[key] = name;
@@ -72,11 +134,12 @@ function pasteObjectClipboard(project, scene, payload, external = []) {
 
 function writeObjectClipboard(payload, sourceWindow = window) {
   const clipboard = sourceWindow.navigator?.clipboard;
-  const text = EDITOR_CLIPBOARD_PREFIX + JSON.stringify(payload);
+  const hud = payload.kind === "atheditor.hud", type = hud ? HUD_CLIPBOARD_TYPE : EDITOR_CLIPBOARD_TYPE;
+  const text = (hud ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX) + JSON.stringify(payload);
   const Item = sourceWindow.ClipboardItem;
   if (clipboard?.write && Item) {
     const data = { "text/plain": new Blob([text], { type: "text/plain" }) };
-    if (Item.supports?.(EDITOR_CLIPBOARD_TYPE)) data[EDITOR_CLIPBOARD_TYPE] = new Blob([JSON.stringify(payload)], { type: "application/x.atheditor.objects+json" });
+    if (Item.supports?.(type)) data[type] = new Blob([JSON.stringify(payload)], { type: type.slice(4) });
     return clipboard.write([new Item(data)]);
   }
   return clipboard?.writeText ? clipboard.writeText(text) : null;
@@ -87,7 +150,9 @@ async function readEditorClipboard(sourceWindow = window) {
   if (clipboard?.read) {
     const items = await clipboard.read();
     for (const item of items) {
-      if (item.types.includes(EDITOR_CLIPBOARD_TYPE)) return { payload: parseObjectClipboard(EDITOR_CLIPBOARD_PREFIX + await (await item.getType(EDITOR_CLIPBOARD_TYPE)).text()) };
+      for (const [type, prefix] of [[EDITOR_CLIPBOARD_TYPE, EDITOR_CLIPBOARD_PREFIX], [HUD_CLIPBOARD_TYPE, HUD_CLIPBOARD_PREFIX]]) {
+        if (item.types.includes(type)) return { payload: parseObjectClipboard(prefix + await (await item.getType(type)).text()) };
+      }
       if (item.types.includes("text/plain")) {
         const payload = parseObjectClipboard(await (await item.getType("text/plain")).text());
         if (payload) return { payload };

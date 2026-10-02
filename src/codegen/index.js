@@ -98,6 +98,13 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.w(`Render.init();`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, ${fl(ir.camera.near)}, ${fl(ir.camera.far)});`);
   e.nl();
+  // Wrap the existing screen surfaces once, shared by sky and shadow passes.
+  // Screen.initBuffers creates JS wrappers; it does not allocate extra VRAM.
+  if (ir.skybox || ir.shadowPasses.length) {
+    e.w(`Screen.initBuffers();`);
+    e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
+    e.nl();
+  }
   // The overlay font is the one baked into the ELF unless the project folder
   // actually has a font file. Naming a file that is not there kills the
   // program at startup, which is a miserable way to greet a new project.

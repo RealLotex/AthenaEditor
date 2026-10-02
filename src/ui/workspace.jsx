@@ -17,7 +17,7 @@ function PanelSlot({ host, active = true }) {
   );
 }
 
-function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onPaste, onWindowFocus, onError, resetWindowsKey }) {
+function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onCopy, onPaste, onWindowFocus, onError, resetWindowsKey }) {
   const root = useRef(null),
     hosts = useRef(null),
     gesture = useRef(null),
@@ -25,7 +25,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
   current.current = layout;
   useDetailsPopovers(root, ".a-dock-options");
   const parking = useRef(null), windows = useRef(new Map()), callbacks = useRef({});
-  callbacks.current = { onKeyDown, onPaste, onWindowFocus, onError };
+  callbacks.current = { onKeyDown, onCopy, onPaste, onWindowFocus, onError };
   const [external, setExternal] = useState([]);
   const releaseWindow = (id) => {
     const frame = windows.current.get(id);
@@ -43,6 +43,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
       const frame = openPanelWindow(window, document, id, `${projectName} — ${DOCK_PANELS[id]} — AthEditor`, {
         onClose: () => releaseWindow(id),
         onKey: (event) => callbacks.current.onKeyDown?.(event),
+        onCopy: (event) => callbacks.current.onCopy?.(event),
         onPaste: (event) => callbacks.current.onPaste?.(event),
         onFocus: () => {
           const view = windows.current.get(id)?.window;

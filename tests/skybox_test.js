@@ -93,6 +93,27 @@ Deno.test("a missing or oversized sky reports an error and export skips it", () 
   assert(A.skyboxAssetProblems(sc, A.editorAssets(p)).some(d => d.level === "error"));
 });
 
+Deno.test("sky masks depth writes in CT16S and shares one buffer initialization with live shadows", () => {
+  const p=A.mkProject(),sc=A.activeScene(p);
+  A.applySkybox(p,sc,{enabled:true},A.skyboxPresetAsset("desert"));
+  const caster=A.mkObject("Caster"); caster.components.model={...A.makeComponent("model"),file:"cube.obj"};
+  caster.components.shadow=A.makeComponent("shadow"); sc.objects.push(caster);
+  const result=A.generateProject(p,[{name:"cube.obj",cat:"models",content:"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"}]);
+  assertEquals((result.main.match(/Screen\.initBuffers\(\)/g)||[]).length,1);
+  assertEquals((result.main.match(/const _mainDepth =/g)||[]).length,1);
+  assertStringIncludes(result.main,"canvas.psm  = Screen.CT16S");
+  const ir={skybox:{objectVN:"sky"},camera:{fov:20,near:1,far:4000}},e=new A.Emitter();
+  A.emitSkyboxDraw(e,ir);
+  let mask=0,enabled=false,method=2,drawn=false,view;
+  const depth={};
+  const Screen={DEPTH_BUFFER:1,DEPTH_TEST_ENABLE:2,DEPTH_TEST_METHOD:3,DEPTH_ALWAYS:1,
+    setBuffer(type,buffer,value){assertEquals(type,1);assertEquals(buffer,depth);mask=value;},
+    setParam(type,value){if(type===2)enabled=value;else method=value;}};
+  const Render={setView(...args){view=args;}},Camera={save(){return {position:{x:1,y:2,z:3}};}},sky={render(){assertEquals(mask,1);assert(enabled);assertEquals(method,1);drawn=true;}};
+  new Function("Screen","Render","Camera","sky","_mainDepth",e.toString())(Screen,Render,Camera,sky,depth);
+  assert(drawn); assertEquals(mask,0); assertEquals(view,[20,1,4000]);
+});
+
 Deno.test("sky and models share a single texture upload when the filter matches", () => {
   const p = A.mkProject(), sc = A.activeScene(p);
   A.applySkybox(p, sc, { enabled: true }, A.skyboxPresetAsset("clear"));

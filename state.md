@@ -2,6 +2,23 @@
 
 _Last updated: 2026-10-02._
 
+## October 2 clipboard and rendering fixes
+
+Ctrl+V now reads during the keyboard gesture, keeps internal-copy fallback for denied
+permissions and ignores late results after scene changes. HUD Copy/Paste/Duplicate
+handles all element types, referenced assets, independent values and undo. Native
+Copy/Paste is forwarded by detached panels; text fields preserve normal editing.
+NEAREST survives RenderData construction and terrain-preview edits. Flat/Gouraud now
+use the release's numeric values instead of missing Render constants.
+
+The exact staged side-scroller from the crash reports reproduced a PCSX2 hardware
+renderer failure with the sky in CT16S + Z16S. Masking sky depth writes fixes it
+without changing buffers or increasing VRAM. The supplied scene, a fresh side-scroller
+and combined sky/shadow/terrain scenes reached 600 frames each in PCSX2. The bundled
+ELF now matches the official August 1 latest release, with verified hashes recorded
+in its reference README. The complete automated suite passed: 538 tests, zero failures.
+See [the current verification](docs/PRODUCTION-VERIFICATION.md).
+
 ## October 2 UX redesign
 
 The follow-up review of bdb36e2 makes Assets show every file, moves folders behind an

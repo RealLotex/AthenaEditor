@@ -7,7 +7,7 @@
 <!--
   GENERATED FILE — do not edit.
   Source lives in src/. Rebuild with:  deno task build
-  Build: v2026-10-02-16-35-GMT
+  Build: v2026-10-02-22-19-GMT
   Bundled dependencies:
 React 18.2.0 / React DOM 18.2.0
 Copyright (c) Facebook, Inc. and its affiliates.
@@ -5932,7 +5932,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 <script>
-window.__ATHENA_BUILD__ = "v2026-10-02-16-35-GMT";
+window.__ATHENA_BUILD__ = "v2026-10-02-22-19-GMT";
 
 // ══════════════════════════════════════════════════════════════════
 // src/core/util.js
@@ -9110,6 +9110,7 @@ function openPanelWindow(sourceWindow, sourceDocument, name, title, callbacks) {
     doc.body.append(header, slot);
     popup.addEventListener("pagehide", callbacks.onClose);
     popup.addEventListener("keydown", callbacks.onKey);
+    if (callbacks.onCopy) popup.addEventListener("copy", callbacks.onCopy);
     if (callbacks.onPaste) popup.addEventListener("paste", callbacks.onPaste);
     popup.addEventListener("focus", callbacks.onFocus);
     doc.addEventListener("pointerdown", callbacks.onFocus, true);
@@ -9121,6 +9122,7 @@ function openPanelWindow(sourceWindow, sourceDocument, name, title, callbacks) {
         cleanup.forEach((dispose) => dispose());
         popup.removeEventListener("pagehide", callbacks.onClose);
         popup.removeEventListener("keydown", callbacks.onKey);
+        if (callbacks.onCopy) popup.removeEventListener("copy", callbacks.onCopy);
         if (callbacks.onPaste) popup.removeEventListener("paste", callbacks.onPaste);
         popup.removeEventListener("focus", callbacks.onFocus);
         doc.removeEventListener("pointerdown", callbacks.onFocus, true);
@@ -11397,6 +11399,41 @@ function useHUDfonts(ref, files, elements) {
 // ══════════════════════════════════════════════════════════════════
 const EDITOR_CLIPBOARD_TYPE = "web application/x.atheditor.objects+json";
 const EDITOR_CLIPBOARD_PREFIX = "AthEditor objects\n";
+const HUD_CLIPBOARD_TYPE = "web application/x.atheditor.hud+json";
+const HUD_CLIPBOARD_PREFIX = "AthEditor HUD\n";
+const clipboardItemCount = (payload) => payload?.objects?.length || payload?.elements?.length || 0;
+const isEditorClipboardText = (text) => text?.startsWith(EDITOR_CLIPBOARD_PREFIX) || text?.startsWith(HUD_CLIPBOARD_PREFIX);
+function hudAssetReferences(elements, visit) {
+  for (const element of elements) {
+    if (element.image) visit(element, "image", "textures");
+    if (element.fontFile && element.fontFile !== "default") visit(element, "fontFile", "fonts");
+    if (element.script?.file) visit(element.script, "file", "scripts");
+  }
+}
+function makeHUDClipboard(project, scene, selectedIds, files) {
+  const elements = deepClone(scene.uiElements.filter((el) => selectedIds.includes(el.id)));
+  const references = /* @__PURE__ */ new Set();
+  hudAssetReferences(elements, (holder, key, cat) => references.add(`${cat}/${holder[key]}`));
+  const assets = files.filter((file) => references.has(`${file.cat}/${file.name}`) && (file.content !== void 0 || file.dataUrl)).map(deepClone);
+  return { kind: "atheditor.hud", version: 1, projectId: project.id, elements, assets };
+}
+function cloneHUDElements(elements, existing, offset = 0) {
+  const copies = [];
+  for (const element of elements) {
+    const copy = deepClone(element);
+    copy.id = uid();
+    copy.name = uniqueName(copy.name, [...existing, ...copies]);
+    copy.x += offset;
+    copy.y += offset;
+    if (copy.script?.ctxKey) {
+      const used = new Set([...existing, ...copies].map((el) => el.script?.ctxKey));
+      const base = copy.script.ctxKey;
+      for (let n = 2; used.has(copy.script.ctxKey); n++) copy.script.ctxKey = `${base}_${n}`;
+    }
+    copies.push(copy);
+  }
+  return copies;
+}
 function objectAssetReferences(objects, visit) {
   walk(objects, (object) => {
     for (const [key, component] of Object.entries(object.components)) {
@@ -11419,13 +11456,14 @@ function makeObjectClipboard(project, scene, selectedIds, files) {
   return { kind: "atheditor.objects", version: 1, projectId: project.id, objects, assets };
 }
 function parseObjectClipboard(text) {
-  if (!text?.startsWith(EDITOR_CLIPBOARD_PREFIX)) return null;
+  if (!isEditorClipboardText(text)) return null;
   if (text.length > 64 * 1024 * 1024) throw Error("The copied objects are too large to paste.");
-  const payload = JSON.parse(text.slice(EDITOR_CLIPBOARD_PREFIX.length), (key, value) => {
+  const hud = text.startsWith(HUD_CLIPBOARD_PREFIX);
+  const payload = JSON.parse(text.slice((hud ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX).length), (key, value) => {
     if (["__proto__", "prototype", "constructor"].includes(key)) throw Error("Invalid object clipboard data.");
     return value;
   });
-  if (payload?.kind !== "atheditor.objects" || payload.version !== 1 || !Array.isArray(payload.objects) || !payload.objects.length || !Array.isArray(payload.assets)) throw Error("Unsupported object clipboard data.");
+  if (payload?.kind !== (hud ? "atheditor.hud" : "atheditor.objects") || payload.version !== 1 || !Array.isArray(hud ? payload.elements : payload.objects) || !clipboardItemCount(payload) || !Array.isArray(payload.assets)) throw Error("Unsupported editor clipboard data.");
   let count = 0;
   const check = (objects, depth) => {
     if (depth > 32) throw Error("The copied hierarchy is nested too deeply.");
@@ -11435,14 +11473,19 @@ function parseObjectClipboard(text) {
       check(object.children, depth + 1);
     }
   };
-  check(payload.objects, 0);
+  if (hud) {
+    if (payload.elements.length > 1e4) throw Error("Too many copied HUD elements.");
+    for (const el of payload.elements) {
+      if (!el || typeof el.name !== "string" || typeof el.id !== "string" || !["Text", "Panel", "Button", "ProgressBar", "Image"].includes(el.type) || ![el.x, el.y, el.width, el.height].every(Number.isFinite) || el.width < 0 || el.height < 0 || el.script && (typeof el.script !== "object" || Array.isArray(el.script))) throw Error("Invalid copied HUD element.");
+    }
+  } else check(payload.objects, 0);
   for (const asset of payload.assets) {
     if (!asset || !Object.hasOwn(ASSET_CATEGORY_LABELS, asset.cat) || !/^[^\\/]+\.[a-z0-9]+$/i.test(asset.name) || asset.name.includes("..") || !(typeof asset.content === "string" || typeof asset.dataUrl === "string" && /^data:[^,]*;base64,/.test(asset.dataUrl))) throw Error("Invalid copied asset.");
   }
   return payload;
 }
-function pasteObjectClipboard(project, scene, payload, external = []) {
-  const objects = deepClone(payload.objects), names = /* @__PURE__ */ new Map();
+function importClipboardAssets(project, payload, external) {
+  const names = /* @__PURE__ */ new Map();
   for (const asset of payload.assets) {
     const files = editorAssets(project, external);
     const same = files.find((file) => file.cat === asset.cat && file.name === asset.name && file.content === asset.content && file.dataUrl === asset.dataUrl);
@@ -11450,6 +11493,19 @@ function pasteObjectClipboard(project, scene, payload, external = []) {
     if (!same) putProjectAsset(project, { ...asset, id: uid(), name, libraryFolder: asset.libraryFolder || "Clipboard" });
     names.set(`${asset.cat}/${asset.name}`, name);
   }
+  return names;
+}
+function pasteHUDClipboard(project, scene, payload, external = []) {
+  const elements = deepClone(payload.elements), names = importClipboardAssets(project, payload, external);
+  hudAssetReferences(elements, (holder, key, cat) => {
+    if (names.has(`${cat}/${holder[key]}`)) holder[key] = names.get(`${cat}/${holder[key]}`);
+  });
+  const copies = cloneHUDElements(elements, scene.uiElements);
+  scene.uiElements.push(...copies);
+  return copies.map((el) => el.id);
+}
+function pasteObjectClipboard(project, scene, payload, external = []) {
+  const objects = deepClone(payload.objects), names = importClipboardAssets(project, payload, external);
   objectAssetReferences(objects, (component, key, cat) => {
     const name = names.get(`${cat}/${component[key]}`);
     if (name) component[key] = name;
@@ -11463,11 +11519,12 @@ function pasteObjectClipboard(project, scene, payload, external = []) {
 }
 function writeObjectClipboard(payload, sourceWindow = window) {
   const clipboard = sourceWindow.navigator?.clipboard;
-  const text = EDITOR_CLIPBOARD_PREFIX + JSON.stringify(payload);
+  const hud = payload.kind === "atheditor.hud", type = hud ? HUD_CLIPBOARD_TYPE : EDITOR_CLIPBOARD_TYPE;
+  const text = (hud ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX) + JSON.stringify(payload);
   const Item = sourceWindow.ClipboardItem;
   if (clipboard?.write && Item) {
     const data = { "text/plain": new Blob([text], { type: "text/plain" }) };
-    if (Item.supports?.(EDITOR_CLIPBOARD_TYPE)) data[EDITOR_CLIPBOARD_TYPE] = new Blob([JSON.stringify(payload)], { type: "application/x.atheditor.objects+json" });
+    if (Item.supports?.(type)) data[type] = new Blob([JSON.stringify(payload)], { type: type.slice(4) });
     return clipboard.write([new Item(data)]);
   }
   return clipboard?.writeText ? clipboard.writeText(text) : null;
@@ -11477,7 +11534,9 @@ async function readEditorClipboard(sourceWindow = window) {
   if (clipboard?.read) {
     const items = await clipboard.read();
     for (const item of items) {
-      if (item.types.includes(EDITOR_CLIPBOARD_TYPE)) return { payload: parseObjectClipboard(EDITOR_CLIPBOARD_PREFIX + await (await item.getType(EDITOR_CLIPBOARD_TYPE)).text()) };
+      for (const [type, prefix] of [[EDITOR_CLIPBOARD_TYPE, EDITOR_CLIPBOARD_PREFIX], [HUD_CLIPBOARD_TYPE, HUD_CLIPBOARD_PREFIX]]) {
+        if (item.types.includes(type)) return { payload: parseObjectClipboard(prefix + await (await item.getType(type)).text()) };
+      }
       if (item.types.includes("text/plain")) {
         const payload = parseObjectClipboard(await (await item.getType("text/plain")).text());
         if (payload) return { payload };
@@ -12851,11 +12910,14 @@ function emitSkyboxDraw(e, ir) {
   const sky = ir.skybox;
   if (!sky) return;
   e.comment("Draw sky before geometry; its own frustum keeps it independent of scene clipping");
-  e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
+  e.w(`Screen.setBuffer(Screen.DEPTH_BUFFER, _mainDepth, 1);`);
+  e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
+  e.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_ALWAYS);`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, 0.01, 4.0);`);
   e.w(`${sky.objectVN}.position = Camera.save().position;`);
   e.w(`${sky.objectVN}.render();`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, ${fl(ir.camera.near)}, ${fl(ir.camera.far)});`);
+  e.w(`Screen.setBuffer(Screen.DEPTH_BUFFER, _mainDepth, 0);`);
   e.nl();
 }
 
@@ -13276,14 +13338,16 @@ function emitRenderDatas(e, ir) {
     }
     e.w(`${rd.dataVN}.pipeline = Render.${m.pipeline || "PL_DEFAULT"};`);
     e.w(`${rd.dataVN}.face_culling = Render.${m.face_culling || "CULL_FACE_BACK"};`);
-    e.w(`${rd.dataVN}.shade_model = Render.${m.shade_model || "SHADE_GOURAUD"};`);
+    e.w(`${rd.dataVN}.shade_model = ${m.shade_model === "SHADE_FLAT" ? 0 : 1};`);
     e.w(`${rd.dataVN}.texture_mapping = ${m.texture_mapping !== false};`);
     e.w(`${rd.dataVN}.accurate_clipping = ${!!m.accurate_clipping};`);
     if (!rd.texVN && !rd.cloneOf) {
-      e.w(`try { ${rd.dataVN}.getTexture(0).filter = ${m.textureFilter || "LINEAR"}; } catch (_e) {}`);
+      e.w(`for (let _i = 0, _tex; (_tex = ${rd.dataVN}.getTexture(_i)); _i++) _tex.filter = ${m.textureFilter || "LINEAR"};`);
     }
     e.nl();
   }
+  for (const t of ir.textures) e.w(`if (${t.vn}) ${t.vn}.filter = ${t.filter};`);
+  if (ir.textures.length) e.nl();
   for (const a of ir.anims) e.w(`const ${a.vn} = new AnimCollection("${jsStr(a.file)}");`);
   if (ir.anims.length) e.nl();
   e.section("Objects");
@@ -13317,7 +13381,6 @@ function emitTexture(e, ir, t) {
     b.w(`}`);
   });
   e.w(`}`);
-  e.w(`if (${t.vn}) ${t.vn}.filter = ${t.filter};`);
   e.nl();
 }
 function emitModelDraws(e, ir) {
@@ -13628,9 +13691,6 @@ function emitShadowSetup(e, ir) {
       `${passes.length} offscreen target(s), ${(ir.rtBytes / 1024).toFixed(0)} KB of VRAM locked.`,
       "Context 2 is aimed at the render target; the main frame keeps context 1."
     );
-    e.w(`Screen.initBuffers();`);
-    e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
-    e.nl();
   }
   for (const s of ir.shadows) {
     const sh = s.sh;
@@ -14118,6 +14178,11 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.w(`Render.init();`);
   e.w(`Render.setView(${fl(ir.camera.fov)}, ${fl(ir.camera.near)}, ${fl(ir.camera.far)});`);
   e.nl();
+  if (ir.skybox || ir.shadowPasses.length) {
+    e.w(`Screen.initBuffers();`);
+    e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
+    e.nl();
+  }
   if (ir.overlayFont) {
     e.w(`os.chdir("${jsStr(ir.dirs.fonts)}");`);
     e.w(`const font = new Font("${jsStr(ir.overlayFont)}");`);
@@ -15475,8 +15540,9 @@ function syncVisual(g, obj, node, files, token, cancelled) {
   const m = obj.components.model;
   if (obj._terrainPreview && m) {
     const texture = files.find((f) => f.name === m.textureFile && f.cat === "textures");
-    const textureKey = assetRevision(texture);
-    if (node.terrainData === obj._terrainPreview && node.terrainTextureKey === textureKey) return;
+    const textureKey = [assetRevision(texture), m.textureFilter || "LINEAR", m.texture_mapping !== false].join("|");
+    const materialKey = [m.pipeline, m.shade_model, m.face_culling].join("|");
+    if (node.terrainData === obj._terrainPreview && node.terrainTextureKey === textureKey && node.terrainMaterialKey === materialKey) return;
     const mesh = terrainMesh(obj._terrainPreview), positions = [], uvs = [], normals = [];
     for (const face of mesh.faces) for (const c of face) {
       positions.push(...mesh.positions[c.v]);
@@ -15503,14 +15569,22 @@ function syncVisual(g, obj, node, files, token, cancelled) {
       visual.geometry.dispose();
       visual.geometry = geometry;
     }
-    if (node.terrainTextureKey !== textureKey) {
+    if (node.terrainMaterialKey !== materialKey) {
       visual.material.map?.dispose();
-      visual.material.map = texture?.dataUrl ? makeTexture(texture.dataUrl, "NEAREST") : null;
+      visual.material.dispose();
+      visual.material = m.pipeline === "PL_NO_LIGHTS" ? new THREE.MeshBasicMaterial({ color: 16777215 }) : new THREE.MeshStandardMaterial({ color: 16777215, roughness: 1 });
+      visual.material.flatShading = m.shade_model === "SHADE_FLAT";
+      visual.material.side = m.face_culling === "CULL_FACE_NONE" ? THREE.DoubleSide : m.face_culling === "CULL_FACE_FRONT" ? THREE.BackSide : THREE.FrontSide;
+    }
+    if (node.terrainTextureKey !== textureKey || node.terrainMaterialKey !== materialKey) {
+      visual.material.map?.dispose();
+      visual.material.map = m.texture_mapping !== false && texture?.dataUrl ? makeTexture(texture.dataUrl, m.textureFilter) : null;
       if (visual.material.map) visual.material.map.encoding = THREE.sRGBEncoding;
       visual.material.needsUpdate = true;
     }
     node.terrainData = obj._terrainPreview;
     node.terrainTextureKey = textureKey;
+    node.terrainMaterialKey = materialKey;
     node.modelKey = "__terrainPreview";
     return;
   }
@@ -16474,12 +16548,12 @@ function PanelSlot({ host, active = true }) {
     }
   );
 }
-function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onPaste, onWindowFocus, onError, resetWindowsKey }) {
+function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onCopy, onPaste, onWindowFocus, onError, resetWindowsKey }) {
   const root = useRef(null), hosts = useRef(null), gesture = useRef(null), current = useRef(layout);
   current.current = layout;
   useDetailsPopovers(root, ".a-dock-options");
   const parking = useRef(null), windows = useRef(/* @__PURE__ */ new Map()), callbacks = useRef({});
-  callbacks.current = { onKeyDown, onPaste, onWindowFocus, onError };
+  callbacks.current = { onKeyDown, onCopy, onPaste, onWindowFocus, onError };
   const [external, setExternal] = useState([]);
   const releaseWindow = (id) => {
     const frame = windows.current.get(id);
@@ -16500,6 +16574,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
       const frame = openPanelWindow(window, document, id, `${projectName} \u2014 ${DOCK_PANELS[id]} \u2014 AthEditor`, {
         onClose: () => releaseWindow(id),
         onKey: (event) => callbacks.current.onKeyDown?.(event),
+        onCopy: (event) => callbacks.current.onCopy?.(event),
         onPaste: (event) => callbacks.current.onPaste?.(event),
         onFocus: () => {
           const view = windows.current.get(id)?.window;
@@ -20753,6 +20828,18 @@ function App() {
     toast.info("Deleted HUD element", { action: { label: "Undo", run: undo } });
   }, [selectedUIId, edit, toast, undo]);
   const duplicateSelection = useCallback(() => {
+    if (selectedUI) {
+      let id;
+      edit((p, sc) => {
+        const copies = cloneHUDElements([selectedUI], sc.uiElements, 12);
+        sc.uiElements.push(...copies);
+        id = copies[0].id;
+      });
+      setSelectedUIId(id);
+      setSelectedIds([]);
+      setActiveId(null);
+      return;
+    }
     if (!selection.length) return;
     const ids = [];
     edit((p, sc) => {
@@ -20767,7 +20854,7 @@ function App() {
     });
     setSelectedIds(ids);
     setActiveId(ids[ids.length - 1]);
-  }, [selectedIds, edit]);
+  }, [selectedIds, selectedUI, edit]);
   const reparent = useCallback((srcId, targetId, where) => {
     edit((p, sc) => {
       const src = findObj(sc.objects, srcId);
@@ -21364,41 +21451,45 @@ function App() {
   }, [edit, files, toast]);
   const pasteObjects = useCallback((payload) => {
     let ids;
+    const hud = payload.kind === "atheditor.hud";
     edit((p, sc) => {
-      ids = pasteObjectClipboard(p, sc, payload, files);
+      ids = hud ? pasteHUDClipboard(p, sc, payload, files) : pasteObjectClipboard(p, sc, payload, files);
     });
     if (ids.length) {
-      setSelectedIds(ids);
-      setActiveId(ids.at(-1));
-      setSelectedUIId(null);
+      setSelectedIds(hud ? [] : ids);
+      setActiveId(hud ? null : ids.at(-1));
+      setSelectedUIId(hud ? ids.at(-1) : null);
+      setSelectedAssetId(null);
+      setMainTab(hud ? "hud" : "viewport");
+      focusPanel("inspector");
     }
     return !!ids.length;
-  }, [edit, files]);
+  }, [edit, files, focusPanel]);
   const pasteSystemClipboard = useCallback(async () => {
     if (clipboardReadRef.current.busy) return false;
     const version = ++clipboardReadRef.current.version;
     clipboardReadRef.current.busy = true;
-    const session = projectSessionRef.current;
+    const session = projectSessionRef.current, sceneId = projectRef.current.activeSceneId;
     try {
       const data = await readEditorClipboard(actionWindow());
-      if (session !== projectSessionRef.current || version !== clipboardReadRef.current.version) return false;
+      if (session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId || version !== clipboardReadRef.current.version) return false;
       if (data?.payload) return pasteObjects(data.payload);
       if (data?.files?.length) return importDroppedAssets({ files: data.files }, "Textures/Clipboard", { isActive: () => version === clipboardReadRef.current.version });
       if (data) {
-        toast.info("The clipboard has no images or AthEditor objects.");
+        toast.info("The clipboard has no images or AthEditor elements.");
         return false;
       }
     } catch (error) {
-      if (version !== clipboardReadRef.current.version || session !== projectSessionRef.current) return false;
-      if (error.name !== "NotAllowedError" && error.name !== "SecurityError") {
+      if (version !== clipboardReadRef.current.version || session !== projectSessionRef.current || sceneId !== projectRef.current.activeSceneId) return false;
+      if (!["NotAllowedError", "SecurityError", "NotSupportedError"].includes(error.name)) {
         toast.error("Could not paste", { sub: error.message });
         return false;
       }
-      toast.warn("System clipboard access is unavailable", { sub: "Use Ctrl+V, or paste the editor's last copy." });
+      if (!clipboardItemCount(clipboardRef.current)) toast.warn("System clipboard access is unavailable", { sub: "Copy an element in the editor, or use your browser's Paste command." });
     } finally {
       if (version === clipboardReadRef.current.version) clipboardReadRef.current.busy = false;
     }
-    return clipboardRef.current?.objects?.length ? pasteObjects(clipboardRef.current) : false;
+    return clipboardItemCount(clipboardRef.current) ? pasteObjects(clipboardRef.current) : false;
   }, [pasteObjects, importDroppedAssets, toast]);
   const handleEditorPaste = useCallback((event) => {
     const el = event.target;
@@ -21406,14 +21497,14 @@ function App() {
     const transfer = event.clipboardData;
     if (!transfer) return;
     const text = transfer.getData("text/plain");
-    if (text.startsWith(EDITOR_CLIPBOARD_PREFIX)) {
+    if (isEditorClipboardText(text)) {
       clipboardReadRef.current.version++;
       clipboardReadRef.current.busy = false;
       event.preventDefault();
       try {
         pasteObjects(parseObjectClipboard(text));
       } catch (error) {
-        toast.error("Could not paste objects", { sub: error.message });
+        toast.error("Could not paste", { sub: error.message });
       }
     } else if ([...transfer.files || []].some((file) => /^image\//.test(file.type))) {
       clipboardReadRef.current.version++;
@@ -21426,6 +21517,39 @@ function App() {
     window.addEventListener("paste", handleEditorPaste);
     return () => window.removeEventListener("paste", handleEditorPaste);
   }, [handleEditorPaste]);
+  const copySelection = useCallback((event) => {
+    if (!selectedUI && !selectedIds.length) return false;
+    const payload = selectedUI ? makeHUDClipboard(projectRef.current, scene, [selectedUI.id], files) : makeObjectClipboard(projectRef.current, scene, selectedIds, files);
+    const count = clipboardItemCount(payload), label = selectedUI ? "HUD element" : "object";
+    if (!count) return false;
+    clipboardRef.current = payload;
+    const copied = () => toast.info(`Copied ${count} ${label}${count === 1 ? "" : "s"}`);
+    if (event?.clipboardData) {
+      event.clipboardData.setData("text/plain", (selectedUI ? HUD_CLIPBOARD_PREFIX : EDITOR_CLIPBOARD_PREFIX) + JSON.stringify(payload));
+      event.preventDefault();
+      copied();
+      return true;
+    }
+    let written;
+    try {
+      written = writeObjectClipboard(payload, actionWindow());
+    } catch (error) {
+      toast.warn("Copied inside the editor", { sub: error.message });
+      return false;
+    }
+    if (written) return written.then(copied, (error) => toast.warn("Copied inside the editor", { sub: error.message }));
+    copied();
+    return true;
+  }, [selectedUI, selectedIds, scene, files, toast]);
+  const handleEditorCopy = useCallback((event) => {
+    const el = event.target;
+    if (modalRef.current || paletteOpen || el?.nodeType === 1 && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+    if (event.clipboardData) copySelection(event);
+  }, [copySelection, paletteOpen]);
+  useEffect(() => {
+    window.addEventListener("copy", handleEditorCopy);
+    return () => window.removeEventListener("copy", handleEditorCopy);
+  }, [handleEditorCopy]);
   const shareReceipts = useRef(/* @__PURE__ */ new Set()), receiveShareRef = useRef(null);
   receiveShareRef.current = async (id) => {
     if (shareReceipts.current.has(id)) return;
@@ -21811,7 +21935,7 @@ function App() {
         title: "Duplicate",
         keys: "Ctrl+D",
         sep: true,
-        enabled: () => selection.length > 0,
+        enabled: () => selection.length > 0 || !!selectedUI,
         run: duplicateSelection
       },
       {
@@ -21819,28 +21943,16 @@ function App() {
         group: "Edit",
         title: "Copy",
         keys: "Ctrl+C",
-        enabled: () => selection.length > 0,
-        run: () => {
-          clipboardRef.current = makeObjectClipboard(projectRef.current, scene, selectedIds, files);
-          const count = clipboardRef.current.objects.length;
-          let written;
-          try {
-            written = writeObjectClipboard(clipboardRef.current, actionWindow());
-          } catch (error) {
-            toast.warn("Copied inside the editor", { sub: error.message });
-            return;
-          }
-          if (written) return written.then(() => toast.info(`Copied ${count} objects`), (error) => toast.warn("Copied inside the editor", { sub: error.message }));
-          toast.info(`Copied ${count} objects`);
-        }
+        enabled: () => selection.length > 0 || !!selectedUI,
+        run: () => copySelection()
       },
       {
         id: "edit.paste",
         group: "Edit",
         title: "Paste",
         keys: "Ctrl+V",
-        enabled: () => !!actionWindow().navigator?.clipboard || clipboardRef.current?.objects?.length > 0,
-        run: () => actionWindow().navigator?.clipboard ? pasteSystemClipboard() : clipboardRef.current?.objects?.length && pasteObjects(clipboardRef.current)
+        enabled: () => !!actionWindow().navigator?.clipboard || clipboardItemCount(clipboardRef.current) > 0,
+        run: () => actionWindow().navigator?.clipboard ? pasteSystemClipboard() : clipboardItemCount(clipboardRef.current) && pasteObjects(clipboardRef.current)
       },
       {
         id: "edit.copyCapture",
@@ -22068,6 +22180,9 @@ function App() {
           });
           setMainTab("hud");
           setSelectedUIId(id);
+          setSelectedIds([]);
+          setActiveId(null);
+          setSelectedAssetId(null);
         }
       });
     }
@@ -22271,6 +22386,7 @@ function App() {
     undo,
     redo,
     duplicateSelection,
+    copySelection,
     pasteObjects,
     pasteSystemClipboard,
     deleteSelection,
@@ -22317,7 +22433,17 @@ function App() {
     const bare = !e.ctrlKey && !e.metaKey && !e.altKey;
     if (typing && bare) return;
     if (typing && !TYPING_SAFE_CHORDS.has(combo)) return;
-    if (combo === "Ctrl+V") return;
+    if (combo === "Ctrl+V") {
+      const clipboard = actionWindow().navigator?.clipboard;
+      if (clipboard?.read || clipboard?.readText || clipboardItemCount(clipboardRef.current)) {
+        const paste = commandsRef.current.find((c) => c.id === "edit.paste");
+        if (paste && (!paste.enabled || paste.enabled())) {
+          e.preventDefault();
+          paste.run();
+        }
+      }
+      return;
+    }
     const cmd = commandsRef.current.find(
       (c) => c.keys && normalizeCombo(c.keys) === combo
     );
@@ -22391,7 +22517,13 @@ function App() {
         scene,
         files,
         selectedId: selectedUIId,
-        onSelect: setSelectedUIId,
+        onSelect: (id) => {
+          setSelectedUIId(id);
+          setSelectedIds([]);
+          setActiveId(null);
+          setSelectedAssetId(null);
+          if (id) focusPanel("inspector");
+        },
         onUpdate: updateUI,
         onAdd: (t2) => {
           let id = null;
@@ -22401,6 +22533,9 @@ function App() {
             id = el.id;
           });
           setSelectedUIId(id);
+          setSelectedIds([]);
+          setActiveId(null);
+          setSelectedAssetId(null);
         },
         onDelete: (id) => {
           edit((p, sc) => {
@@ -22733,6 +22868,7 @@ function App() {
       resetWindowsKey: windowReset,
       projectName: project.name,
       onKeyDown: handleEditorKey,
+      onCopy: handleEditorCopy,
       onPaste: handleEditorPaste,
       onWindowFocus: (view) => {
         actionWindowRef.current = view;
