@@ -1,53 +1,70 @@
-# AthenaEditor
-AthenaEditor is a browser-based 3D Level Editor that allows you to open your project folder, arrange 3D models in scenes, create empty objects and add any type of component to them.
+# AthEditor
 
-AthenaEditor.html runs entirely in your browser — no installation/internet access needed — and produces main.js scripts that you can copy and paste.
+A visual scene and game editor for [AthenaEnv](https://github.com/DanielSant0s/AthenaEnv) on PlayStation 2.
+Create a project, arrange objects, try the game, then export its scenes, scripts and assets.
 
-Key concepts:
-• Every level is a Scene — a list of objects with components
-• Every object gets a Transform (position, rotation, scale) automatically
-• Additional behavior comes from Components (Model, Light, Camera, Sound, Script, Animator)
-• Scripts are ES module files that receive a shared `ctx` object each frame that contains references to all RenderObjects, RenderDatas, Sounds, Textures and AnimCollections in the scene
-• Export Button generates one `main.js` per scene and links them.
+[Open the editor](https://reallotex.github.io/AthenaEditor/) · [Design review](docs/UX-REVIEW.md) · [Verification](docs/PRODUCTION-VERIFICATION.md)
 
-Requirements:
-Your "project/" folder should have the following structure. 
-project/
-   3dmodels/
-   textures/
-   sounds/
-   fonts/
-   scripts/
-   MyPS2Game.athena.json
-   main.js
-   athena.elf
+![Focused scene workspace](docs/verification/workspace.jpg)
 
-Usage:
-• When you use the Load Button (Inside the File menu), the editor will ask you to upload your main "project/" folder. After you select it and upload it, it will list all files inside all those children folders.
-• After that, It will load MyPS2Game.athena.json if it is found, populating your scenes.
-• Every time you save, you should take the downloaded MyPS2Game.athena.json and replace the old MyPS2Game.athena.json one in your project folder.
-• Every time you hit Export, you should copy the exported main.js content and manually replace the old text inside the main.js in your project. Same with every other scene.
+## Start editing
 
-Known Issues:
-Shaded mode may not represent final look on PS2 or PCSX2.
-Face culling seems not to be working.
-Shading modes (gouraud/flat) seem not to be working
-Texture map (inside model component) seems not to do anything when toggled on/off
-Objects' icons in the outliner don't get updated according to the components in them.
-Prefabs aren't fully implemented and may not get saved/loaded/replaced correctly. They are more like templates at the time of writing.
-Font's don't get previewed correctly.
+Open **AthenaEditor.html** in a desktop browser. The editor includes its dependencies and works offline.
+Choose **Create project**, enter a name and select a starting template. Empty starts with a camera
+and light; the other four templates include playable controllers, geometry and physics.
 
-Upcoming features:
-Shadow Projectors.
-ODE Physics, Collisions and Raycasting.
-Better saving/loading system (maybe dropping .json saving system and just parsing the main.js every time we load?)
-Better Scene management/linking (maybe combining scenes in one single main.js?)
-Cutscenes system (.csv player that disables behaviors, lerps properties of objects, plays sound clips, and plays animations following a timeline)
+The scene occupies the center, Objects and Assets share the left side, and Properties appear on
+the right. Select an object and move it directly, or edit its properties. Additional tools are
+available through the menus and Ctrl+K. Existing layout preferences are preserved; select
+**View → Layout presets → Focus** to use the new workspace.
 
+**Save** writes a portable project file with imported assets and scripts. The browser also keeps
+a recovery copy; that backup is distinct from saving a file. Keep a file copy of your work.
+Linking an existing project folder lets Save and Export write there, with conflict checks before
+replacing edited files. File and folder pickers depend on the browser; Chrome and Edge support
+the full folder workflow, and the editor falls back to file uploads and downloads elsewhere.
 
-Download:
-This is a public Claude Artifact that you can access/customize according to Anthropic's legal terms through the following link:
-https://claude.ai/public/artifacts/a1416ff3-fe03-41e6-b25b-da00bf7488c2
+**Export** produces a ZIP containing main.js, every scene, scripts, assets and athena.ini.
+The game starts at the project's start scene. Add athena.elf from the included reference folder
+to run the exported folder on the console or an emulator. Referenced files must be available;
+missing assets, ambiguous filenames and glTF models with external dependencies block export.
+Use self-contained GLB models for glTF assets. Scene exits are available to scripts as
+`ctx.goToScene("Exit name")` and take effect on the next frame.
 
-This software is released under GNU GENERAL PUBLIC LICENSE 3.0
-https://www.gnu.org/licenses/gpl-3.0.html
+## Run on Windows
+
+Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) 2.9 and PCSX2,
+then double-click **Start AthEditor.vbs**, or run:
+
+```sh
+deno task app
+```
+
+The editor opens at a fixed local address. **Run** discovers the included console player and
+PCSX2's standard installation. If necessary, Run settings lets you select their locations.
+PCSX2 needs a working BIOS and HostFS enabled. Run stages the open scene in a fresh temporary
+folder; Stop controls only the emulator process started by this editor.
+The standalone file and the hosted site provide export; native Run requires the local service.
+See [Desktop setup](docs/DESKTOP.md).
+
+## Develop and verify
+
+```sh
+deno task check       # Build the standalone editor and run the automated suite
+deno task serve       # Development server with rebuild/reload
+deno task build       # Rebuild AthenaEditor.html from src/
+```
+
+Deno downloads build dependencies on the first run. No separate Node installation is required.
+Do not edit the generated HTML. Source modules live in src/ and their build order is in
+tools/modules.js. Read [CLAUDE.md](CLAUDE.md) and the [verified engine API](docs/ATHENAENV-API.md)
+before changing generated engine calls.
+
+The release review includes automated regression tests, browser interaction checks, four
+controller fixtures in PCSX2 and repeated scene transitions. It does not certify real PS2
+hardware or every possible combination of user scripts and assets.
+GitHub Actions builds and tests on each change before deploying the generated editor to Pages.
+
+The editor is GPL-3.0; bundled libraries and AthenaEnv retain their own licenses.
+See [LICENSE](LICENSE), [vendor licenses](vendor/LICENSE-MIT.txt) and the
+[console player notice](reference/AthenaEnvReleaseAndExamples/README.md).

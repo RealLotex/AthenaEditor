@@ -1,0 +1,30 @@
+{
+  "id": "/",
+  "name": "AthEditor",
+  "short_name": "AthEditor",
+  "description": "Create scenes and games for AthenaEnv.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay"],
+  "launch_handler": { "client_mode": "focus-existing" },
+  "share_target": {
+    "action": "/share-images", "method": "POST", "enctype": "multipart/form-data",
+    "params": { "files": [{ "name": "images", "accept": ["image/png", "image/jpeg", ".png", ".jpg", ".jpeg"] }] }
+  },
+  "file_handlers": [{
+    "action": "/?action=open",
+    "accept": { "application/vnd.atheditor.project+json": [".atheditor"] },
+    "launch_type": "single-client"
+  }],
+  "shortcuts": [
+    { "name": "New project", "url": "/?action=new", "icons": [{ "src": "/app/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Recent projects", "url": "/?action=recent", "icons": [{ "src": "/app/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "background_color": "#101216",
+  "theme_color": "#1b1e25",
+  "icons": [
+    { "src": "/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

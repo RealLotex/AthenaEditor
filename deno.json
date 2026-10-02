@@ -1,0 +1,20 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "build": "deno run -A tools/build.js",
+    "watch": "deno run -A tools/build.js --watch",
+    "serve": "deno run -A tools/serve.js",
+    "app": "deno run -A tools/serve.js --app",
+    "test": "deno test -A tests/",
+    "check": "deno run -A tools/build.js && deno test -A tests/",
+    "ps2run": "deno run -A tools/ps2run.js",
+    "ps2shadow": "deno run -A tools/ps2shadow.js",
+    "vendor": "deno run -A tools/fetch-vendor.js"
+  },
+  "fmt": {
+    "exclude": ["AthenaEditor.html", "vendor/", "reference/", "build-manifest.json"]
+  },
+  "lint": {
+    "exclude": ["AthenaEditor.html", "vendor/", "reference/"]
+  }
+}

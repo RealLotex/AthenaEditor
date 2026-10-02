@@ -1,0 +1,541 @@
+[
+  {
+    "id": "first-person",
+    "ok": true,
+    "checks": [
+      [
+        "gravity",
+        true,
+        "body settled at y=0.3939, expected 0.4 +/- 0.15"
+      ],
+      [
+        "cam.x",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "cam.y",
+        true,
+        "off by 0.0028 (tolerance 0.05)"
+      ],
+      [
+        "cam.z",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "right",
+        true,
+        "x moved 5.604, wanted +1 or more"
+      ],
+      [
+        "forward",
+        true,
+        "z moved -5.604, wanted -1 or more"
+      ]
+    ],
+    "records": [
+      {
+        "key": "boot",
+        "numbers": [],
+        "raw": "[TEST] boot"
+      },
+      {
+        "key": "rest.body",
+        "numbers": [
+          0,
+          0.3939,
+          4
+        ],
+        "raw": "[TEST] rest.body 0 0.3939 4"
+      },
+      {
+        "key": "rest.cam",
+        "numbers": [
+          0,
+          1.64674,
+          4
+        ],
+        "raw": "[TEST] rest.cam 0 1.64674 4"
+      },
+      {
+        "key": "rest.tgt",
+        "numbers": [
+          0,
+          1.64674,
+          -6
+        ],
+        "raw": "[TEST] rest.tgt 0 1.64674 -6"
+      },
+      {
+        "key": "right.body",
+        "numbers": [
+          5.60401,
+          0.39019,
+          4
+        ],
+        "raw": "[TEST] right.body 5.60401 0.39019 4"
+      },
+      {
+        "key": "right.cam",
+        "numbers": [
+          5.54104,
+          1.64019,
+          4
+        ],
+        "raw": "[TEST] right.cam 5.54104 1.64019 4"
+      },
+      {
+        "key": "right.tgt",
+        "numbers": [
+          5.54104,
+          1.64019,
+          -6
+        ],
+        "raw": "[TEST] right.tgt 5.54104 1.64019 -6"
+      },
+      {
+        "key": "fwd.body",
+        "numbers": [
+          5.66698,
+          0.39019,
+          -1.60402
+        ],
+        "raw": "[TEST] fwd.body 5.66698 0.39019 -1.60402"
+      },
+      {
+        "key": "fwd.cam",
+        "numbers": [
+          5.66698,
+          1.64019,
+          -1.54106
+        ],
+        "raw": "[TEST] fwd.cam 5.66698 1.64019 -1.54106"
+      },
+      {
+        "key": "fwd.tgt",
+        "numbers": [
+          5.66698,
+          1.64019,
+          -11.5411
+        ],
+        "raw": "[TEST] fwd.tgt 5.66698 1.64019 -11.5411"
+      },
+      {
+        "key": "frames",
+        "numbers": [
+          240
+        ],
+        "raw": "[TEST] frames 240"
+      },
+      {
+        "key": "DONE",
+        "numbers": [],
+        "raw": "[TEST] DONE"
+      }
+    ]
+  },
+  {
+    "id": "third-person",
+    "ok": true,
+    "checks": [
+      [
+        "gravity",
+        true,
+        "body settled at y=0.486868, expected 0.5 +/- 0.15"
+      ],
+      [
+        "cam.x",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "cam.y",
+        true,
+        "off by 0.0002 (tolerance 0.05)"
+      ],
+      [
+        "cam.z",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "right",
+        true,
+        "x moved 6.725, wanted +1 or more"
+      ],
+      [
+        "forward",
+        true,
+        "z moved -6.725, wanted -1 or more"
+      ]
+    ],
+    "records": [
+      {
+        "key": "boot",
+        "numbers": [],
+        "raw": "[TEST] boot"
+      },
+      {
+        "key": "rest.body",
+        "numbers": [
+          0,
+          0.486868,
+          0
+        ],
+        "raw": "[TEST] rest.body 0 0.486868 0"
+      },
+      {
+        "key": "rest.cam",
+        "numbers": [
+          0,
+          4.73023,
+          7.51498
+        ],
+        "raw": "[TEST] rest.cam 0 4.73023 7.51498"
+      },
+      {
+        "key": "rest.tgt",
+        "numbers": [
+          0,
+          1.98705,
+          0
+        ],
+        "raw": "[TEST] rest.tgt 0 1.98705 0"
+      },
+      {
+        "key": "right.body",
+        "numbers": [
+          6.72527,
+          0.49019,
+          0
+        ],
+        "raw": "[TEST] right.body 6.72527 0.49019 0"
+      },
+      {
+        "key": "right.cam",
+        "numbers": [
+          6.64971,
+          4.73337,
+          7.51498
+        ],
+        "raw": "[TEST] right.cam 6.64971 4.73337 7.51498"
+      },
+      {
+        "key": "right.tgt",
+        "numbers": [
+          6.64971,
+          1.99019,
+          0
+        ],
+        "raw": "[TEST] right.tgt 6.64971 1.99019 0"
+      },
+      {
+        "key": "fwd.body",
+        "numbers": [
+          6.80084,
+          0.49019,
+          -6.72527
+        ],
+        "raw": "[TEST] fwd.body 6.80084 0.49019 -6.72527"
+      },
+      {
+        "key": "fwd.cam",
+        "numbers": [
+          6.80084,
+          4.73337,
+          0.865273
+        ],
+        "raw": "[TEST] fwd.cam 6.80084 4.73337 0.865273"
+      },
+      {
+        "key": "fwd.tgt",
+        "numbers": [
+          6.80084,
+          1.99019,
+          -6.64971
+        ],
+        "raw": "[TEST] fwd.tgt 6.80084 1.99019 -6.64971"
+      },
+      {
+        "key": "frames",
+        "numbers": [
+          240
+        ],
+        "raw": "[TEST] frames 240"
+      },
+      {
+        "key": "DONE",
+        "numbers": [],
+        "raw": "[TEST] DONE"
+      }
+    ]
+  },
+  {
+    "id": "side-scroller",
+    "ok": true,
+    "checks": [
+      [
+        "gravity",
+        true,
+        "body settled at y=0.496341, expected 0.5 +/- 0.15"
+      ],
+      [
+        "cam.x",
+        true,
+        "off by 0.0001 (tolerance 0.05)"
+      ],
+      [
+        "cam.z",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "right",
+        true,
+        "x moved 1.713, wanted +1 or more"
+      ],
+      [
+        "forward",
+        true,
+        "z moved -0.000, must stay put"
+      ]
+    ],
+    "records": [
+      {
+        "key": "boot",
+        "numbers": [],
+        "raw": "[TEST] boot"
+      },
+      {
+        "key": "rest.body",
+        "numbers": [
+          -6.00015,
+          0.496341,
+          -7.68E-05
+        ],
+        "raw": "[TEST] rest.body -6.00015 0.496341 -7.68e-05"
+      },
+      {
+        "key": "rest.cam",
+        "numbers": [
+          -6.00008,
+          2.5,
+          11
+        ],
+        "raw": "[TEST] rest.cam -6.00008 2.5 11"
+      },
+      {
+        "key": "rest.tgt",
+        "numbers": [
+          -6.00008,
+          2.5,
+          0
+        ],
+        "raw": "[TEST] rest.tgt -6.00008 2.5 0"
+      },
+      {
+        "key": "right.body",
+        "numbers": [
+          -4.28723,
+          0.49406,
+          -3.05176E-12
+        ],
+        "raw": "[TEST] right.body -4.28723 0.49406 -3.05176e-12"
+      },
+      {
+        "key": "right.cam",
+        "numbers": [
+          -4.26726,
+          2.5,
+          11
+        ],
+        "raw": "[TEST] right.cam -4.26726 2.5 11"
+      },
+      {
+        "key": "right.tgt",
+        "numbers": [
+          -4.26726,
+          2.5,
+          0
+        ],
+        "raw": "[TEST] right.tgt -4.26726 2.5 0"
+      },
+      {
+        "key": "fwd.body",
+        "numbers": [
+          -4.30826,
+          0.496341,
+          -7.68E-05
+        ],
+        "raw": "[TEST] fwd.body -4.30826 0.496341 -7.68e-05"
+      },
+      {
+        "key": "fwd.cam",
+        "numbers": [
+          -4.30819,
+          2.5,
+          11
+        ],
+        "raw": "[TEST] fwd.cam -4.30819 2.5 11"
+      },
+      {
+        "key": "fwd.tgt",
+        "numbers": [
+          -4.30819,
+          2.5,
+          0
+        ],
+        "raw": "[TEST] fwd.tgt -4.30819 2.5 0"
+      },
+      {
+        "key": "frames",
+        "numbers": [
+          240
+        ],
+        "raw": "[TEST] frames 240"
+      },
+      {
+        "key": "DONE",
+        "numbers": [],
+        "raw": "[TEST] DONE"
+      }
+    ]
+  },
+  {
+    "id": "top-down",
+    "ok": true,
+    "checks": [
+      [
+        "gravity",
+        true,
+        "body settled at y=0.486868, expected 0.5 +/- 0.15"
+      ],
+      [
+        "cam.x",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "cam.y",
+        true,
+        "off by 0.0002 (tolerance 0.05)"
+      ],
+      [
+        "cam.z",
+        true,
+        "off by 0.0000 (tolerance 0.05)"
+      ],
+      [
+        "right",
+        true,
+        "x moved 6.725, wanted +1 or more"
+      ],
+      [
+        "forward",
+        true,
+        "z moved -6.725, wanted -1 or more"
+      ]
+    ],
+    "records": [
+      {
+        "key": "boot",
+        "numbers": [],
+        "raw": "[TEST] boot"
+      },
+      {
+        "key": "rest.body",
+        "numbers": [
+          0,
+          0.486868,
+          0
+        ],
+        "raw": "[TEST] rest.body 0 0.486868 0"
+      },
+      {
+        "key": "rest.cam",
+        "numbers": [
+          0,
+          13.4871,
+          9
+        ],
+        "raw": "[TEST] rest.cam 0 13.4871 9"
+      },
+      {
+        "key": "rest.tgt",
+        "numbers": [
+          0,
+          0.487051,
+          0
+        ],
+        "raw": "[TEST] rest.tgt 0 0.487051 0"
+      },
+      {
+        "key": "right.body",
+        "numbers": [
+          6.72527,
+          0.49019,
+          0
+        ],
+        "raw": "[TEST] right.body 6.72527 0.49019 0"
+      },
+      {
+        "key": "right.cam",
+        "numbers": [
+          6.64971,
+          13.4902,
+          9
+        ],
+        "raw": "[TEST] right.cam 6.64971 13.4902 9"
+      },
+      {
+        "key": "right.tgt",
+        "numbers": [
+          6.64971,
+          0.49019,
+          0
+        ],
+        "raw": "[TEST] right.tgt 6.64971 0.49019 0"
+      },
+      {
+        "key": "fwd.body",
+        "numbers": [
+          6.80084,
+          0.49019,
+          -6.72527
+        ],
+        "raw": "[TEST] fwd.body 6.80084 0.49019 -6.72527"
+      },
+      {
+        "key": "fwd.cam",
+        "numbers": [
+          6.80084,
+          13.4902,
+          2.35029
+        ],
+        "raw": "[TEST] fwd.cam 6.80084 13.4902 2.35029"
+      },
+      {
+        "key": "fwd.tgt",
+        "numbers": [
+          6.80084,
+          0.49019,
+          -6.64971
+        ],
+        "raw": "[TEST] fwd.tgt 6.80084 0.49019 -6.64971"
+      },
+      {
+        "key": "frames",
+        "numbers": [
+          240
+        ],
+        "raw": "[TEST] frames 240"
+      },
+      {
+        "key": "DONE",
+        "numbers": [],
+        "raw": "[TEST] DONE"
+      }
+    ]
+  }
+]

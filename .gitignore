@@ -1,0 +1,28 @@
+# Dependencies, local settings and test output
+node_modules/
+.verification/
+.verification-tests.log
+build-manifest.json
+.AthenaEditor-*.tmp
+_site/
+*.log
+.DS_Store
+Thumbs.db
+
+# Historical builds and unrelated personal/sample game folders
+AthenaEditor.legacy.html
+SampleProject/
+ps2run/
+tetris-rpg/
+textures/
+controllers/
+readme.txt
+
+# Keep the tested console player; upstream sources/examples are separate.
+reference/*
+!reference/AthenaEnvReleaseAndExamples/
+reference/AthenaEnvReleaseAndExamples/*
+!reference/AthenaEnvReleaseAndExamples/athena.elf
+!reference/AthenaEnvReleaseAndExamples/athena.ini
+!reference/AthenaEnvReleaseAndExamples/LICENSE
+!reference/AthenaEnvReleaseAndExamples/README.md
