@@ -108,17 +108,22 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   // The overlay font is the one baked into the ELF unless the project folder
   // actually has a font file. Naming a file that is not there kills the
   // program at startup, which is a miserable way to greet a new project.
-  if (ir.overlayFont) {
+  const showOverlay = D.frameCounter !== false || !!D.debugHUD;
+  if (showOverlay && ir.overlayFont) {
     e.w(`os.chdir("${jsStr(ir.dirs.fonts)}");`);
     e.w(`const font = new Font("${jsStr(ir.overlayFont)}");`);
     e.w(`os.chdir("..");`);
-  } else {
+  } else if (showOverlay) {
     e.w(`const font = new Font("default");`);
   }
-  e.w(`font.scale = 0.6;`);
-  e.w(`font.outline = 1.0;`);
-  e.w(`font.outline_color = Color.new(0, 0, 0);`);
-  e.nl();
+  if (showOverlay) {
+    e.w(`font.scale = 0.6;`);
+    e.w(`font.outline = 1.0;`);
+    e.w(`font.outline_color = Color.new(0, 0, 0);`);
+    e.comment("Refresh diagnostics every 15 frames; draw cached text every frame.");
+    e.w(`let _hudFrame = 15, _hudText = "0 FPS", _hudMemory = "";`);
+    e.nl();
+  }
   const bg = scene.background || { r: 40, g: 40, b: 40, a: 128 };
   e.w(`const gray = Color.new(${il(bg.r)}, ${il(bg.g)}, ${il(bg.b)}, ${il(bg.a ?? 128)});`);
   e.nl();
@@ -189,6 +194,8 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
 
   // ── frame loop ───────────────────────────────────────────────────────
   e.section("Frame loop");
+  const frameHas3D = !!(ir.models.length || ir.shadows.length || ir.skybox || ir.scripts.files.length);
+  if (!frameHas3D) e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
   // The module must finish evaluating before its VM can be freed.
   // Screen.display runs frames from js_std_loop after module evaluation;
   // reloading inside a top-level infinite loop trips JS_FreeRuntime's live
@@ -242,7 +249,8 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
 
     emitPhysicsStep(b, ir);
 
-    b.w(`Camera.update();`);
+    b.comment("Rendering");
+    if (frameHas3D) b.w(`Camera.update();`);
     b.nl();
     emitSkyboxDraw(b, ir);
 
@@ -251,25 +259,34 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
       b.nl();
     }
 
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`);
+    if (frameHas3D) {
+      b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
+      b.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`);
+    }
     b.nl();
 
     emitModelDraws(b, ir);
     emitShadowDraws(b, ir);
 
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
+    if (frameHas3D) b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
     b.nl();
 
     if (ir.ui.length) { b.w(`drawUI();`); b.nl(); }
 
-    if (D.debugHUD) {
-      b.w(`font.print(10, 10, Screen.getFPS(360) + " FPS  " +`);
-      b.w(`    Math.floor(System.getMemoryStats().used / 1048576) + " MB RAM");`);
-      b.w(`font.print(10, 26, "VRAM static " + (Screen.getMemoryStats(Screen.VRAM_USED_STATIC) / 1024) +`);
-      b.w(`    " KB  dynamic " + (Screen.getMemoryStats(Screen.VRAM_USED_DYNAMIC) / 1024) + " KB");`);
-    } else {
-      b.w(`font.print(10, 10, Screen.getFPS(360) + " FPS");`);
+    if (showOverlay) {
+      b.w(`if (++_hudFrame >= 15) {`);
+      b.block(h => {
+        h.w(`_hudFrame = 0;`);
+        h.w(`_hudText = Screen.getFPS(60) + " FPS";`);
+        if (D.debugHUD) {
+          h.w(`_hudText += "  " + Math.floor(System.getMemoryStats().used / 1048576) + " MB RAM";`);
+          h.w(`_hudMemory = "VRAM static " + (Screen.getMemoryStats(Screen.VRAM_USED_STATIC) / 1024) +`);
+          h.w(`    " KB  dynamic " + (Screen.getMemoryStats(Screen.VRAM_USED_DYNAMIC) / 1024) + " KB";`);
+        }
+      });
+      b.w(`}`);
+      b.w(`font.print(10, 10, _hudText);`);
+      if (D.debugHUD) b.w(`font.print(10, 26, _hudMemory);`);
     }
     b.nl();
 

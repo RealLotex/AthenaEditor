@@ -44,8 +44,11 @@ El controlador publica estos datos en `ctx.player`:
 | `charge` | Intensidad del impulso cargado |
 | `events` | Pulsos de un frame: `jump`, `land`, `dash`, `launch`, `slamLand` |
 
-Todavía usa el modelo provisional. La rodada y el agachado conservan el collider
-vertical actual; la integración del personaje podrá ajustar sus dimensiones y sus
+Todavía usa el modelo provisional, ahora con normales suaves sin agregar triángulos.
+El collider es una esfera de radio 0,5 y masa 5, con rotación congelada y profundidad
+fija. Genera un contacto con el suelo y atraviesa mejor los bordes de plataformas.
+Conserva altura 1; su ancho es 1, frente al 0,6 de la caja anterior. La rodada y el
+agachado conservan este collider; la integración del personaje podrá ajustar sus dimensiones y sus
 clips. Las embestidas publican estados para integrar después daño y objetos rompibles.
 Las pendientes aportan impulso a la rodada cuando la física informa una normal de
 apoyo inclinada. Los loops y el movimiento sobre techos requieren otro sistema de
@@ -56,6 +59,10 @@ colisión y no forman parte de este controlador.
 Los proyectos nuevos incluyen este controlador automáticamente. Los proyectos ya
 creados conservan su copia del script: reemplazá el contenido de
 `SideScrollerController.js` en el editor por el archivo
-[`../controllers/SideScrollerController.js`](../controllers/SideScrollerController.js),
+[`SideScrollerController.js`](../examples/controllers/SideScrollerController.js),
 o copiá ese archivo a la carpeta de scripts de tu proyecto. Después volvé a ejecutar
 el juego. La fuente de la plantilla está en `src/templates/sidescroller.js`.
+Para recibir también el ahorro físico de la nueva plantilla, cambiar el Rigidbody
+del jugador a esfera, radio 0,5 y masa 5, manteniendo Freeze Rotation y eventos de
+colisión. El script es compatible con la caja anterior. Ver las
+[mediciones y ajustes de las cinco plantillas](TEMPLATE-PERFORMANCE.md).

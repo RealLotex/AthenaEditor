@@ -109,7 +109,10 @@ function objPrism(b, sides, radius, yBottom, yTop) {
   }
   for (let i = 0; i < sides; i++) {
     const j = (i + 1) % sides;
-    b.quad(bottom[i], bottom[j], top[j], top[i], side[i]);
+    // Smooth the curved body without adding triangles. Caps retain their
+    // separate normals, so Gouraud rounds the sides but preserves hard rims.
+    b.f.push([[bottom[i], side[i]], [bottom[j], side[j]], [top[j], side[j]]]);
+    b.f.push([[bottom[i], side[i]], [top[j], side[j]], [top[i], side[i]]]);
   }
   // Fan the caps from vertex 0. Convex, so a fan is safe.
   for (let i = 1; i < sides - 1; i++) {

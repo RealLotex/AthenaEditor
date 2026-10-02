@@ -7,7 +7,7 @@
 <!--
   GENERATED FILE — do not edit.
   Source lives in src/. Rebuild with:  deno task build
-  Build: v2026-10-02-22-26-GMT
+  Build: v2026-10-02-23-27-GMT
   Bundled dependencies:
 React 18.2.0 / React DOM 18.2.0
 Copyright (c) Facebook, Inc. and its affiliates.
@@ -5932,7 +5932,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 <script>
-window.__ATHENA_BUILD__ = "v2026-10-02-22-26-GMT";
+window.__ATHENA_BUILD__ = "v2026-10-02-23-27-GMT";
 
 // ══════════════════════════════════════════════════════════════════
 // src/core/util.js
@@ -9236,7 +9236,8 @@ function objPrism(b, sides, radius, yBottom, yTop) {
   }
   for (let i = 0; i < sides; i++) {
     const j = (i + 1) % sides;
-    b.quad(bottom[i], bottom[j], top[j], top[i], side[i]);
+    b.f.push([[bottom[i], side[i]], [bottom[j], side[j]], [top[j], side[j]]]);
+    b.f.push([[bottom[i], side[i]], [top[j], side[j]], [top[i], side[i]]]);
   }
   for (let i = 1; i < sides - 1; i++) {
     b.tri(top[0], top[i], top[i + 1], up);
@@ -9319,8 +9320,11 @@ const PITCH_LIMIT = 1.35;
 
 /** A stick axis as -1..1, with the rest position filtered out. */
 function axis(v) {
-    return (v > DEADZONE || v < -DEADZONE) ? v / STICK_MAX : 0.0;
+    return (v > DEADZONE || v < -DEADZONE) ? Math.max(-1.0, Math.min(1.0, v / STICK_MAX)) : 0.0;
 }
+
+const numberBuffer = new Float64Array(1);
+function number(value) { numberBuffer[0] = value; return numberBuffer[0]; }
 
 export function init(ctx) {
     const s = ctx.player;
@@ -9331,11 +9335,21 @@ export function init(ctx) {
     s.jumpSpeed = 4.6;
     s.eyeHeight = 1.25;     // above the body's centre, not above the ground
     s.grounded = false;
+    s.coyote = 0.0;
+    s.jumpBuffer = 0.0;
+    s.jumping = false;
+    s.body = ctx.physics.bodies.player;
+    s.cachedYaw = null;
+    s.cachedPitch = null;
 }
 
 export function update(ctx, pad) {
     const s = ctx.player;
-    const body = ctx.physics.bodies.player;
+    const body = s.body;
+    const dt = Math.max(0.001, Math.min(0.05, ctx.dt || 0.016));
+    const p = body.getPosition();
+    const vel = body.getLinearVel();
+    let vy = number(vel[1]);
 
     // \u2500\u2500 grounded \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // ode_onCollide stored the contact normal from the last step, so no extra
@@ -9343,8 +9357,12 @@ export function update(ctx, pad) {
     // into whichever geom the broad phase happened to call the first one, so
     // the sign is not ours to rely on \u2014 hence the abs().
     const n = s.lastHitNormal;
-    s.grounded = !!n && Math.abs(n[1]) > 0.7;
+    const hit = s.lastHitPosition;
+    s.grounded = !!n && Math.abs(n[1]) > 0.7 && (!hit || hit[1] < p[1]) && (!s.jumping || vy <= 0.0);
     s.lastHitNormal = null;     // consume it, or one contact grounds you forever
+    if (s.grounded) s.jumping = false;
+    s.coyote = s.grounded ? 0.10 : Math.max(0.0, s.coyote - dt);
+    s.jumpBuffer = pad.justPressed(Pads.CROSS) ? 0.12 : Math.max(0.0, s.jumpBuffer - dt);
 
     // \u2500\u2500 look \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // Turning right decreases yaw: forward is (-sin yaw, 0, -cos yaw), so
@@ -9352,13 +9370,20 @@ export function update(ctx, pad) {
     let turn = axis(pad.rx);
     if (pad.pressed(Pads.L1)) turn = -1.0;   // fallback for a digital pad
     if (pad.pressed(Pads.R1)) turn =  1.0;
-    s.yaw -= turn * s.lookRate * ctx.dt;
+    s.yaw = number(s.yaw - turn * s.lookRate * dt);
+    if (s.yaw > Math.PI) s.yaw = number(s.yaw - Math.PI * 2.0);
+    if (s.yaw < -Math.PI) s.yaw = number(s.yaw + Math.PI * 2.0);
     // pad.ry grows downwards (it is rjoy_v - 127), so push-up must raise the aim.
-    s.pitch -= axis(pad.ry) * s.lookRate * ctx.dt;
+    s.pitch = number(s.pitch - axis(pad.ry) * s.lookRate * dt);
     if (s.pitch >  PITCH_LIMIT) s.pitch =  PITCH_LIMIT;
     if (s.pitch < -PITCH_LIMIT) s.pitch = -PITCH_LIMIT;
 
-    const sy = Math.sin(s.yaw), cy = Math.cos(s.yaw);
+    // A steady view needs no trigonometry. Invalidate when editable angles change.
+    if (s.cachedYaw !== s.yaw) {
+        s.cachedYaw = s.yaw;
+        s.sinYaw = Math.sin(s.yaw); s.cosYaw = Math.cos(s.yaw);
+    }
+    const sy = s.sinYaw, cy = s.cosYaw;
     const fx = -sy, fz = -cy;   // forward, flattened onto the ground plane
     const rx =  cy, rz = -sy;   // right
 
@@ -9371,14 +9396,16 @@ export function update(ctx, pad) {
     if (pad.pressed(Pads.DOWN))  iz = -1.0;
 
     // Clamp to the unit circle so diagonals are not faster.
-    const mag = Math.sqrt(ix * ix + iz * iz);
-    if (mag > 1.0) { ix /= mag; iz /= mag; }
+    const squared = number(ix * ix + iz * iz);
+    if (squared > 1.0) { const mag = Math.sqrt(squared); ix /= mag; iz /= mag; }
 
     // Drive velocity directly and leave Y to gravity, except on the frame the
     // jump starts. Reading the current Y back keeps the fall going.
-    const vel = body.getLinearVel();
-    let vy = vel[1];
-    if (s.grounded && pad.justPressed(Pads.CROSS)) vy = s.jumpSpeed;
+    if (s.coyote > 0.0 && s.jumpBuffer > 0.0) {
+        vy = s.jumpSpeed;
+        s.coyote = s.jumpBuffer = 0.0;
+        s.grounded = false; s.jumping = true;
+    }
     body.setLinearVel((fx * iz + rx * ix) * s.speed, vy, (fz * iz + rz * ix) * s.speed);
 
     // \u2500\u2500 camera \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -9386,9 +9413,12 @@ export function update(ctx, pad) {
     // Target BEFORE position: Camera.target() moves the camera by the same
     // delta to preserve the view vector (setCameraTarget in src/camera.c), so
     // calling it second would drag the eye that was just placed.
-    const p = body.getPosition();
     const ex = p[0], ey = p[1] + s.eyeHeight, ez = p[2];
-    const cp = Math.cos(s.pitch), sp = Math.sin(s.pitch);
+    if (s.cachedPitch !== s.pitch) {
+        s.cachedPitch = s.pitch;
+        s.cosPitch = Math.cos(s.pitch); s.sinPitch = Math.sin(s.pitch);
+    }
+    const cp = s.cosPitch, sp = s.sinPitch;
     Camera.target(ex + fx * cp * 10.0, ey + sp * 10.0, ez + fz * cp * 10.0);
     Camera.position(ex, ey, ez);
 }
@@ -9418,7 +9448,7 @@ function templateFirstPerson() {
   });
   camera.components.transform.position = v3(0, 1.65, 4);
   const ground = mkObject("Ground");
-  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj" });
+  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj", accurate_clipping: true });
   ground.components.rigidbody = Object.assign(makeComponent("rigidbody"), {
     mode: "static",
     shape: "plane",
@@ -9450,10 +9480,13 @@ function templateFirstPerson() {
     o.components.model = Object.assign(makeComponent("model"), { file: "crate.obj" });
     o.components.transform.position = v3(x, y, z);
     o.components.rigidbody = Object.assign(makeComponent("rigidbody"), {
+      // One-centimetre collision skin on a metre-wide prop. The visible mesh
+      // stays full size. Athena otherwise solves useless static/static contacts
+      // between the floor, crates and stacked crates on every frame.
       mode: "static",
       shape: "box",
       autoFit: false,
-      size: v3(1, 1, 1)
+      size: v3(0.98, 0.98, 0.98)
     });
     return o;
   };
@@ -9491,8 +9524,11 @@ const PITCH_MAX = 1.2;
 
 /** A stick axis as -1..1, with the rest position filtered out. */
 function axis(v) {
-    return (v > DEADZONE || v < -DEADZONE) ? v / STICK_MAX : 0.0;
+    return (v > DEADZONE || v < -DEADZONE) ? Math.max(-1.0, Math.min(1.0, v / STICK_MAX)) : 0.0;
 }
+
+const numberBuffer = new Float64Array(1);
+function number(value) { numberBuffer[0] = value; return numberBuffer[0]; }
 
 export function init(ctx) {
     const s = ctx.player;
@@ -9506,20 +9542,37 @@ export function init(ctx) {
     s.camDistance = 8.0;
     s.camHeight = 1.5;      // where the camera looks, above the body centre
     s.grounded = false;
+    s.coyote = 0.0;
+    s.jumpBuffer = 0.0;
+    s.jumping = false;
+    s.body = ctx.physics.bodies.player;
+    s.view = ctx.RenderObjects.player;
+    s.rotation = { x: 0.0, y: s.angle, z: 0.0 };
+    s.view.rotation = s.rotation;
+    s.cachedYaw = null; s.cachedPitch = null;
+    s.moveX = null; s.moveZ = null; s.wantAngle = s.angle;
 }
 
 export function update(ctx, pad) {
     const s = ctx.player;
-    const body = ctx.physics.bodies.player;
-    const view = ctx.RenderObjects.player;
+    const body = s.body;
+    const view = s.view;
+    const dt = Math.max(0.001, Math.min(0.05, ctx.dt || 0.016));
+    const p = body.getPosition();
+    const vel = body.getLinearVel();
+    let vy = number(vel[1]);
 
     // \u2500\u2500 grounded \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // ode_onCollide stored the contact normal from the last step. Only its
     // steepness is meaningful: ODE's normal points into whichever geom the
     // broad phase called the first one, so the sign is not ours to rely on.
     const n = s.lastHitNormal;
-    s.grounded = !!n && Math.abs(n[1]) > 0.7;
+    const hit = s.lastHitPosition;
+    s.grounded = !!n && Math.abs(n[1]) > 0.7 && (!hit || hit[1] < p[1]) && (!s.jumping || vy <= 0.0);
     s.lastHitNormal = null;     // consume it, or one contact grounds you forever
+    if (s.grounded) s.jumping = false;
+    s.coyote = s.grounded ? 0.10 : Math.max(0.0, s.coyote - dt);
+    s.jumpBuffer = pad.justPressed(Pads.CROSS) ? 0.12 : Math.max(0.0, s.jumpBuffer - dt);
 
     // \u2500\u2500 swing the camera \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // Turning right decreases yaw: forward is (-sin yaw, 0, -cos yaw), so
@@ -9527,15 +9580,21 @@ export function update(ctx, pad) {
     let turn = axis(pad.rx);
     if (pad.pressed(Pads.L1)) turn = -1.0;   // fallback for a digital pad
     if (pad.pressed(Pads.R1)) turn =  1.0;
-    s.yaw -= turn * s.lookRate * ctx.dt;
+    s.yaw = number(s.yaw - turn * s.lookRate * dt);
+    if (s.yaw > Math.PI) s.yaw = number(s.yaw - Math.PI * 2.0);
+    if (s.yaw < -Math.PI) s.yaw = number(s.yaw + Math.PI * 2.0);
     // pad.ry grows downwards (it is rjoy_v - 127), and pitch is the camera's
     // elevation, so adding it means pushing the stick up drops the camera and
     // aims the view upward \u2014 the same gesture as in first person.
-    s.pitch += axis(pad.ry) * s.lookRate * ctx.dt;
+    s.pitch = number(s.pitch + axis(pad.ry) * s.lookRate * dt);
     if (s.pitch > PITCH_MAX) s.pitch = PITCH_MAX;
     if (s.pitch < PITCH_MIN) s.pitch = PITCH_MIN;
 
-    const sy = Math.sin(s.yaw), cy = Math.cos(s.yaw);
+    if (s.cachedYaw !== s.yaw) {
+        s.cachedYaw = s.yaw;
+        s.sinYaw = Math.sin(s.yaw); s.cosYaw = Math.cos(s.yaw);
+    }
+    const sy = s.sinYaw, cy = s.cosYaw;
     const fx = -sy, fz = -cy;   // where the camera looks, flattened
     const rx =  cy, rz = -sy;   // its right
 
@@ -9548,28 +9607,38 @@ export function update(ctx, pad) {
     if (pad.pressed(Pads.DOWN))  iz = -1.0;
 
     // Clamp to the unit circle so diagonals are not faster.
-    const mag = Math.sqrt(ix * ix + iz * iz);
-    if (mag > 1.0) { ix /= mag; iz /= mag; }
+    const squared = number(ix * ix + iz * iz);
+    if (squared > 1.0) { const mag = Math.sqrt(squared); ix /= mag; iz /= mag; }
 
     const mx = fx * iz + rx * ix;   // world direction of travel
     const mz = fz * iz + rz * ix;
 
-    const vel = body.getLinearVel();
-    let vy = vel[1];
-    if (s.grounded && pad.justPressed(Pads.CROSS)) vy = s.jumpSpeed;
+    if (s.coyote > 0.0 && s.jumpBuffer > 0.0) {
+        vy = s.jumpSpeed;
+        s.coyote = s.jumpBuffer = 0.0;
+        s.grounded = false; s.jumping = true;
+    }
     body.setLinearVel(mx * s.speed, vy, mz * s.speed);
 
     // \u2500\u2500 face the direction of travel \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // rotation.y = T sends the model's +Z axis to (sin T, cos T), so the angle
     // that points its nose along (mx, mz) is atan2(mx, mz).
     // Freeze Rotation keeps the solver from touching this.
-    if (mag > 0.15) {
-        const want = Math.atan2(mx, mz);
-        let delta = want - s.angle;
-        while (delta >  Math.PI) delta -= Math.PI * 2.0;
-        while (delta < -Math.PI) delta += Math.PI * 2.0;
-        s.angle += delta * Math.min(1.0, s.turnRate * ctx.dt);
-        view.rotation = { x: 0.0, y: s.angle, z: 0.0 };
+    if (squared > 0.0225) {
+        if (mx !== s.moveX || mz !== s.moveZ) {
+            s.moveX = mx; s.moveZ = mz; s.wantAngle = Math.atan2(mx, mz);
+        }
+        const want = s.wantAngle;
+        let delta = number(want - s.angle);
+        if (delta >  Math.PI) delta = number(delta - Math.PI * 2.0);
+        if (delta < -Math.PI) delta = number(delta + Math.PI * 2.0);
+        if (Math.abs(delta) > 0.001) {
+            s.angle = number(s.angle + delta * Math.min(1.0, s.turnRate * dt));
+            if (s.angle > Math.PI) s.angle = number(s.angle - Math.PI * 2.0);
+            if (s.angle < -Math.PI) s.angle = number(s.angle + Math.PI * 2.0);
+            s.rotation.y = s.angle;
+            view.rotation = s.rotation;
+        }
     }
 
     // \u2500\u2500 camera \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -9577,11 +9646,15 @@ export function update(ctx, pad) {
     // Target BEFORE position: Camera.target() moves the camera by the same
     // delta to preserve the view vector (setCameraTarget in src/camera.c), so
     // calling it second would drag the position that was just set.
-    const p = body.getPosition();
     const tx = p[0], ty = p[1] + s.camHeight, tz = p[2];
-    const back = s.camDistance * Math.cos(s.pitch);
+    if (s.cachedPitch !== s.pitch || s.cachedDistance !== s.camDistance) {
+        s.cachedPitch = s.pitch; s.cachedDistance = s.camDistance;
+        s.back = s.camDistance * Math.cos(s.pitch);
+        s.lift = s.camDistance * Math.sin(s.pitch);
+    }
+    const back = s.back;
     Camera.target(tx, ty, tz);
-    Camera.position(tx - fx * back, ty + s.camDistance * Math.sin(s.pitch), tz - fz * back);
+    Camera.position(tx - fx * back, ty + s.lift, tz - fz * back);
 }
 `;
 function templateThirdPerson() {
@@ -9607,7 +9680,7 @@ function templateThirdPerson() {
   });
   camera.components.transform.position = v3(0, 4.75, 7.51);
   const ground = mkObject("Ground");
-  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj" });
+  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj", accurate_clipping: true });
   ground.components.rigidbody = Object.assign(makeComponent("rigidbody"), {
     mode: "static",
     shape: "plane",
@@ -9721,18 +9794,24 @@ export function init(ctx) {
     s.wasDown = false;
     s.lookAhead = 0.0;
     s.events = { jump: false, land: false, dash: false, launch: false, slamLand: false };
+    s.body = ctx.physics.bodies.player;
+    s.view = ctx.RenderObjects.player;
+    s.rotation = { x: 0.0, y: Math.PI * 0.5, z: 0.0 };
+    s.view.rotation = s.rotation;
+    s.drawFacing = s.facing;
+    s.cameraX = s.cameraY = s.cameraDistance = null;
 }
 
 export function update(ctx, pad) {
     const s = ctx.player;
-    const body = ctx.physics.bodies.player;
-    const view = ctx.RenderObjects.player;
+    const body = s.body;
+    const view = s.view;
     const t = s.tuning;
     const dt = Math.max(0.001, Math.min(0.05, ctx.dt || 0.016));
     const vel = body.getLinearVel();
     const p = body.getPosition();
     let vx = number(vel[0]), vy = number(vel[1]);
-    for (const key in s.events) s.events[key] = false;
+    s.events.jump = s.events.land = s.events.dash = s.events.launch = s.events.slamLand = false;
     s.dashTimer = Math.max(0.0, s.dashTimer - dt);
     s.dashCooldown = Math.max(0.0, s.dashCooldown - dt);
     s.recovery = Math.max(0.0, s.recovery - dt);
@@ -9772,8 +9851,9 @@ export function update(ctx, pad) {
     let ix = axis(pad.lx);
     if (pad.pressed(Pads.LEFT))  ix = -1.0;
     if (pad.pressed(Pads.RIGHT)) ix =  1.0;
-    const down = pad.pressed(Pads.DOWN) || axis(pad.ly) > 0.5;
-    const up = pad.pressed(Pads.UP) || axis(pad.ly) < -0.5;
+    const vertical = number(axis(pad.ly));
+    const down = pad.pressed(Pads.DOWN) || vertical > 0.5;
+    const up = pad.pressed(Pads.UP) || vertical < -0.5;
     const sprint = pad.pressed(Pads.R1);
     const jumpPressed = pad.justPressed(Pads.CROSS);
     const jumpHeld = pad.pressed(Pads.CROSS);
@@ -9910,7 +9990,13 @@ export function update(ctx, pad) {
     // Keep facing the travel direction during a skid or roll.
     if (!s.charging && Math.abs(vx) > 0.2) s.facing = vx > 0.0 ? 1.0 : -1.0;
     else if (!s.charging && Math.abs(ix) > 0.15) s.facing = ix > 0.0 ? 1.0 : -1.0;
-    view.rotation = { x: 0.0, y: s.facing * Math.PI * 0.5, z: 0.0 };
+    // Direction has only two values. Rebuilding the native transform every
+    // frame wastes matrix work and allocates an otherwise identical object.
+    if (s.drawFacing !== s.facing) {
+        s.drawFacing = s.facing;
+        s.rotation.y = s.facing * Math.PI * 0.5;
+        view.rotation = s.rotation;
+    }
 
     // \u2500\u2500 camera \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // Follows X freely and Y only upward, so a jump does not make the whole
@@ -9921,8 +10007,11 @@ export function update(ctx, pad) {
     const ahead = Math.max(-1.0, Math.min(1.0, vx / t.machSpeed)) * t.lookAhead;
     s.lookAhead += (ahead - s.lookAhead) * Math.min(1.0, t.cameraResponse * dt);
     const cx = p[0] + s.lookAhead;
-    Camera.target(cx, cy, PLANE_Z);
-    Camera.position(cx, cy, PLANE_Z + s.camDistance);
+    if (cx !== s.cameraX || cy !== s.cameraY || s.camDistance !== s.cameraDistance) {
+        s.cameraX = cx; s.cameraY = cy; s.cameraDistance = s.camDistance;
+        Camera.target(cx, cy, PLANE_Z);
+        Camera.position(cx, cy, PLANE_Z + s.camDistance);
+    }
 }
 `;
 function templateSideScroller() {
@@ -9975,9 +10064,12 @@ function templateSideScroller() {
   player.components.rigidbody = Object.assign(makeComponent("rigidbody"), {
     // Mass 5, not a person's 70 — the engine's contact softness is fixed and
     // penetration grows with mass. See docs/HARDWARE-NOTES.md.
+    // One sphere/floor contact instead of four box corners. It keeps the
+    // character one unit tall and softens catches on platform edges. The
+    // controller still freezes rotation and pins depth to the play plane.
     mode: "dynamic",
-    shape: "box",
-    size: v3(0.6, 1, 0.6),
+    shape: "sphere",
+    radius: 0.5,
     mass: 5,
     autoFit: false,
     freezeRotation: true,
@@ -10013,6 +10105,12 @@ const TOPDOWN_CONTROLLER = `// TopDownController.js \u2014 generated by the Top 
 const DEADZONE = 25;      // sticks rest near 0 but are never exactly 0
 const STICK_MAX = 127.0;
 
+function axis(v) {
+    return (v > DEADZONE || v < -DEADZONE) ? Math.max(-1.0, Math.min(1.0, v / STICK_MAX)) : 0.0;
+}
+const numberBuffer = new Float64Array(1);
+function number(value) { numberBuffer[0] = value; return numberBuffer[0]; }
+
 export function init(ctx) {
     const s = ctx.player;
     s.speed = 6.0;          // world units per second
@@ -10020,42 +10118,56 @@ export function init(ctx) {
     s.angle = 0.0;
     s.camHeight = 13.0;
     s.camDistance = 9.0;
+    s.body = ctx.physics.bodies.player;
+    s.view = ctx.RenderObjects.player;
+    s.rotation = { x: 0.0, y: s.angle, z: 0.0 };
+    s.view.rotation = s.rotation;
+    s.moveX = null; s.moveZ = null; s.wantAngle = s.angle;
 }
 
 export function update(ctx, pad) {
     const s = ctx.player;
-    const body = ctx.physics.bodies.player;
-    const view = ctx.RenderObjects.player;
+    const body = s.body;
+    const view = s.view;
+    const dt = Math.max(0.001, Math.min(0.05, ctx.dt || 0.016));
 
     // \u2500\u2500 read the stick, fall back to the d-pad \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    let ix = (pad.lx > DEADZONE || pad.lx < -DEADZONE) ? pad.lx / STICK_MAX : 0.0;
-    // pad.ly grows downwards, so negate it to get "forward".
-    let iz = (pad.ly > DEADZONE || pad.ly < -DEADZONE) ? -pad.ly / STICK_MAX : 0.0;
+    let ix = axis(pad.lx);
+    // World -Z is screen-up. Negative pad.ly already points along -Z.
+    let iz = axis(pad.ly);
 
     if (pad.pressed(Pads.LEFT))  ix = -1.0;
     if (pad.pressed(Pads.RIGHT)) ix =  1.0;
-    if (pad.pressed(Pads.UP))    iz =  1.0;
-    if (pad.pressed(Pads.DOWN))  iz = -1.0;
+    if (pad.pressed(Pads.UP))    iz = -1.0;
+    if (pad.pressed(Pads.DOWN))  iz =  1.0;
 
     // Clamp to the unit circle so diagonals are not faster.
-    const mag = Math.sqrt(ix * ix + iz * iz);
-    if (mag > 1.0) { ix /= mag; iz /= mag; }
+    const squared = number(ix * ix + iz * iz);
+    if (squared > 1.0) { const mag = Math.sqrt(squared); ix /= mag; iz /= mag; }
 
     // \u2500\u2500 move \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // Drive velocity directly and leave Y to gravity. Forward on the stick
     // means -Z, which is the direction the camera looks.
     const vel = body.getLinearVel();
-    body.setLinearVel(ix * s.speed, vel[1], -iz * s.speed);
+    body.setLinearVel(ix * s.speed, vel[1], iz * s.speed);
 
     // \u2500\u2500 face the direction of travel \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     // Freeze Rotation keeps the solver from touching this.
-    if (mag > 0.15) {
-        const want = Math.atan2(ix, -iz);
-        let delta = want - s.angle;
-        while (delta >  Math.PI) delta -= Math.PI * 2.0;
-        while (delta < -Math.PI) delta += Math.PI * 2.0;
-        s.angle += delta * Math.min(1.0, s.turnRate * ctx.dt);
-        view.rotation = { x: 0.0, y: s.angle, z: 0.0 };
+    if (squared > 0.0225) {
+        if (ix !== s.moveX || iz !== s.moveZ) {
+            s.moveX = ix; s.moveZ = iz; s.wantAngle = Math.atan2(ix, iz);
+        }
+        const want = s.wantAngle;
+        let delta = number(want - s.angle);
+        if (delta >  Math.PI) delta = number(delta - Math.PI * 2.0);
+        if (delta < -Math.PI) delta = number(delta + Math.PI * 2.0);
+        if (Math.abs(delta) > 0.001) {
+            s.angle = number(s.angle + delta * Math.min(1.0, s.turnRate * dt));
+            if (s.angle > Math.PI) s.angle = number(s.angle - Math.PI * 2.0);
+            if (s.angle < -Math.PI) s.angle = number(s.angle + Math.PI * 2.0);
+            s.rotation.y = s.angle;
+            view.rotation = s.rotation;
+        }
     }
 
     // \u2500\u2500 camera \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -10088,7 +10200,7 @@ function templateTopDown() {
   camera.components.camera = Object.assign(makeComponent("camera"), { fov: 50 });
   camera.components.transform.position = v3(0, 13, 9);
   const ground = mkObject("Ground");
-  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj" });
+  ground.components.model = Object.assign(makeComponent("model"), { file: "ground.obj", accurate_clipping: true });
   ground.components.rigidbody = Object.assign(makeComponent("rigidbody"), {
     mode: "static",
     shape: "plane",
@@ -10108,8 +10220,10 @@ function templateTopDown() {
     mass: 5,
     autoFit: false,
     freezeRotation: true,
-    collisionEvents: true,
-    onCollide: "player"
+    // Movement needs gravity and solid contacts, but reads no contact events.
+    // Avoid the release's JS callback/contact-recovery cost entirely.
+    collisionEvents: false,
+    onCollide: ""
   });
   player.components.script = Object.assign(makeComponent("script"), {
     file: "TopDownController.js",
@@ -12949,7 +13063,14 @@ const RESERVED_VARS = [
   "_hit",
   "_odeLegacyContacts",
   "_odeEventPairs",
-  "_odePollContacts"
+  "_odePollContacts",
+  "_odeBoundGeoms",
+  "_odeBoundPositions",
+  "_odeBoundNumber",
+  "_odeEventBounds",
+  "_hudFrame",
+  "_hudText",
+  "_hudMemory"
 ];
 function resolveScene(project, scene, files = []) {
   files = editorAssets(project, files);
@@ -13562,21 +13683,77 @@ function emitContactCallback(e, ir) {
   e.w(`}`);
   e.nl();
   const solids = ir.physics.bodies.filter((b) => !b.isTrigger);
+  const pairs = [];
+  for (let i = 0; i < solids.length; i++) for (let j = i + 1; j < solids.length; j++) {
+    const a = solids[i], d = solids[j];
+    if ((a.events || d.events) && (a.isDynamic || d.isDynamic)) pairs.push([a, d]);
+  }
+  const radiusOf = (b) => {
+    const radius = b.shape === "sphere" ? b.radius : b.shape === "box" ? Math.hypot(b.size.x, b.size.y, b.size.z) / 2 : null;
+    return Number.isFinite(radius) && radius >= 0 ? radius : null;
+  };
+  const bounded = [], centres = [];
+  const centreIndex = (b) => {
+    let index = centres.indexOf(b);
+    if (index < 0) {
+      index = centres.length;
+      centres.push(b);
+    }
+    return index;
+  };
+  for (const [a, d] of pairs) {
+    if (pairs.length === 1) {
+      bounded.push(null);
+      continue;
+    }
+    const ar = radiusOf(a), dr = radiusOf(d);
+    const plane = a.shape === "plane" ? a : d.shape === "plane" ? d : null;
+    const mover = plane === a ? d : a, radius = radiusOf(mover);
+    if (plane && radius !== null && Number.isFinite(plane.rb.planeY ?? 0)) {
+      bounded.push([centreIndex(mover), -1, Math.ceil(((plane.rb.planeY ?? 0) + radius) * 1e3) / 1e3 + 1e-3]);
+    } else if (ar !== null && dr !== null) {
+      const r = Math.ceil((ar + dr) * 1e3) / 1e3 + 1e-3;
+      bounded.push([centreIndex(a), centreIndex(d), Math.ceil(r * r * 1e3) / 1e3]);
+    } else bounded.push(null);
+  }
   e.w(`const _odeEventPairs = [`);
   e.block((b) => {
-    for (let i = 0; i < solids.length; i++) {
-      for (let j = i + 1; j < solids.length; j++) {
-        const a = solids[i], d = solids[j];
-        if (!(a.events || d.events) || !(a.isDynamic || d.isDynamic)) continue;
-        b.w(`[${a.geomVN}, ${d.geomVN}],`);
-      }
-    }
+    for (const [a, d] of pairs) b.w(`[${a.geomVN}, ${d.geomVN}],`);
   });
   e.w(`];`);
+  if (centres.length) {
+    e.comment(
+      "Skip impossible contact pairs; each live centre is read once per poll.",
+      "Float64 storage avoids the release QuickJS mixed float comparison defect."
+    );
+    e.w(`const _odeBoundGeoms = [${centres.map((b) => b.geomVN).join(", ")}];`);
+    e.w(`const _odeBoundPositions = new Array(${il(centres.length)});`);
+    e.w(`const _odeBoundNumber = new Float64Array(1);`);
+    e.w(`const _odeEventBounds = [${bounded.map((b) => b ? `[${il(b[0])}, ${il(b[1])}, ${fl(b[2])}]` : "null").join(", ")}];`);
+  }
   e.w(`function _odePollContacts() {`);
   e.block((b) => {
-    b.w(`for (const pair of _odeEventPairs) {`);
+    if (centres.length) b.w(`for (let i = 0; i < _odeBoundGeoms.length; i++) _odeBoundPositions[i] = _odeBoundGeoms[i].getPosition();`);
+    b.w(`for (let i = 0; i < _odeEventPairs.length; i++) {`);
     b.block((x) => {
+      x.w(`const pair = _odeEventPairs[i];`);
+      if (centres.length) {
+        x.w(`const bounds = _odeEventBounds[i];`);
+        x.w(`if (bounds) {`);
+        x.block((y) => {
+          y.w(`const a = _odeBoundPositions[bounds[0]];`);
+          y.w(`if (bounds[1] === -1) _odeBoundNumber[0] = a[1];`);
+          y.w(`else {`);
+          y.block((z) => {
+            z.w(`const d = _odeBoundPositions[bounds[1]];`);
+            z.w(`const dx = a[0] - d[0], dy = a[1] - d[1], dz = a[2] - d[2];`);
+            z.w(`_odeBoundNumber[0] = dx * dx + dy * dy + dz * dz;`);
+          });
+          y.w(`}`);
+          y.w(`if (_odeBoundNumber[0] > bounds[2]) continue;`);
+        });
+        x.w(`}`);
+      }
       x.w(`const hits = ODE.geomCollide(pair[0], pair[1]);`);
       x.w(`for (const hit of hits || []) {`);
       x.block((y) => {
@@ -13644,7 +13821,10 @@ function emitPhysicsStep(e, ir) {
   const dt = f3(P.settings.stepSize ?? 0.016);
   const cb = P.bodies.some((b) => !b.isTrigger && b.events) ? ", ode_onCollide" : "";
   e.comment("Physics step \u2014 broad phase, contact joints, solve, all in one call");
-  if (cb) e.w(`if (_odeLegacyContacts) _odePollContacts();`);
+  if (cb) {
+    e.w(`if (_odeLegacyContacts) _odePollContacts();`);
+    e.w(`_odeLegacyContacts = false;`);
+  }
   e.w(`ode_world.stepWithContacts(ode_space, ode_contacts, ${fl(dt)}${cb});`);
   if (P.bodies.some((b) => b.isTrigger)) e.w(`_updateTriggers();`);
   e.nl();
@@ -14183,17 +14363,22 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
     e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
     e.nl();
   }
-  if (ir.overlayFont) {
+  const showOverlay = D.frameCounter !== false || !!D.debugHUD;
+  if (showOverlay && ir.overlayFont) {
     e.w(`os.chdir("${jsStr(ir.dirs.fonts)}");`);
     e.w(`const font = new Font("${jsStr(ir.overlayFont)}");`);
     e.w(`os.chdir("..");`);
-  } else {
+  } else if (showOverlay) {
     e.w(`const font = new Font("default");`);
   }
-  e.w(`font.scale = 0.6;`);
-  e.w(`font.outline = 1.0;`);
-  e.w(`font.outline_color = Color.new(0, 0, 0);`);
-  e.nl();
+  if (showOverlay) {
+    e.w(`font.scale = 0.6;`);
+    e.w(`font.outline = 1.0;`);
+    e.w(`font.outline_color = Color.new(0, 0, 0);`);
+    e.comment("Refresh diagnostics every 15 frames; draw cached text every frame.");
+    e.w(`let _hudFrame = 15, _hudText = "0 FPS", _hudMemory = "";`);
+    e.nl();
+  }
   const bg = scene.background || { r: 40, g: 40, b: 40, a: 128 };
   e.w(`const gray = Color.new(${il(bg.r)}, ${il(bg.g)}, ${il(bg.b)}, ${il(bg.a ?? 128)});`);
   e.nl();
@@ -14256,6 +14441,8 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.w(`let lx = 0.0, ly = 0.0;`);
   e.nl();
   e.section("Frame loop");
+  const frameHas3D = !!(ir.models.length || ir.shadows.length || ir.skybox || ir.scripts.files.length);
+  if (!frameHas3D) e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
   e.w(`Screen.clearColor(gray);`);
   e.w(`Screen.display(() => {`);
   e.block((b) => {
@@ -14297,31 +14484,41 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
       }
     }
     emitPhysicsStep(b, ir);
-    b.w(`Camera.update();`);
+    b.comment("Rendering");
+    if (frameHas3D) b.w(`Camera.update();`);
     b.nl();
     emitSkyboxDraw(b, ir);
     if (ir.shadowPasses.length) {
       b.w(`_shadowPass();`);
       b.nl();
     }
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`);
+    if (frameHas3D) {
+      b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, true);`);
+      b.w(`Screen.setParam(Screen.DEPTH_TEST_METHOD, Screen.DEPTH_GEQUAL);`);
+    }
     b.nl();
     emitModelDraws(b, ir);
     emitShadowDraws(b, ir);
-    b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
+    if (frameHas3D) b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
     b.nl();
     if (ir.ui.length) {
       b.w(`drawUI();`);
       b.nl();
     }
-    if (D.debugHUD) {
-      b.w(`font.print(10, 10, Screen.getFPS(360) + " FPS  " +`);
-      b.w(`    Math.floor(System.getMemoryStats().used / 1048576) + " MB RAM");`);
-      b.w(`font.print(10, 26, "VRAM static " + (Screen.getMemoryStats(Screen.VRAM_USED_STATIC) / 1024) +`);
-      b.w(`    " KB  dynamic " + (Screen.getMemoryStats(Screen.VRAM_USED_DYNAMIC) / 1024) + " KB");`);
-    } else {
-      b.w(`font.print(10, 10, Screen.getFPS(360) + " FPS");`);
+    if (showOverlay) {
+      b.w(`if (++_hudFrame >= 15) {`);
+      b.block((h) => {
+        h.w(`_hudFrame = 0;`);
+        h.w(`_hudText = Screen.getFPS(60) + " FPS";`);
+        if (D.debugHUD) {
+          h.w(`_hudText += "  " + Math.floor(System.getMemoryStats().used / 1048576) + " MB RAM";`);
+          h.w(`_hudMemory = "VRAM static " + (Screen.getMemoryStats(Screen.VRAM_USED_STATIC) / 1024) +`);
+          h.w(`    " KB  dynamic " + (Screen.getMemoryStats(Screen.VRAM_USED_DYNAMIC) / 1024) + " KB";`);
+        }
+      });
+      b.w(`}`);
+      b.w(`font.print(10, 10, _hudText);`);
+      if (D.debugHUD) b.w(`font.print(10, 26, _hudMemory);`);
     }
     b.nl();
   });

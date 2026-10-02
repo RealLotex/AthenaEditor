@@ -1,0 +1,582 @@
+{
+  "date": "2026-10-02",
+  "results": [
+    {
+      "id": "first-person",
+      "passed": true,
+      "records": [
+        {
+          "tag": "jump",
+          "n": 62,
+          "p": [
+            0,
+            0.461278,
+            0
+          ],
+          "v": [
+            0,
+            4.44304,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00981095,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "noDoubleJump",
+          "n": 64,
+          "p": [
+            0,
+            0.595921,
+            0
+          ],
+          "v": [
+            0,
+            4.12912,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00981095,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "coyote",
+          "n": 153,
+          "p": [
+            0,
+            20.0636,
+            0
+          ],
+          "v": [
+            0,
+            4.44304,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00918981,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "bufferedJump",
+          "n": 214,
+          "p": [
+            0,
+            0.6124,
+            0
+          ],
+          "v": [
+            0,
+            3.97216,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.0568859,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "cameraBounds",
+          "n": 266,
+          "p": [
+            0,
+            0.456583,
+            0
+          ],
+          "v": [
+            0,
+            -4.18976,
+            0
+          ],
+          "grounded": false,
+          "yaw": -2.913585307179587,
+          "pitch": 1.35,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.0568859,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "shortTurn",
+          "n": 282,
+          "p": [
+            0.024033,
+            0.412466,
+            -0.0763048
+          ],
+          "v": [
+            1.50206,
+            -0.31392,
+            -4.76905
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "angle": -3,
+          "jumping": false,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00628081,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "diagonal",
+          "n": 301,
+          "p": [
+            0.248679,
+            0.388405,
+            -0.666853
+          ],
+          "v": [
+            3.53393,
+            -0.0172154,
+            -3.53393
+          ],
+          "grounded": true,
+          "yaw": 0,
+          "pitch": 0,
+          "angle": -3,
+          "jumping": false,
+          "coyote": 0.1,
+          "contactPoint": [
+            0.192136,
+            -0.0113198,
+            -0.61031
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "ceiling",
+          "n": 340,
+          "p": [
+            50,
+            0.868755,
+            0
+          ],
+          "v": [
+            0,
+            -0.48178,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0,
+          "angle": -3,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            50,
+            1.2,
+            0
+          ],
+          "rotation": null
+        },
+        {
+          "tag": "DONE",
+          "n": 360,
+          "p": [
+            50,
+            0.407261,
+            0
+          ],
+          "v": [
+            0,
+            1.42961,
+            0
+          ],
+          "grounded": true,
+          "yaw": 0,
+          "pitch": 0,
+          "angle": -3,
+          "jumping": false,
+          "coyote": 0.1,
+          "contactPoint": [
+            50,
+            -0.0156127,
+            0
+          ],
+          "rotation": null
+        }
+      ]
+    },
+    {
+      "id": "third-person",
+      "passed": true,
+      "records": [
+        {
+          "tag": "jump",
+          "n": 62,
+          "p": [
+            0,
+            0.570878,
+            0
+          ],
+          "v": [
+            0,
+            5.04304,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00981095,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "noDoubleJump",
+          "n": 64,
+          "p": [
+            0,
+            0.724721,
+            0
+          ],
+          "v": [
+            0,
+            4.72912,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00981095,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "coyote",
+          "n": 153,
+          "p": [
+            0,
+            20.0732,
+            0
+          ],
+          "v": [
+            0,
+            5.04304,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.00918981,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "bufferedJump",
+          "n": 214,
+          "p": [
+            0,
+            0.7508,
+            0
+          ],
+          "v": [
+            0,
+            4.57216,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.0568859,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "cameraBounds",
+          "n": 266,
+          "p": [
+            0,
+            1.09418,
+            0
+          ],
+          "v": [
+            0,
+            -3.58976,
+            0
+          ],
+          "grounded": false,
+          "yaw": -2.932785307179585,
+          "pitch": 1.2,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.0568859,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "shortTurn",
+          "n": 282,
+          "p": [
+            0.0288396,
+            0.512466,
+            -0.0915657
+          ],
+          "v": [
+            1.80247,
+            -0.31392,
+            -5.72286
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": -3.0857696533203125,
+          "jumping": false,
+          "coyote": 0,
+          "contactPoint": [
+            0,
+            -0.0952056,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": -3.08577,
+            "z": 0
+          }
+        },
+        {
+          "tag": "diagonal",
+          "n": 301,
+          "p": [
+            0.298445,
+            0.488405,
+            -0.800254
+          ],
+          "v": [
+            4.24104,
+            -0.0172154,
+            -4.24104
+          ],
+          "grounded": true,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 2.8098297825098952,
+          "jumping": false,
+          "coyote": 0.1,
+          "contactPoint": [
+            0.230589,
+            -0.0113198,
+            -0.732398
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 2.80983,
+            "z": 0
+          }
+        },
+        {
+          "tag": "ceiling",
+          "n": 340,
+          "p": [
+            50,
+            0.667039,
+            0
+          ],
+          "v": [
+            0,
+            -2.31069,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": true,
+          "coyote": 0,
+          "contactPoint": [
+            50,
+            1.2,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        },
+        {
+          "tag": "DONE",
+          "n": 360,
+          "p": [
+            50,
+            0.537087,
+            0
+          ],
+          "v": [
+            0,
+            -0.302724,
+            0
+          ],
+          "grounded": false,
+          "yaw": 0,
+          "pitch": 0.35,
+          "angle": 3.141592653589793,
+          "jumping": false,
+          "coyote": 0,
+          "contactPoint": [
+            50,
+            -0.00972968,
+            0
+          ],
+          "rotation": {
+            "x": 0,
+            "y": 3.14159,
+            "z": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "top-down",
+      "passed": true,
+      "records": [
+        {
+          "tag": "shortTurn",
+          "n": 282,
+          "p": [
+            0.0288396,
+            0.512466,
+            -0.0915657
+          ],
+          "v": [
+            1.80247,
+            -0.31392,
+            -5.72286
+          ],
+          "angle": -3.0857696533203125,
+          "rotation": {
+            "x": 0,
+            "y": -3.08577,
+            "z": 0
+          }
+        },
+        {
+          "tag": "diagonal",
+          "n": 301,
+          "p": [
+            0.298445,
+            0.488405,
+            -0.800254
+          ],
+          "v": [
+            4.24104,
+            -0.0172154,
+            -4.24104
+          ],
+          "angle": 2.8098297825098952,
+          "rotation": {
+            "x": 0,
+            "y": 2.80983,
+            "z": 0
+          }
+        },
+        {
+          "tag": "DONE",
+          "n": 360,
+          "p": [
+            0.298445,
+            0.49019,
+            -0.800254
+          ],
+          "v": [
+            0,
+            0.0000171186,
+            0
+          ],
+          "angle": 2.8098297825098952,
+          "rotation": {
+            "x": 0,
+            "y": 2.80983,
+            "z": 0
+          }
+        }
+      ]
+    }
+  ]
+}

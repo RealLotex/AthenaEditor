@@ -1,0 +1,1456 @@
+{
+  "date": "2026-10-02",
+  "emulator": "PCSX2 2.6.3",
+  "renderer": "Vulkan, 3x internal resolution",
+  "baselineRevision": "af1d0c088f76c81505328bb69db15a990c346a17",
+  "optimizedSource": "Working tree recorded by each generated program's SHA-256",
+  "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+  "units": "Emulated EE Timer microseconds",
+  "phases": [
+    "controller logic and frame setup",
+    "physics, contact events and transform sync",
+    "camera, drawing submission and HUD",
+    "complete measured callback"
+  ],
+  "methodology": {
+    "trialsPerTemplatePerVersion": 3,
+    "warmupFrames": 120,
+    "measuredFrames": 600,
+    "input": "300-frame cycle: 60 idle, 90 right, 60 diagonal, 60 camera, 30 idle; Cross at 90 and 180; reset body at cycle start",
+    "measurement": "After pad.update and injected input through the end of the frame callback, including fixed Timer/array instrumentation overhead",
+    "exclusions": [
+      "input polling and injected pad setup",
+      "frame clear, presentation and VSync wait",
+      "GS/GPU completion",
+      "host wall-clock performance"
+    ],
+    "aggregation": "Median of the three per-run means; p95 is the median of the three per-run 95th percentiles",
+    "limitation": "Deterministic emulated CPU work in these starter scenes; not a real PS2 hardware or larger-scene FPS certification"
+  },
+  "summary": [
+    {
+      "id": "empty",
+      "name": "Empty",
+      "before": {
+        "meanUs": [
+          26.475,
+          8.375,
+          170.18833333333333,
+          213.62166666666667
+        ],
+        "p95Us": 247,
+        "contactQueries": 0,
+        "frameIntervalUs": 16683.363333333335,
+        "vramBytes": 1786880
+      },
+      "after": {
+        "meanUs": [
+          26.536666666666665,
+          8.336666666666666,
+          137.27166666666668,
+          180.71666666666667
+        ],
+        "p95Us": 232,
+        "contactQueries": 0,
+        "frameIntervalUs": 16683.346666666668,
+        "vramBytes": 1786880
+      },
+      "reductionPercent": 15.40340009206307
+    },
+    {
+      "id": "first-person",
+      "name": "First Person",
+      "before": {
+        "meanUs": [
+          244.90666666666667,
+          2518.455,
+          194.06166666666667,
+          2965.99
+        ],
+        "p95Us": 3277,
+        "contactQueries": 3000,
+        "frameIntervalUs": 16683.345,
+        "vramBytes": 1786880
+      },
+      "after": {
+        "meanUs": [
+          256.5566666666667,
+          289.2683333333333,
+          175.47166666666666,
+          729.8166666666667
+        ],
+        "p95Us": 1264,
+        "contactQueries": 166,
+        "frameIntervalUs": 16683.343333333334,
+        "vramBytes": 1786880
+      },
+      "reductionPercent": 75.39382578273471
+    },
+    {
+      "id": "third-person",
+      "name": "Third Person",
+      "before": {
+        "meanUs": [
+          326.19,
+          421.04,
+          182.60166666666666,
+          938.3516666666667
+        ],
+        "p95Us": 1217,
+        "contactQueries": 600,
+        "frameIntervalUs": 16683.345,
+        "vramBytes": 1786880
+      },
+      "after": {
+        "meanUs": [
+          274.5316666666667,
+          356.55,
+          163.995,
+          803.595
+        ],
+        "p95Us": 1044,
+        "contactQueries": 328,
+        "frameIntervalUs": 16683.343333333334,
+        "vramBytes": 1786880
+      },
+      "reductionPercent": 14.360998275344528
+    },
+    {
+      "id": "side-scroller",
+      "name": "Side Scroller",
+      "before": {
+        "meanUs": [
+          533.51,
+          1631.66,
+          197.25166666666667,
+          2370.9366666666665
+        ],
+        "p95Us": 3791,
+        "contactQueries": 2400,
+        "frameIntervalUs": 16683.343333333334,
+        "vramBytes": 1786880
+      },
+      "after": {
+        "meanUs": [
+          362.385,
+          923.6216666666667,
+          177.945,
+          1472.4833333333333
+        ],
+        "p95Us": 1832,
+        "contactQueries": 940,
+        "frameIntervalUs": 16683.365,
+        "vramBytes": 1786880
+      },
+      "reductionPercent": 37.894446779824
+    },
+    {
+      "id": "top-down",
+      "name": "Top Down",
+      "before": {
+        "meanUs": [
+          192.47166666666666,
+          561.095,
+          182.035,
+          944.125
+        ],
+        "p95Us": 1087,
+        "contactQueries": 600,
+        "frameIntervalUs": 16683.345,
+        "vramBytes": 1786880
+      },
+      "after": {
+        "meanUs": [
+          170.62333333333333,
+          405.81,
+          164.53666666666666,
+          749.4133333333333
+        ],
+        "p95Us": 846,
+        "contactQueries": 0,
+        "frameIntervalUs": 16683.345,
+        "vramBytes": 1786880
+      },
+      "reductionPercent": 20.623505009047182
+    }
+  ],
+  "baseline": [
+    {
+      "id": "empty",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "51e5f265-124a-4dd7-ae01-e9d8352b4902",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.475,
+        8.375,
+        170.18833333333333,
+        213.62166666666667
+      ],
+      "frameIntervalUs": 16683.363333333335,
+      "p95Us": 247,
+      "contactQueries": 0,
+      "ramUsed": 6912942,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "6b0868d3-8bc2-46e3-a0f3-73c2b8fcc744",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        244.90666666666667,
+        2518.455,
+        194.06166666666667,
+        2965.99
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 3277,
+      "contactQueries": 3000,
+      "ramUsed": 6991576,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "b568b5fa-1459-4433-9884-9aa912cf0f14",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        326.19,
+        421.04,
+        182.60166666666666,
+        938.3516666666667
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1217,
+      "contactQueries": 600,
+      "ramUsed": 6972919,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "058200cc-9323-4bd0-967f-9df29dbefd33",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        533.51,
+        1631.66,
+        197.25166666666667,
+        2370.9366666666665
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 3791,
+      "contactQueries": 2400,
+      "ramUsed": 7007971,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "f9ec8ef4-bb33-4b4e-9782-58645c44640d",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        192.47166666666666,
+        561.095,
+        182.035,
+        944.125
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1087,
+      "contactQueries": 600,
+      "ramUsed": 6966658,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "empty",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "d65c4f8b-c8b9-4896-b9c8-e884518b0371",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.475,
+        8.375,
+        170.18833333333333,
+        213.62166666666667
+      ],
+      "frameIntervalUs": 16683.363333333335,
+      "p95Us": 247,
+      "contactQueries": 0,
+      "ramUsed": 6912942,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "ae9411db-1656-400f-8563-7c501b591771",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        244.90666666666667,
+        2518.455,
+        194.06166666666667,
+        2965.99
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 3277,
+      "contactQueries": 3000,
+      "ramUsed": 6991576,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "345b6d8b-46a4-466d-b124-444daa36021f",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        326.19,
+        421.04,
+        182.60166666666666,
+        938.3516666666667
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1217,
+      "contactQueries": 600,
+      "ramUsed": 6972919,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "3b7bb8c1-8381-4e41-9719-f971658063ad",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        533.51,
+        1631.66,
+        197.25166666666667,
+        2370.9366666666665
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 3791,
+      "contactQueries": 2400,
+      "ramUsed": 7007971,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "6484004a-223a-4c20-8125-ebf92a6c03cc",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        192.47166666666666,
+        561.095,
+        182.035,
+        944.125
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1087,
+      "contactQueries": 600,
+      "ramUsed": 6966658,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "empty",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "22b17551-993f-4887-9fdc-30dfb9d71739",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.475,
+        8.375,
+        170.18833333333333,
+        213.62166666666667
+      ],
+      "frameIntervalUs": 16683.363333333335,
+      "p95Us": 247,
+      "contactQueries": 0,
+      "ramUsed": 6912942,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "3b24e9d6-78f5-48b5-b552-bd9f3fbafbc4",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        244.90666666666667,
+        2518.455,
+        194.06166666666667,
+        2965.99
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 3277,
+      "contactQueries": 3000,
+      "ramUsed": 6991576,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "98be611a-b41d-45ae-86af-343e8c7e371a",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        326.19,
+        421.04,
+        182.60166666666666,
+        938.3516666666667
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1217,
+      "contactQueries": 600,
+      "ramUsed": 6972919,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "8daff255-1868-4fb3-994a-9ac07d090232",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        533.51,
+        1631.66,
+        197.25166666666667,
+        2370.9366666666665
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 3791,
+      "contactQueries": 2400,
+      "ramUsed": 7007971,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": false,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "runId": "9b7dee7c-5a85-4e8a-a206-765274acb536",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        192.47166666666666,
+        561.095,
+        182.035,
+        944.125
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 1087,
+      "contactQueries": 600,
+      "ramUsed": 6966658,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    }
+  ],
+  "optimized": [
+    {
+      "id": "empty",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "02986b8f8e4d0ade60e9ab6ace295d84f080fc4838e2c673416fbb157064aa94",
+      "runId": "c8df6216-9b70-4380-913b-132ee60b8bf1",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.536666666666665,
+        8.336666666666666,
+        137.27166666666668,
+        180.71666666666667
+      ],
+      "frameIntervalUs": 16683.346666666668,
+      "p95Us": 232,
+      "contactQueries": 0,
+      "ramUsed": 6913003,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "1cfeace9b194774f1c1343c8613b0f79be31d877370e0f9ce6097c47189f24a2",
+      "runId": "2fc9fcb9-c040-46f7-b10b-b80ae5708eba",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        256.5566666666667,
+        289.2683333333333,
+        175.47166666666666,
+        729.8166666666667
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1264,
+      "contactQueries": 166,
+      "ramUsed": 6970489,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "ff409c239f4a2efde0283e44d7b32d6face1868ea934d125775eaf399fce53e7",
+      "runId": "cceaed28-3b38-45f7-a5e7-352f2035e1fc",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        274.5316666666667,
+        356.55,
+        163.995,
+        803.595
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1044,
+      "contactQueries": 328,
+      "ramUsed": 6974822,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "0c375c41b07c42d518dc4ab89f9941821e256ba148e078f61729cb1debdddad5",
+      "runId": "37716189-d486-48c3-aa57-6066b00637e6",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        362.385,
+        923.6216666666667,
+        177.945,
+        1472.4833333333333
+      ],
+      "frameIntervalUs": 16683.365,
+      "p95Us": 1832,
+      "contactQueries": 940,
+      "ramUsed": 7002853,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 1,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "6c92d0bcfef2e67cb23731314a35abe0ac132f894d125d2e0731fa743300d17f",
+      "runId": "dd127f0e-6143-4735-b142-10a2bf3807aa",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        170.62333333333333,
+        405.81,
+        164.53666666666666,
+        749.4133333333333
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 846,
+      "contactQueries": 0,
+      "ramUsed": 6964597,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "empty",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "02986b8f8e4d0ade60e9ab6ace295d84f080fc4838e2c673416fbb157064aa94",
+      "runId": "957af416-b268-43dc-8acb-60ee69dedd0c",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.536666666666665,
+        8.336666666666666,
+        137.27166666666668,
+        180.71666666666667
+      ],
+      "frameIntervalUs": 16683.346666666668,
+      "p95Us": 232,
+      "contactQueries": 0,
+      "ramUsed": 6913003,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "1cfeace9b194774f1c1343c8613b0f79be31d877370e0f9ce6097c47189f24a2",
+      "runId": "1c83e707-7f42-4cb8-8697-e8fb35412355",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        256.5566666666667,
+        289.2683333333333,
+        175.47166666666666,
+        729.8166666666667
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1264,
+      "contactQueries": 166,
+      "ramUsed": 6970489,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "ff409c239f4a2efde0283e44d7b32d6face1868ea934d125775eaf399fce53e7",
+      "runId": "6c8c6c19-c420-4789-84a6-66be3c17e48d",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        274.5316666666667,
+        356.55,
+        163.995,
+        803.595
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1044,
+      "contactQueries": 328,
+      "ramUsed": 6974822,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "0c375c41b07c42d518dc4ab89f9941821e256ba148e078f61729cb1debdddad5",
+      "runId": "a74a308e-4d4f-445b-84d3-27730938b832",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        362.385,
+        923.6216666666667,
+        177.945,
+        1472.4833333333333
+      ],
+      "frameIntervalUs": 16683.365,
+      "p95Us": 1832,
+      "contactQueries": 940,
+      "ramUsed": 7002853,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 2,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "6c92d0bcfef2e67cb23731314a35abe0ac132f894d125d2e0731fa743300d17f",
+      "runId": "574d4440-66d3-426b-9844-5ee4ea3a7b19",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        170.62333333333333,
+        405.81,
+        164.53666666666666,
+        749.4133333333333
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 846,
+      "contactQueries": 0,
+      "ramUsed": 6964597,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "empty",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "02986b8f8e4d0ade60e9ab6ace295d84f080fc4838e2c673416fbb157064aa94",
+      "runId": "46f4d8b6-dae5-409f-a60e-64b2c94ea8a0",
+      "stats": {
+        "models": 0,
+        "renderDatas": 0,
+        "lights": 1,
+        "bodies": 0,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        26.536666666666665,
+        8.336666666666666,
+        137.27166666666668,
+        180.71666666666667
+      ],
+      "frameIntervalUs": 16683.346666666668,
+      "p95Us": 232,
+      "contactQueries": 0,
+      "ramUsed": 6913003,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "first-person",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "1cfeace9b194774f1c1343c8613b0f79be31d877370e0f9ce6097c47189f24a2",
+      "runId": "7e5270cc-fcec-43b0-b705-cb7d5efec588",
+      "stats": {
+        "models": 5,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 6,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        256.5566666666667,
+        289.2683333333333,
+        175.47166666666666,
+        729.8166666666667
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1264,
+      "contactQueries": 166,
+      "ramUsed": 6970489,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "third-person",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "ff409c239f4a2efde0283e44d7b32d6face1868ea934d125775eaf399fce53e7",
+      "runId": "c0cf3bf6-b876-4458-b61b-63791625da54",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        274.5316666666667,
+        356.55,
+        163.995,
+        803.595
+      ],
+      "frameIntervalUs": 16683.343333333334,
+      "p95Us": 1044,
+      "contactQueries": 328,
+      "ramUsed": 6974822,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "side-scroller",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "0c375c41b07c42d518dc4ab89f9941821e256ba148e078f61729cb1debdddad5",
+      "runId": "c659598e-f08b-47e0-b49f-135f750f0b6b",
+      "stats": {
+        "models": 5,
+        "renderDatas": 3,
+        "lights": 1,
+        "bodies": 5,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        362.385,
+        923.6216666666667,
+        177.945,
+        1472.4833333333333
+      ],
+      "frameIntervalUs": 16683.365,
+      "p95Us": 1832,
+      "contactQueries": 940,
+      "ramUsed": 7002853,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    },
+    {
+      "id": "top-down",
+      "trial": 3,
+      "revision": "af1d0c088f76c81505328bb69db15a990c346a17",
+      "workingCopy": true,
+      "runtimeSha256": "a5c56a648ed4188d6bc9fd4c9090ad61a5f26c08603a30d94652eacf288fff84",
+      "programSha256": "6c92d0bcfef2e67cb23731314a35abe0ac132f894d125d2e0731fa743300d17f",
+      "runId": "ce1094da-d110-496a-84f8-12ebe55160f1",
+      "stats": {
+        "models": 2,
+        "renderDatas": 2,
+        "lights": 1,
+        "bodies": 2,
+        "shadows": 0,
+        "uiElements": 0,
+        "vramLocked": 0
+      },
+      "samples": 600,
+      "warmup": 120,
+      "meanUs": [
+        170.62333333333333,
+        405.81,
+        164.53666666666666,
+        749.4133333333333
+      ],
+      "frameIntervalUs": 16683.345,
+      "p95Us": 846,
+      "contactQueries": 0,
+      "ramUsed": 6964597,
+      "vramStatic": 1720320,
+      "vramDynamic": 66560,
+      "mode": {
+        "mode": 2,
+        "width": 640,
+        "height": 448,
+        "psm": 10,
+        "interlace": 1,
+        "field": 0,
+        "psmz": 10,
+        "zbuffering": true,
+        "double_buffering": true
+      }
+    }
+  ]
+}

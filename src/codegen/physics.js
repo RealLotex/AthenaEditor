@@ -180,21 +180,76 @@ function emitContactCallback(e, ir) {
   // pairs involving an event geom to recover their identities. geomCollide
   // (ath_ode.c:639) queries contacts without creating joints or stepping ODE.
   const solids = ir.physics.bodies.filter((b) => !b.isTrigger);
+  const pairs = [];
+  for (let i = 0; i < solids.length; i++) for (let j = i + 1; j < solids.length; j++) {
+    const a = solids[i], d = solids[j];
+    if ((a.events || d.events) && (a.isDynamic || d.isDynamic)) pairs.push([a, d]);
+  }
+  // Enclosing spheres remain conservative even if a script rotates/moves a
+  // collider. Read live geom centres, never cache static world positions.
+  // Meshes/rays have unknown extents and retain the unconditional query path.
+  const radiusOf = b => {
+    const radius = b.shape === "sphere" ? b.radius : b.shape === "box"
+      ? Math.hypot(b.size.x, b.size.y, b.size.z) / 2 : null;
+    return Number.isFinite(radius) && radius >= 0 ? radius : null;
+  };
+  const bounded = [], centres = [];
+  const centreIndex = b => {
+    let index = centres.indexOf(b);
+    if (index < 0) { index = centres.length; centres.push(b); }
+    return index;
+  };
+  for (const [a, d] of pairs) {
+    // One event pair needs no additional broad check: querying that pair is
+    // cheaper than reading its centres. The numeric callback already gates it.
+    if (pairs.length === 1) { bounded.push(null); continue; }
+    const ar = radiusOf(a), dr = radiusOf(d);
+    const plane = a.shape === "plane" ? a : d.shape === "plane" ? d : null;
+    const mover = plane === a ? d : a, radius = radiusOf(mover);
+    if (plane && radius !== null && Number.isFinite(plane.rb.planeY ?? 0)) {
+      bounded.push([centreIndex(mover), -1, Math.ceil(((plane.rb.planeY ?? 0) + radius) * 1000) / 1000 + 0.001]);
+    } else if (ar !== null && dr !== null) {
+      const r = Math.ceil((ar + dr) * 1000) / 1000 + 0.001;
+      bounded.push([centreIndex(a), centreIndex(d), Math.ceil(r * r * 1000) / 1000]);
+    } else bounded.push(null);
+  }
   e.w(`const _odeEventPairs = [`);
   e.block((b) => {
-    for (let i = 0; i < solids.length; i++) {
-      for (let j = i + 1; j < solids.length; j++) {
-        const a = solids[i], d = solids[j];
-        if (!(a.events || d.events) || !(a.isDynamic || d.isDynamic)) continue;
-        b.w(`[${a.geomVN}, ${d.geomVN}],`);
-      }
-    }
+    for (const [a, d] of pairs) b.w(`[${a.geomVN}, ${d.geomVN}],`);
   });
   e.w(`];`);
+  if (centres.length) {
+    e.comment("Skip impossible contact pairs; each live centre is read once per poll.",
+      "Float64 storage avoids the release QuickJS mixed float comparison defect.");
+    e.w(`const _odeBoundGeoms = [${centres.map(b => b.geomVN).join(", ")}];`);
+    e.w(`const _odeBoundPositions = new Array(${il(centres.length)});`);
+    e.w(`const _odeBoundNumber = new Float64Array(1);`);
+    // Round radii up before formatting; rounding down could omit a contact.
+    e.w(`const _odeEventBounds = [${bounded.map(b => b ? `[${il(b[0])}, ${il(b[1])}, ${fl(b[2])}]` : "null").join(", ")}];`);
+  }
   e.w(`function _odePollContacts() {`);
   e.block((b) => {
-    b.w(`for (const pair of _odeEventPairs) {`);
+    if (centres.length) b.w(`for (let i = 0; i < _odeBoundGeoms.length; i++) _odeBoundPositions[i] = _odeBoundGeoms[i].getPosition();`);
+    b.w(`for (let i = 0; i < _odeEventPairs.length; i++) {`);
     b.block((x) => {
+      x.w(`const pair = _odeEventPairs[i];`);
+      if (centres.length) {
+        x.w(`const bounds = _odeEventBounds[i];`);
+        x.w(`if (bounds) {`);
+        x.block((y) => {
+          y.w(`const a = _odeBoundPositions[bounds[0]];`);
+          y.w(`if (bounds[1] === -1) _odeBoundNumber[0] = a[1];`);
+          y.w(`else {`);
+          y.block((z) => {
+            z.w(`const d = _odeBoundPositions[bounds[1]];`);
+            z.w(`const dx = a[0] - d[0], dy = a[1] - d[1], dz = a[2] - d[2];`);
+            z.w(`_odeBoundNumber[0] = dx * dx + dy * dy + dz * dz;`);
+          });
+          y.w(`}`);
+          y.w(`if (_odeBoundNumber[0] > bounds[2]) continue;`);
+        });
+        x.w(`}`);
+      }
       x.w(`const hits = ODE.geomCollide(pair[0], pair[1]);`);
       x.w(`for (const hit of hits || []) {`);
       x.block((y) => {
@@ -272,7 +327,12 @@ function emitPhysicsStep(e, ir) {
   const cb = P.bodies.some((b) => !b.isTrigger && b.events) ? ", ode_onCollide" : "";
 
   e.comment("Physics step — broad phase, contact joints, solve, all in one call");
-  if (cb) e.w(`if (_odeLegacyContacts) _odePollContacts();`);
+  if (cb) {
+    e.w(`if (_odeLegacyContacts) _odePollContacts();`);
+    // Numeric callbacks re-arm this flag for the following frame. Airborne
+    // frames with no contacts need no fallback queries at all.
+    e.w(`_odeLegacyContacts = false;`);
+  }
   e.w(`ode_world.stepWithContacts(ode_space, ode_contacts, ${fl(dt)}${cb});`);
   if (P.bodies.some((b) => b.isTrigger)) e.w(`_updateTriggers();`);
   e.nl();

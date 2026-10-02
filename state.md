@@ -2,6 +2,29 @@
 
 _Last updated: 2026-10-02._
 
+## October 2 template performance
+
+All five starter templates were optimized and measured against af1d0c0 using the
+same official Athena ELF, PCSX2 2.6.3 and CT16S/Z16S. Thirty executions, each with
+120 warmup and 600 measured frames, show 15.4% less measured callback time for Empty,
+75.4% for First Person, 14.4% for Third Person, 37.9% for Side Scroller and 20.6% for
+Top Down. VSync remains approximately 59.94 FPS and VRAM stays at 1,786,880 bytes.
+These are emulated EE logic/physics/drawing-submission timings, excluding presentation
+and GPU completion. See [the measurements and tradeoffs](docs/TEMPLATE-PERFORMANCE.md).
+
+The generator gates legacy contact recovery, bounds distant pairs conservatively
+using live geom centres and caches diagnostic text. Controllers cache trigonometry,
+reuse settled transforms and clamp input; First/Third Person add tested edge/landing
+jump tolerances. First Person props use a 1 cm collider skin; Side Scroller uses a
+radius-0.5 sphere while retaining every momentum ability. Top Down fixes inverted UP
+and omits unused contact events. Player mesh side normals are smooth with the same
+50 triangles. The four downloadable scripts in examples/controllers match their
+embedded sources exactly. Existing authored projects retain their own script copies.
+
+All four generated controller fixtures passed in Athena; native camera/turn/jump
+quality probes passed and the 1,030-frame momentum fixture passed. The full build
+and automated suite passed: **549 tests, zero failures**.
+
 ## October 2 clipboard and rendering fixes
 
 Ctrl+V now reads during the keyboard gesture, keeps internal-copy fallback for denied

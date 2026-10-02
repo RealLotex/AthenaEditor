@@ -46,13 +46,13 @@ const TOP_LEVEL =
 
 let cached = null;
 
-export async function load(modules = PURE_MODULES) {
-  if (cached && modules === PURE_MODULES) return cached;
+export async function load(modules = PURE_MODULES, { readSource } = {}) {
+  if (cached && modules === PURE_MODULES && !readSource) return cached;
 
   const parts = [];
   const names = new Set();
   for (const rel of modules) {
-    const src = await Deno.readTextFile(`${ROOT}/src/${rel}`);
+    const src = readSource ? await readSource(rel) : await Deno.readTextFile(`${ROOT}/src/${rel}`);
     for (const m of src.matchAll(TOP_LEVEL)) names.add(m[1] || m[2] || m[3]);
     const { code } = await esbuild.transform(src, {
       loader: rel.endsWith(".jsx") ? "jsx" : "js", target: "es2020", sourcefile: `src/${rel}`,
@@ -75,7 +75,7 @@ return __out;`;
     throw new Error(`test loader: ${e.message}`);
   }
   const result = exports;
-  if (modules === PURE_MODULES) cached = result;
+  if (modules === PURE_MODULES && !readSource) cached = result;
   return result;
 }
 

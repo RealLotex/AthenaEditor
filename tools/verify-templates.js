@@ -1,6 +1,6 @@
 // Verify generated controllers against the shipped console player through Run.
 // Each launch has isolated settings and output, and stops only its own process.
-import { load, PURE_MODULES } from "../tests/_load.js";
+import { load, PURE_MODULES, shutdown } from "../tests/_load.js";
 import { templateFixture, templateProbeScript, parseProbe, checkTemplate, probeValue } from "./ps2run.js";
 import { createGameLauncher } from "./play.js";
 import { fromFileUrl, join } from "jsr:@std/path@1";
@@ -41,4 +41,5 @@ for (const id of ["first-person", "third-person", "side-scroller", "top-down"]) 
   } finally { await request("stop", {}).catch(() => {}); }
 }
 await Deno.writeTextFile(join(root, ".verification", "production-templates.json"), JSON.stringify(results, null, 2));
+await shutdown();
 if (results.some(r => !r.ok)) throw Error("A generated controller failed its runtime checks.");

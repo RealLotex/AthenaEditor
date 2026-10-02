@@ -16,6 +16,8 @@ ps2run/
 tetris-rpg/
 textures/
 controllers/
+!examples/controllers/
+!examples/controllers/*.js
 readme.txt
 
 # Keep the tested console player; upstream sources/examples are separate.

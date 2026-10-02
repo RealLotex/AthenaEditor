@@ -12,6 +12,28 @@ longer describe the generator. See [verification](VERIFICATION.md) for the curre
 
 ---
 
+## 2026-10-02 — optimized starter templates
+
+All five templates were compared with af1d0c0 using the same official release ELF,
+PCSX2 2.6.3, Vulkan and CT16S/Z16S. Three 600-frame measurements per version/template
+show callback-time reductions of 15.4% (Empty), 75.4% (First Person), 14.4% (Third
+Person), 37.9% (Side Scroller) and 20.6% (Top Down). Timer measures emulated EE work
+inside logic, physics and drawing submission, excluding presentation and GPU completion.
+VSync stays at approximately 59.94 FPS; static/dynamic VRAM totals 1,786,880 bytes.
+See [method, phase timings, input and raw records](TEMPLATE-PERFORMANCE.md).
+
+First Person avoids static contacts between touching props with a 1 cm collision skin.
+Side Scroller uses a radius-0.5 sphere instead of four box floor contacts, maintaining
+height and all momentum abilities while widening collision from 0.6 to 1. Native
+movement/camera fixtures pass for all four playable templates. The 1,030-frame
+[momentum probe](verification/momentum-optimized.json) passes, as do native
+[jump, camera limit and ±π turn probes](verification/controller-quality.json).
+Controllers normalize comparison-sensitive angles/magnitudes through reusable
+Float64 storage, covering the mixed float32/float64 comparison defect below.
+The complete build/test suite passes 549 tests. Real PS2 hardware remains untested.
+
+---
+
 ## 2026-10-01 — side-scroller jump
 
 The release ELF returns numeric native geom IDs in contact callbacks, unlike the

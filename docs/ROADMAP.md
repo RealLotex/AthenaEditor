@@ -166,7 +166,7 @@ static `plane` rigidbody, physics on at `-9.81`, and an input map.
 | **Empty** | Camera, Sun | none | static, orbit via the default rig |
 | **First Person** | Player (dynamic sphere r 0.4, mass 70), Ground | `FirstPersonController.js` | `Camera.position` at player + eye height; `Camera.target` from yaw/pitch |
 | **Third Person** | Player model + dynamic sphere, Ground | `ThirdPersonController.js` | orbit rig behind the player, right stick controls yaw/pitch |
-| **Side Scroller** | Player (dynamic box), Ground, 3 platforms (static boxes) | `SideScrollerController.js` | fixed on -Z, follows player X, Y clamped |
+| **Side Scroller** | Player (dynamic sphere, radius 0.5), Ground, 3 platforms (static boxes) | `SideScrollerController.js` | on +Z, follows player X, Y clamped |
 | **Top Down** | Player (dynamic sphere), Ground, 4 walls | `TopDownController.js` | fixed height above player, looks straight down |
 
 ### Controller pattern

@@ -16,6 +16,8 @@ const RESERVED_VARS = [
   "drawUI", "_mainCam", "_mainDraw", "_mainDepth", "_shadowPass", "_odeEuler",
   "ode_world", "ode_space", "ode_contacts", "ode_onCollide", "_dt", "_hit",
   "_odeLegacyContacts", "_odeEventPairs", "_odePollContacts",
+  "_odeBoundGeoms", "_odeBoundPositions", "_odeBoundNumber", "_odeEventBounds",
+  "_hudFrame", "_hudText", "_hudMemory",
 ];
 
 function resolveScene(project, scene, files = []) {

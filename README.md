@@ -5,6 +5,12 @@ Create a project, arrange objects, try the game, then export its scenes, scripts
 
 [Open the editor](https://reallotex.github.io/AthenaEditor/) · [Design review](docs/UX-REVIEW.md) · [Verification](docs/PRODUCTION-VERIFICATION.md)
 
+The five starting templates now use less CPU time per frame: measured reductions range
+from 14.4% to 75.4% in PCSX2, with unchanged CT16S/Z16S VRAM. See the
+[before/after measurements and their limits](docs/TEMPLATE-PERFORMANCE.md).
+New projects include the optimized scripts; existing projects can import matching
+[controller copies](examples/controllers/) and apply the documented collider changes.
+
 ![Focused scene workspace](docs/verification/workspace.jpg)
 
 ## Start editing

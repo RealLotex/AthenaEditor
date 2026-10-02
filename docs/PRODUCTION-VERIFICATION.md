@@ -4,8 +4,35 @@ The standalone editor is built from the committed source; index.html is synchron
 with that build. The current UX review used Deno 2.9.2 and a Chromium browser, including
 Run/Stop through the local PCSX2 launcher. The baseline was bdb36e2; the existing
 playable-start and focused-workspace redesign was reviewed and extended.
-The console execution fixtures below were recorded on October 1 with PCSX2 2.6.3
-and the bundled AthenaEnv player; those longer fixtures were not rerun for the UX changes.
+The earlier scene-transition fixtures below were recorded on October 1 with PCSX2 2.6.3.
+The template benchmarks and controller fixtures were rerun on October 2 with the
+official August 1 AthenaEnv release, as described below.
+
+## Template optimizations — October 2
+
+All five templates were measured before/after against af1d0c0 with identical runtime,
+PCSX2 2.6.3, Vulkan, NTSC and CT16S/Z16S. Thirty independent launches each completed
+120 warmup and 600 measured frames. Median callback-time reductions are **15.4% Empty,
+75.4% First Person, 14.4% Third Person, 37.9% Side Scroller and 20.6% Top Down**.
+The callback measures emulated EE logic, physics and drawing submission, excluding
+presentation and GPU completion. VRAM remains 1,786,880 bytes; both versions maintain
+approximately 59.94 FPS with VSync. See the [complete method and tradeoffs](TEMPLATE-PERFORMANCE.md)
+and [all 30 numeric records](verification/template-performance.json).
+
+Native generated movement/camera fixtures passed for all four playable templates;
+their [records](verification/templates.json) cover settled bodies and right/forward movement.
+Additional [controller quality probes](verification/controller-quality.json) verify
+bounded diagonal speed, camera clamps, shortest turns through ±π, buffered landing
+and edge jumps, rejection of repeated rising jumps and real ceiling contacts.
+The Side Scroller [1,030-frame momentum sequence](verification/momentum-optimized.json)
+passes all assertions for progressive sprint, coasting, skidding, rolling, charge/launch,
+variable jump, ground pound/recovery, one air dash and platform jumping.
+
+The ten new regression tests also cover moving static collider bounds, unknown-shape
+fallback, settled transform/trigonometry reuse, overlay disablement, unchanged 50-triangle
+smooth normals and exact agreement between downloadable and embedded controllers.
+The complete build and suite pass **549 tests, zero failures**. These checks use PCSX2;
+real PS2 hardware was not tested. Existing projects keep their authored controller copies.
 
 ## Clipboard and rendering corrections — October 2
 
@@ -105,7 +132,7 @@ The actual keyboard and native Copy handlers are also exercised in the regressio
 
 ## Automated suite
 
-`deno task check`: **539 passed, 0 failed**. The suite covers project migration,
+`deno task check`: **549 passed, 0 failed**. The suite covers project migration,
 generation, hierarchy, physics/shadow math, viewport geometry/resources, fonts, terrain,
 prefabs, assets, history, folder operations, project replacement, saves, launcher isolation
 and exported bundles. The added UX tests cover creation, dialog focus, cancellation,

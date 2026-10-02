@@ -339,7 +339,8 @@ Deno.test("top-down physics is wired up", () => {
   assertStringIncludes(main, "ODE.GeomPlane(ode_space, 0.0, 1.0, 0.0, 0.0);");
   assertStringIncludes(main, "ODE.GeomSphere(ode_space, 0.5);");
   assertStringIncludes(main, "player_body.setMassSphere(5.0, 0.5);");
-  assertStringIncludes(main, "stepWithContacts(ode_space, ode_contacts, 0.016, ode_onCollide)");
+  assertStringIncludes(main, "stepWithContacts(ode_space, ode_contacts, 0.016);");
+  assert(!main.includes("function ode_onCollide"), "top-down does not consume contact events");
 });
 
 Deno.test("embedded scripts do not trip the missing-asset warning", () => {
@@ -466,9 +467,11 @@ function sideScrollerRuntime() {
       getPosition: () => [-6, 0.5, 0],
     } } },
   };
-  const ground = { _name: "Ground" }, player = { _name: "Player", _ctxKey: "player" };
+  const ground = { _name: "Ground" }, player = { _name: "Player", _ctxKey: "player", getPosition: () => [-6, 0.5, 0] };
   const contacts = new Function("ctx", "ODE", "_odeEventPairs", `
     let _odeLegacyContacts = false;
+    const _odeBoundGeoms = [_odeEventPairs[0][1]], _odeBoundPositions = [], _odeBoundNumber = new Float64Array(1);
+    const _odeEventBounds = [[0, -1, 0.502]];
     function ode_onCollide(c) { ${braced(main, main.indexOf("function ode_onCollide"))} }
     function _odePollContacts() { ${braced(main, main.indexOf("function _odePollContacts"))} }
     return { contact: ode_onCollide, poll: () => { if (_odeLegacyContacts) _odePollContacts(); } };
@@ -576,8 +579,8 @@ Deno.test("the side-scroller player is pinned to the play plane", () => {
 
 Deno.test("side-scroller physics is wired up", () => {
   const { main } = A.generateProject(build("side-scroller"), []);
-  assertStringIncludes(main, "ODE.GeomBox(ode_space, 0.6, 1.0, 0.6);");
-  assertStringIncludes(main, "player_body.setMassBox(5.0, 0.6, 1.0, 0.6);");
+  assertStringIncludes(main, "ODE.GeomSphere(ode_space, 0.5);");
+  assertStringIncludes(main, "player_body.setMassSphere(5.0, 0.5);");
   assertStringIncludes(main, "ODE.GeomPlane(ode_space, 0.0, 1.0, 0.0, 0.0);");
   assertStringIncludes(main, "stepWithContacts(ode_space, ode_contacts, 0.016, ode_onCollide)");
 });

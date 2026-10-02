@@ -9,6 +9,9 @@
     "check": "deno run -A tools/build.js && deno test -A tests/",
     "ps2run": "deno run -A tools/ps2run.js",
     "ps2shadow": "deno run -A tools/ps2shadow.js",
+    "controllers": "deno run -A tools/export-controllers.js",
+    "benchmark-templates": "deno run -A tools/benchmark-templates.js",
+    "report-template-benchmark": "deno run -A tools/report-template-benchmark.js",
     "vendor": "deno run -A tools/fetch-vendor.js"
   },
   "fmt": {

@@ -199,6 +199,12 @@ to be read back. The shipped release ELF instead returns numeric native geom IDs
 ID lookup binding. The editor detects numeric contacts and, before subsequent steps,
 queries event pairs with `ODE.geomCollide` to recover known geom identities. This only
 queries contacts; it does not repeat the broad phase or create extra contact joints.
+Recovery runs only if the preceding native step reported numeric contacts. With multiple
+event pairs, conservative enclosing spheres/plane height checks omit impossible pairs;
+centres are read live once per poll, including static geoms that scripts can move.
+Unknown mesh/ray extents retain queries. A single pair uses the direct query without
+extra centre reads. Float64 scratch storage avoids the release's mixed float comparison
+defect; the native physics broad phase and solver remain unchanged.
 The editor tags geoms with `_name` and `_ctxKey`.
 Its event state records `lastHit`, `lastHitNormal` and `lastHitPosition`. The contact
 position lets controllers distinguish a floor below the body's centre from a ceiling.
