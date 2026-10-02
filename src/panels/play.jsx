@@ -1,11 +1,15 @@
 function PlaySettingsModal({ onClose, onReady }) {
   const [settings, setSettings] = useState(null),
     [error, setError] = useState(""),
+    [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    editorPlayRequest("status").then(setSettings).catch((e) =>
-      setError(e.message)
-    );
+    let cancelled = false;
+    editorPlayRequest("status")
+      .then((next) => { if (!cancelled) setSettings(next); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
   const save = async () => {
     setBusy(true);
@@ -26,30 +30,26 @@ function PlaySettingsModal({ onClose, onReady }) {
       width={530}
       footer={
         <>
-          <button className="a-btn" onClick={onClose}>Close</button>
+          <button className="a-btn" onClick={onClose}>Cancel</button>
           {settings && (
             <button
               className="a-btn a-btn--primary"
-              disabled={busy}
+              disabled={busy || !settings.pcsx2?.trim() || !settings.runtime?.trim()}
               onClick={save}
             >
-              {busy ? "Preparing…" : "Save and run"}
+              {busy ? "Preparing…" : "Run game"}
             </button>
           )}
         </>
       }
     >
-      <p className="a-lead">Run the current scene with one click.</p>
-      <p className="a-dim">
-        The editor prepares a temporary game folder automatically. Your project
-        stays open while you play.
-      </p>
+      {loading && <p role="status">Checking PCSX2…</p>}
       {settings && (
         <>
           <p className="a-run-status">
             {settings.available
-              ? "PCSX2 is ready to run."
-              : "Choose PCSX2 and the console player once."}
+              ? "The current scene is ready to play."
+              : "Choose PCSX2 and the console player to run your game."}
           </p>
           <details className="a-disclosure" open={!settings.available}>
             <summary>Run settings</summary>
@@ -70,8 +70,7 @@ function PlaySettingsModal({ onClose, onReady }) {
               />
             </label>
             <p className="a-dim">
-              PCSX2 needs a configured BIOS and HostFS enabled. Paths are
-              remembered on this computer.
+              PCSX2 needs a configured BIOS and HostFS enabled. These paths are remembered on this computer.
             </p>
           </details>
         </>

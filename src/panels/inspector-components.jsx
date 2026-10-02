@@ -7,7 +7,7 @@
 //  shipped with no UI at all.
 // ═══════════════════════════════════════════════════════════════════════
 
-function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, alwaysAdvanced }) {
+function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, alwaysAdvanced, mixedFields = [] }) {
   const def = COMPONENTS[compKey];
   const [open, setOpen] = useState(false);
   if (!def) return null;
@@ -25,8 +25,8 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
   //
   // An advanced field with an ERROR opens the section on its own. Hiding the
   // reason a thing is broken is worse than showing a knob nobody wanted.
-  const everyday = visible.filter((f) => !f.advanced);
-  const advanced = visible.filter((f) => f.advanced);
+  const everyday = visible.filter((f) => !f.advanced || f.required);
+  const advanced = visible.filter((f) => f.advanced && !f.required);
   const advancedHasError = advanced.some((f) => errorFor(f.key)) ||
     (advanced.length > 0 && issues?.some(i => i.level === "error"));
   const showAdvanced = alwaysAdvanced || open || advancedHasError;
@@ -53,8 +53,9 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
             scene={scene}
             files={files}
             error={errorFor(f.key)}
-            showHelp={showAdvanced}
-            onChange={(v, phase) => onChange(f.key, v, phase)}
+            mixed={mixedFields.includes(f.key)}
+            showHelp={showAdvanced && !!f.advanced}
+            onChange={(v, phase, axes) => onChange(f.key, v, phase, axes)}
           />
         ))}
       </React.Fragment>
@@ -71,15 +72,15 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
               <div className="a-sec__group a-sec__group--adv">
                 Advanced
                 {!alwaysAdvanced && !advancedHasError && (
-                  <button className="a-adv__hide" onClick={() => setOpen(false)}>hide</button>
+                  <button className="a-adv__hide" aria-label={`Hide advanced ${def.label} settings`} aria-expanded="true" onClick={() => setOpen(false)}>Hide</button>
                 )}
               </div>
               {render(advanced)}
             </>
           )
           : (
-            <button className="a-adv__more" onClick={() => setOpen(true)}>
-              Advanced ({advanced.length})
+            <button className="a-adv__more" aria-expanded="false" onClick={() => setOpen(true)}>
+              Advanced
             </button>
           )
       )}
@@ -87,8 +88,8 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
   );
 }
 
-function FieldControl({ field: f, value, comp, obj, scene, files, error, onChange, showHelp }) {
-  const common = { label: f.label, help: showHelp ? f.help : undefined, error, required: f.required };
+function FieldControl({ field: f, value, comp, obj, scene, files, error, onChange, showHelp, mixed }) {
+  const common = { label: `${f.label}${mixed ? " · mixed" : ""}`, help: showHelp ? f.help : undefined, error, required: f.required };
 
   switch (f.type) {
     case "vec3":
@@ -199,22 +200,28 @@ function ComponentIssues({ issues }) {
 /** Add-component menu, built from the registry. */
 function AddComponentMenu({ obj, onAdd, onClose }) {
   const [query, setQuery] = useState("");
+  const purpose = {
+    model: "3D appearance", animator: "Play animations", light: "Light the scene",
+    camera: "Set a viewpoint", sound: "Play audio", script: "Custom behavior",
+    rigidbody: "Collisions and movement", shadow: "Cast a shadow",
+  };
   const available = COMPONENT_KEYS.filter((k) => {
     const d = COMPONENTS[k];
     if (d.required || obj.components[k]) return false;
     if (!query.trim()) return true;
-    return fuzzyScore(query, `${d.label} ${k}`) > 0;
+    return fuzzyScore(query, `${d.label} ${k} ${purpose[k] || ""}`) > 0;
   });
 
   return (
-    <Modal title="Add Component" onClose={onClose} width={340}>
+    <Modal title="Add component" onClose={onClose} width={340}>
       <input
-        className="a-input" autoFocus placeholder="Search components…"
+        className="a-input" placeholder="Search components…"
+        aria-label="Search components"
         value={query} onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && available[0]) { onAdd(available[0]); onClose(); } }}
         style={{ marginBottom: 9 }}
       />
-      {available.length === 0 && <Empty>Every component is already on this object.</Empty>}
+      {available.length === 0 && <Empty>{query.trim() ? `No component matches “${query}”.` : "Every component is already on this object."}</Empty>}
       {available.map((k) => {
         const d = COMPONENTS[k];
         const missingDep = (d.requires || []).find((r) => !obj.components[r]);
@@ -225,11 +232,12 @@ function AddComponentMenu({ obj, onAdd, onClose }) {
             style={{ height: "auto", padding: "8px 10px", justifyContent: "flex-start", marginBottom: 4, textAlign: "left" }}
             onClick={() => { onAdd(k); onClose(); }}
           >
-            <span style={{ color: d.color, fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{d.icon}</span>
+            <span aria-hidden="true" style={{ color: "var(--fg-dim)", fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{d.icon}</span>
             <span style={{ flex: 1 }}>
               <span style={{ display: "block", color: "var(--fg-strong)", fontWeight: 600 }}>{d.label}</span>
+              {purpose[k] && <span className="a-dim" style={{ display: "block", fontSize: 11 }}>{purpose[k]}</span>}
               {missingDep && (
-                <span style={{ display: "block", fontSize: 10, color: "var(--warn)" }}>
+                <span style={{ display: "block", fontSize: 10, color: "var(--fg-dim)" }}>
                   Also adds {COMPONENTS[missingDep].label}
                 </span>
               )}

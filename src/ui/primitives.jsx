@@ -168,9 +168,10 @@ function Vec3Input(
           }
           : { x: next, y: next, z: next },
         phase,
+        ["x", "y", "z"],
       );
     } else {
-      onChange({ ...v, [axis]: next }, phase);
+      onChange({ ...v, [axis]: next }, phase, [axis]);
     }
   };
 
@@ -218,7 +219,7 @@ function Vec2XZInput({ value, onChange, step = 0.1, min, integer }) {
           min={min}
           integer={integer}
           value={v[a]}
-          onChange={(n, phase) => onChange({ ...v, [a]: n }, phase)}
+          onChange={(n, phase) => onChange({ ...v, [a]: n }, phase, [a])}
         />
       ))}
     </div>

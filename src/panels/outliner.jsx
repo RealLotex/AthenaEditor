@@ -81,6 +81,12 @@ function Outliner({
     return (
       <React.Fragment key={obj.id}>
         <div
+          role="treeitem"
+          aria-label={obj.name}
+          aria-level={depth + 1}
+          aria-selected={selected}
+          aria-expanded={hasKids ? open : undefined}
+          tabIndex={0}
           className={[
             "a-node",
             selected ? "a-node--sel" : "",
@@ -123,6 +129,17 @@ function Outliner({
             });
           }}
           onDoubleClick={() => setRenaming(obj.id)}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault(); e.stopPropagation();
+              onSelect(obj.id, { additive: e.ctrlKey || e.metaKey, range: e.shiftKey });
+            } else if (e.key === "F2") {
+              e.preventDefault(); e.stopPropagation(); setRenaming(obj.id);
+            } else if (hasKids && (e.key === "ArrowRight" && !open || e.key === "ArrowLeft" && open)) {
+              e.preventDefault(); e.stopPropagation(); onToggleExpand(obj.id);
+            }
+          }}
         >
           <span
             className="a-node__twist"
@@ -236,6 +253,7 @@ function Outliner({
         <input
           className="a-input"
           placeholder="Search objects…"
+          aria-label="Search objects"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -271,12 +289,12 @@ function Outliner({
           finishDrop(null, "root");
         }}
       >
-        <div className="a-tree">
+        <div className="a-tree" role="tree" aria-label="Scene objects" aria-multiselectable="true">
           {(scene?.objects || []).map((o) => renderNode(o, 0))}
           {!scene?.objects?.length && (
             <Empty>
-              Nothing here yet.<br />Use <Kbd>Ctrl</Kbd> <Kbd>K</Kbd>{" "}
-              to add an object.
+              <p>Your scene is empty.</p>
+              <button className="a-btn" onClick={onAdd}>Add object</button>
             </Empty>
           )}
           {matches && matches.size === 0 && (

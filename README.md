@@ -10,16 +10,21 @@ Create a project, arrange objects, try the game, then export its scenes, scripts
 ## Start editing
 
 Open **AthenaEditor.html** in a desktop browser. The editor includes its dependencies and works offline.
-Choose **Create project**, enter a name and select a starting template. Empty starts with a camera
-and light; the other four templates include playable controllers, geometry and physics.
+Choose **Create project**, enter a name and press Enter. A third-person game starts with a
+character, ground and playable controller. **Change starting point** offers first-person,
+platform and top-down games, or a blank scene with a camera and light.
 
 The scene occupies the center, Objects and Assets share the left side, and Properties appear on
-the right. Select an object and move it directly, or edit its properties. Additional tools are
-available through the menus and Ctrl+K. Existing layout preferences are preserved; select
-**View → Layout presets → Focus** to use the new workspace.
+the right. **Add object** offers common objects first; search or **More objects…** reveals
+other types. Select an object to see its transformation tools and properties. **Save**,
+**Export…** and **Run game** stay in the header while you work. Additional tools are available
+through the menus and Ctrl+K. A new project starts in Focus; resumed projects retain their
+layout preferences. **Scene options** opens sky and scene settings beside the scene.
 
 **Save** writes a portable project file with imported assets and scripts. The browser also keeps
 a recovery copy; that backup is distinct from saving a file. Keep a file copy of your work.
+Opening another project with changes offers **Save and continue**, **Discard changes** or
+**Cancel**. A cancelled or failed save keeps your current work open.
 Linking an existing project folder lets Save and Export write there, with conflict checks before
 replacing edited files. File and folder pickers depend on the browser; Chrome and Edge support
 the full folder workflow, and the editor falls back to file uploads and downloads elsewhere.

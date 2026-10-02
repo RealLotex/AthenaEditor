@@ -1,168 +1,261 @@
-# Revisión de producto y UX — 1 de octubre de 2026
+# Revisión de producto y UX — 2 de octubre de 2026
 
-Esta revisión sigue los 24 pasos de la guía adjunta. El resultado está implementado en
-el editor. La interfaz mantiene el inglés existente y la ayuda conserva sus traducciones.
+Esta intervención aplica la guía adjunta completa: revisión A–J en su orden, los nueve
+apartados de salida y trazabilidad de sus 24 principios. Parte del editor existente, que
+ya incluía bienvenida, recuperación, guardado portable, plantillas, controles avanzados y
+exportación de varios niveles. El trabajo de hoy corrige decisiones e interacciones que
+seguían haciendo difícil el camino habitual; esas capacidades anteriores no se presentan
+como novedades de esta intervención.
 
 ## 1. Lo que el usuario realmente quiere
 
-Crear una escena jugable de PlayStation 2, probarla y llevarse un proyecto que pueda abrir,
-seguir editando y ejecutar.
+Crear una escena jugable de PlayStation 2, modificarla viendo el resultado, probarla y
+conservar un proyecto que pueda seguir editando y llevar a la consola.
 
 ## 2. Qué estaba mal
 
-El producto empezaba mostrando su organización interna antes de conocer la intención del
-usuario. HUD, código, configuración y bibliotecas competían por espacio. Se confundía
-recuperación automática con guardado a un archivo. La exportación parecía exitosa aunque
-faltaran archivos o escenas. El cielo combinaba controles con lenguaje publicitario y su
-panel sustituía la escena que el usuario quería observar.
+El primer proyecto proponía una escena vacía y una elección de plantilla antes de dar un
+resultado útil. La acción de añadir objetos abría comandos de toda la aplicación. Las
+acciones de proyecto estaban repartidas entre escena, menús y estado, y se perdían al
+trabajar en otras herramientas. Los controles de transformación seguían visibles sin nada
+que transformar. WORLD y los colores de todos los componentes competían con el contenido.
 
-La revisión A–J se realizó en el orden pedido:
+Había fricción funcional además de ruido visual: un filtro de propiedades podía continuar
+activo al seleccionar un objeto pequeño, aunque desapareciera el campo para limpiarlo.
+Los encabezados de selección múltiple parecían plegables pero no se plegaban, había dos
+acciones para añadir componentes y se mostraban valores del primer objeto sin indicar
+que los demás tenían valores diferentes. Exportar ocultaba el código pero mantenía Copy
+en su pie, sin una explicación clara del resultado principal.
 
-| Paso | Hallazgo y decisión |
+La confirmación de reemplazo también hacía cancelar, guardar y repetir la operación.
+Ahora ofrece Save and continue dentro de la misma decisión y conserva el diálogo si el
+guardado se cancela o falla.
+
+La revisión se realizó primero en el orden A–J exigido por el paso 22:
+
+| Paso | Diagnóstico concreto y decisión |
 | --- | --- |
-| A. Intención | Componer y probar un juego, no administrar un entorno. |
-| B. Camino esencial | Crear → editar la escena → Run → Save/Export. |
-| C. Fricción | Pestañas iniciales excesivas; guardar/exportar exigía entender qué archivos existían. Inicio explícito y guardado portable. |
-| D. Complejidad expuesta | Estados de vínculo, build, filtros y solver visibles sin necesidad. Fuera del estado habitual o dentro de Advanced. |
-| E. Decisiones innecesarias | La plantilla incluye archivos y carpetas estándar; no se elige destino antes de crear. El launcher busca el reproductor y el emulador. |
-| F. Jerarquía | Create domina el inicio; la escena domina la edición; Run es la acción principal de su barra. |
-| G. Eliminación | Eslogan del cielo, descripción emocional duplicada, catálogo de componentes del estado y advertencia duplicada de New. |
-| H. Consolidación | Objects/Assets comparten espacio; Save incluye recursos; toda sustitución de proyecto usa la misma protección de cambios. |
-| I. Revelación progresiva | Código de exportación, opciones de objeto, solver, filtrado y parámetros de cuerpos se abren a pedido. |
-| J. Experiencia completa | Crear, manipular una escena, probar, guardar un archivo portable y exportar todos los niveles con comprobaciones previas. |
+| A. Intención | Trabajar sobre un juego que pueda probarse, sin administrar primero carpetas y opciones del editor. |
+| B. Camino esencial | Create project → nombre → escena jugable → editar → Run game → Save o Export. |
+| C. Fricción | La elección inicial, el catálogo de comandos al añadir y el filtro invisible obligaban a detenerse. Default jugable, selector contextual y filtro ligado a la selección. |
+| D. Complejidad expuesta | WORLD, metadatos de archivos, detalles del emulador, código y formato de pantalla aparecían antes de ser útiles. Se traducen o se revelan a pedido. |
+| E. Decisiones innecesarias | No hace falta elegir entre cinco comienzos, escoger carpetas ni preparar un reproductor para empezar. Third-person game es el default; las alternativas siguen disponibles. |
+| F. Jerarquía | Create project domina el inicio; la escena domina el editor; Run game es la acción de proyecto destacada y permanece visible durante el trabajo. |
+| G. Eliminación | Se retiran acciones duplicadas de barras, badge WORLD, conteos avanzados y párrafos redundantes de ejecución. |
+| H. Consolidación | Save, Export y Run viven juntos en la cabecera; Add component queda una vez; el comienzo alternativo y los detalles del archivo usan una sola revelación. |
+| I. Revelación progresiva | Transformaciones sólo con selección; Change starting point, Scene options, Advanced, File details y Code and export details cuando se necesitan. |
+| J. Experiencia final | Dar nombre, recibir una escena lista para modificar, seleccionar y manipular, ejecutar, guardar y descargar un juego con diagnósticos visibles si está bloqueado. |
+
+La evaluación siguió los tres niveles del paso 19: primero el valor de llegar a una escena
+jugable; después el modelo de empezar con algo editable y actuar sobre ello; finalmente
+la distribución, los estados, el texto y la tipografía. Una capa visual por sí sola no
+habría corregido el inicio vacío ni las propiedades ocultas.
 
 ## 3. Qué debe desaparecer
 
-- Todas las capacidades visibles desde el primer uso.
-- El eslogan «UN MUNDO, OTRO CIELO.» y el texto de ambientación redundante.
-- Elegir carpetas o el reproductor como requisito para crear una escena.
-- Contadores técnicos permanentes que no indican una acción necesaria.
-- Explicaciones extensas bajo cada propiedad ordinaria.
-- Una exportación aparentemente exitosa con scripts vacíos o dependencias ausentes.
-- La segunda advertencia de cambios sin guardar dentro de New: queda la protección común
-  en el momento de reemplazar el proyecto.
+Estas eliminaciones están aplicadas a la experiencia habitual:
 
-La primera pantalla no muestra menús de edición, paneles vacíos ni opciones avanzadas.
+- La obligación de elegir una plantilla: se muestra el comienzo elegido y cambiarlo es
+  opcional.
+- El catálogo de comandos de toda la aplicación al pulsar Add object o añadir un HUD.
+- Move, Rotate, Scale, ajuste de referencia y grid snap cuando no hay selección.
+- Run y Export duplicados en la barra de escena; Save duplicado en el estado inferior.
+- El badge WORLD permanente, el símbolo de marca de la cabecera y el contador de objetos
+  cuando no hay selección.
+- Los botones de plegar paneles junto a cada pestaña; esa opción sigue en su menú contextual.
+- El catálogo completo al abrir Add object: siete objetos habituales primero, More objects
+  para el resto y búsqueda que incluye todas las opciones.
+- El segundo botón de añadir componentes en selección múltiple y sus controles de
+  plegado sin efecto.
+- Los metadatos y la vista previa de código que desplazaban la acción útil de un recurso.
+- Copy junto a Download game folder cuando el código ni siquiera está abierto.
+- Los párrafos que prometían ejecutar con un clic y explicaban la preparación interna de
+  la carpeta antes de pedir las rutas realmente necesarias.
+- La secuencia cancelar → guardar → volver a abrir al reemplazar trabajo sin guardar.
+- La lista de Set start por cada escena, la doble revelación de carpetas y los defaults de
+  cámara que no afectaban a la cámara seleccionada.
+
+Se conserva el acceso completo a las herramientas especializadas, los parámetros
+avanzados y las distribuciones alternativas. Su presencia permanente no es necesaria
+para que el usuario pueda usarlos.
 
 ## 4. Qué decide el sistema automáticamente
 
-- Un proyecto nuevo empieza en Focus: escena central, objetos/recursos a la izquierda,
-  propiedades a la derecha.
-- Las plantillas aportan los archivos necesarios. Empty permite empezar sin gameplay.
-- Las carpetas de exportación usan valores estándar; personalizarlas es secundario.
-- Save incorpora los recursos disponibles. Las copias de archivos importados permiten abrir
-  sin carpeta; al refrescar la carpeta, sus archivos actuales prevalecen.
-- Export arranca en la escena inicial y genera nombres distintos para niveles homónimos.
-  Run arranca en la escena abierta para iterar rápidamente.
-- El cambio de escena se encola para el siguiente frame.
-- Todas las escenas se comprueban. Destinos inválidos, archivos faltantes, nombres ambiguos
-  o glTF externo requieren corrección antes de descargar/escribir el juego.
-- Los panoramas válidos se adaptan a 512 × 256.
-- Los ajustes de escena aparecen junto al viewport, sin reemplazarlo.
-- Las preferencias existentes se respetan. Restablecer vuelve a Focus.
+- **Comienzo útil:** Third-person game y My Game; la plantilla existente incorpora
+  personaje, suelo, comportamiento y recursos. Blank scene sigue disponible bajo Change
+  starting point.
+- **Distribución al crear:** Focus, con escena central, Objects/Assets a la izquierda y
+  Properties a la derecha. La creación restablece también las ventanas de paneles.
+- **Contexto de añadir:** Add object filtra a objetos; añadir HUD filtra a elementos HUD.
+  Se muestran siete objetos habituales y la búsqueda encuentra también los especializados.
+  Ctrl+K conserva el catálogo general de comandos.
+- **Contexto de edición:** Move es la herramienta inicial; la selección determina cuándo
+  aparecen sus controles y el objetivo de Focus selection/Show whole scene.
+- **Propiedades encontrables:** cambiar de selección limpia el filtro; un filtro sin
+  control visible no se aplica; buscar una propiedad revela sus ajustes avanzados y un
+  error abre la sección afectada.
+- **Selección múltiple honesta:** las propiedades diferentes se identifican como mixed y
+  los componentes compartidos no se ofrecen otra vez al añadir. Cambiar un eje conserva
+  los otros ejes de cada objeto, en lugar de copiar los del primero.
+- **Continuidad:** se conserva la recuperación automática del trabajo anterior y se
+  distingue la copia del navegador del archivo guardado.
+- **Escena pertinente:** si hay una cámara, Edit camera lleva a sus propiedades; los
+  valores de fallback quedan aparte. El color de fondo queda secundario con un cielo
+  activo y Scene exits no aparece hasta que haya otras escenas o salidas que revisar.
+- **Configuración de proyecto:** Start scene aparece como una elección sólo si hay varias
+  escenas. Las carpetas necesitan una sola revelación; los controles de hardware se abren
+  si están personalizados o explican un estado inválido.
+
+El editor ya infería las carpetas estándar, incluía recursos en Save, preparaba Run con
+la instalación local y validaba las escenas al exportar. Esas decisiones se conservan.
+La instalación del emulador y del reproductor sigue siendo necesaria para Run; si falta,
+se muestra la información que el usuario debe aportar en ese momento.
 
 ## 5. Nuevo modelo de interacción
 
-1. **Create project**: nombre y plantilla; Enter crea. **Open project…** es la alternativa.
-2. Seleccionar el objeto en la escena o en Objects. Moverlo con el gizmo o editar Properties.
-   El resultado se ve inmediatamente y cada gesto se puede deshacer.
-3. **Run** prueba la escena abierta. La preparación es automática cuando hay una instalación
-   local; la configuración aparece únicamente si falta algo.
-4. **Save changes…** escribe un proyecto portable. **Browser backup** informa recuperación
-   sin insinuar que ya existe un archivo guardado.
-5. **Export** muestra escenas y archivos incluidos. Los errores llevan a la escena/objeto
-   afectado. Si pasa, **Download game folder** entrega los archivos del juego.
+1. **Create project.** El nombre recibe foco y selecciona el texto inicial. Enter o Create
+   project crea el juego. Change starting point permite optar por otro estilo o una escena
+   en blanco; no se piden carpetas ni reproductores.
+2. **Modificar la escena.** Seleccionar un objeto en la escena o en Objects; mover, rotar
+   o escalarlo allí mismo, o editar sus Properties. Add object abre sólo opciones de
+   objetos. Los cambios siguen el historial de deshacer existente.
+3. **Run game.** La acción permanece en la cabecera también al editar HUD, scripts o
+   terrain. Preparing… y Stop game comunican su estado. Si falta configuración, se piden
+   PCSX2 y el console player; el requisito de BIOS/HostFS está junto a esas rutas.
+4. **Save.** La misma acción de cabecera conserva un archivo portable. El estado inferior
+   informa Backed up in this browser o Saved con el nombre del archivo; no necesita otro
+   botón para guardar.
+5. **Export… → Download game folder.** El diálogo muestra nombre del juego, escenas,
+   recursos y si está listo. Si hay errores, indica cuántos deben corregirse y cada
+   diagnóstico lleva al elemento afectado. El código y Copy aparecen al abrir sus detalles.
 
-Las tareas especializadas se abren desde Tools/View o Ctrl+K. Sustituir un proyecto con
-cambios requiere una decisión explícita; Cancel conserva el proyecto y su historial.
+Las tareas poco frecuentes están en los menús o en Ctrl+K. Reemplazar un proyecto con
+cambios ofrece Save and continue, Discard changes y Cancel. Si se cancela o falla el
+guardado, se conserva la decisión pendiente; cancelar conserva el trabajo y el historial.
 
 ## 6. Diseño de pantallas
 
 | Pantalla | Primary | Secondary | Advanced/contextual |
 | --- | --- | --- | --- |
-| Inicio | Create project | Open project; recientes si existen | Ninguno |
-| Crear | Nombre y Create project | Plantilla, Cancel | Sin carpetas ni reproductores |
-| Editar | Escena central y Run | Objects/Assets, Properties, transformación, Save | View options, opciones de objeto, componentes avanzados, otros paneles |
-| Cielo | Escena visible y miniaturas a su derecha | Import panorama, rotación, brillo | Defaults de cámara, Physics y Transitions cerrados |
-| Exportar | Download game folder o errores que impiden continuar | Resumen del contenido | Code and export details, Copy, memoria |
-| Herramientas | El objeto de trabajo: HUD, UV, terrain o script | Controles de esa tarea | Parámetros específicos y configuración del editor |
+| Bienvenida | Create project | Open project…; recientes cuando existen | Sin configuración inicial |
+| Crear | Nombre y Create project | Resumen del comienzo elegido; Cancel | Change starting point con alternativas y Blank scene |
+| Edición | La escena; Run game en cabecera | Objects/Assets, Properties, Add object, Save y Export | Transformaciones con selección; Scene options; paneles y distribución |
+| Propiedades | Nombre y propiedades del objeto seleccionado | Add component; indicación de errores y valores mixed | Object options, Advanced y búsqueda si el objeto tiene muchas propiedades |
+| Recurso | Imagen/nombre y Add to scene, Edit script o Texture tools | Errores del archivo | File details y Preview script |
+| Cielo y escena | Resultado visible junto al editor de la escena | Miniaturas, color y nombre de escena | Cámara, física y transiciones según contexto |
+| Ejecutar con configuración pendiente | Rutas que faltan y Run game | Cancel; estado de comprobación | Cambiar rutas si ya estaba listo; requisito de BIOS/HostFS junto a ellas |
+| Exportar | Estado del juego; Download game folder o errores que lo bloquean | Nombre, escenas/recursos y Share cuando el navegador lo permite | Code and export details, Copy y datos técnicos |
 
-Move/Rotate/Scale tienen selección visible y accesible. Las propiedades tienen nombres
-accesibles, incluidos los ejes. Los encabezados plegables son botones de teclado. Los diálogos
-atrapan el foco, Escape cierra y restauran el foco al salir. Se respeta movimiento reducido.
-Exportar deshabilitado muestra la razón y la acción de recuperación.
+La escala tipográfica se contiene y el espacio organiza el contenido. El acento principal
+se reserva para la siguiente acción; las secciones y los menús ceden atención a la escena.
+Los controles muestran selección y foco, las entradas tienen nombres accesibles y los
+diálogos mantienen Escape, foco inicial y restauración del foco en el recorrido revisado. La creación en curso
+impide iniciar otra creación o cerrar un diálogo que aún está sustituyendo el proyecto.
 
 ## 7. Ejemplos de copy
 
-| Lugar | Texto implementado |
+| Contexto | Texto implementado |
 | --- | --- |
 | Inicio | Create a PlayStation 2 game. |
-| Acción principal | Create project |
-| Propiedades vacías | Select an object to edit it. |
-| Fondos | Sky · Import panorama… · Background color |
-| Imagen inválida | Choose a 360° panorama with a 2:1 ratio, such as 2048 × 1024. |
-| Archivo faltante | “filename” is missing. Import the file before exporting. |
-| Guardado | Save changes… · Saved to file · Browser backup |
-| Exportación bloqueada | Fix the errors above, then export again. |
-| Resultado | Download game folder |
+| Crear | Create project · Project name |
+| Default | Third-person game |
+| Decisión opcional | Change starting point · Blank scene |
+| Añadir | Add object · Find an object… |
+| Transformar | Move · Rotate · Scale |
+| Encuadrar | Focus selection · Show whole scene |
+| Escena | Scene options · Edit sky and scene… |
+| Propiedades | Select an object in the scene. · Add component |
+| Selección múltiple | Changes apply to all selected objects. · mixed |
+| Archivo | File details · Preview script |
+| Cámara | Edit camera · Fallback camera |
+| Escenas | Start scene · Scene exits · Add exit to… |
+| Proyecto | Save · Export… · Run game · Stop game |
+| Reemplazar trabajo | Save and continue · Discard changes · Cancel |
+| Recuperación | Backed up in this browser |
+| Preparar Run | Checking PCSX2… · Run game |
+| Exportar listo | Your game is ready · Download game folder |
+| Exportar bloqueado | Fix 1 error to export · Fix the errors above, then export again. |
+| Detalles de exportación | Code and export details · Copy main.js |
 
-Clear, Cloudy, Sunset y Night describen el resultado visual. No prometen una experiencia
-emocional ni explican cómo está implementado el cielo.
+Las etiquetas describen intención o resultado. “Componente” se conserva donde corresponde
+a la tarea de un editor de juegos; las opciones de añadir incluyen propósitos como
+Custom behavior, Light the scene o Collisions and movement.
 
 ## 8. Antes → Después
 
-**Antes:** abrir → interpretar paneles → decidir carpeta/configuración → crear → importar
-recursos faltantes → editar → distinguir qué se guardó → copiar código y reconstruir el juego.
+**Antes:** Create project → nombre → interpretar cinco plantillas → aceptar Empty →
+encontrar cómo añadir → filtrar comandos de toda la aplicación → construir algo que
+probar → localizar Run en la escena.
 
-**Después:** Create project → nombre/plantilla → editar y Run → Save → Download game folder.
+**Después:** Create project → nombre → Create project → editar una escena jugable →
+Run game. Cambiar el comienzo añade un paso sólo si el usuario lo desea.
 
-**Antes:** cielo → eslogan/descripción → cambiar de pantalla → elegir → volver para comprobar.
+**Antes:** seleccionar objeto complejo → filtrar → seleccionar objeto sencillo → filtro
+desaparece → las propiedades continúan ocultas.
 
-**Después:** Sky → elegir una miniatura junto a la escena → observar el resultado.
+**Después:** seleccionar otro objeto → filtro limpio → propiedades del nuevo objeto.
 
-**Antes:** exportar la escena activa → niveles enlazados sin programa → juego incompleto.
+**Antes:** editar HUD o scripts → buscar dónde volver para Run/Export → volver a la escena
+→ ejecutar o exportar; Save también aparecía como acción inferior.
 
-**Después:** exportar desde el inicio → todos los niveles y dependencias → errores previos a
-escribir o descargar.
+**Después:** editar cualquier herramienta → Save, Export… o Run game en la misma cabecera.
+
+**Antes:** Export → resumen breve y Copy main.js al mismo nivel de trabajo que descargar,
+aunque el código estuviera cerrado.
+
+**Después:** Export… → estado y contenido del juego → Download game folder. Para examinar
+o copiar código: Code and export details.
 
 ## 9. Última pasada de eliminación
 
-Se retiró la advertencia duplicada de New, la descripción bajo el cielo, el texto largo de
-escena inicial y la configuración técnica cotidiana. Physics queda cerrado hasta necesitarlo.
-El código no ocupa Export hasta abrir sus detalles. Las estadísticas técnicas no ocupan el
-estado inferior.
+Después del rediseño se volvió a preguntar qué podía retirarse sin impedir el resultado.
+La segunda pasada movió Copy dentro de sus detalles, eliminó párrafos redundantes de Run,
+dejó una sola acción para añadir componentes a varias selecciones y retiró conteos de
+Advanced que convertían la revelación en un catálogo. También retiró los botones de plegar
+de las pestañas y limitó el primer selector a los siete objetos habituales. Las transformaciones y los badges
+de referencia/snap se mantienen sólo donde la selección hace útil su información.
 
-Se mantuvieron nombre, plantilla, selección, transformación, Run, Save y errores: quitarlos
-perjudicaría la tarea. La confirmación de reemplazo protege trabajo real. El nombre del
-emulador y los límites de textura aparecen donde cambian lo que el usuario puede hacer.
+Se conservaron nombre, elección alternativa de comienzo, selección, transformación,
+Run, Save, diagnósticos y confirmación de reemplazo. Cada uno corresponde a una intención
+real o protege el trabajo; su eliminación dañaría el camino esencial.
 
-## Trazabilidad de los 24 pasos
+La reducción busca acortar el camino al primer resultado útil. No se atribuyen a esta
+intervención mediciones de tiempo de usuarios ni nuevas pruebas de hardware. Las pruebas
+y comprobaciones efectivamente realizadas se registran por separado en
+[PRODUCTION-VERIFICATION.md](PRODUCTION-VERIFICATION.md).
 
-| Paso | Aplicación comprobable |
+### Trazabilidad de los 24 principios
+
+| Principio | Aplicación específica |
 | --- | --- |
-| 1. Simplicidad | Camino habitual sin carpetas; recursos incluidos por Save y plantillas. |
-| 2. Jerarquía | Create principal al inicio y Run destacado durante edición. |
-| 3. Quitar antes de agregar | Paneles especializados fuera del inicio; retiro de slogans/badges. |
-| 4. Experiencia ideal primero | Crear/editar/probar/guardar definido antes de ajustar paneles y generador. |
-| 5. Revelación progresiva | Advanced, opciones de objeto y Code and export details cerrados. |
-| 6. Defaults | Focus, plantillas autosuficientes, carpetas y descubrimiento local del emulador. |
-| 7. Conceptos humanos | Objects, Properties, Sky, Save changes y Browser backup. |
-| 8. Interacción natural | Nombre + Enter; selección y transformación; clic en problema revela destino. |
-| 9. Atención | Escena dominante, estado reducido y explicación breve de errores. |
-| 10. Manipulación directa | Gizmos, propiedades inmediatas, cielo junto al viewport; undo por gesto. |
-| 11. Modos | Transformación activa visible; selector de escena sólo cuando hay varias. |
-| 12. Documentación | Crear/probar/exportar sin leer una explicación de arquitectura. |
-| 13. Recorrido completo | Inicio, edición, ejecución, guardado, recuperación y exportación revisados juntos. |
-| 14. Detalles | Accesibilidad, teclado, Escape/foco, busy/disabled, cancelación y tamaños. |
-| 15. Tipografía | Encabezados en sentence case, escala contenida, contraste y separación por espacio. |
-| 16. Evitar dashboard | Workspace de escena y dos soportes laterales, sin widgets/estadísticas/CTA adicionales. |
-| 17. Visibilidad útil | HUD/UV/scripts/solver aparecen por tarea. |
-| 18. Cuestionar premisa | Sin destino al crear ni reconstrucción manual copiando archivos. |
-| 19. Producto/interacción/interfaz | Fiabilidad de datos, luego recorrido, luego tamaños/estados/copy. |
-| 20. Opinión | Se prioriza iterar una escena jugable; otras distribuciones son secundarias. |
-| 21. Calidad emocional | Inicio tranquilo, escena despejada, feedback breve y recuperación. |
-| 22. Revisión A–J | Tabla en sección 2; recorrido final en sección 5. |
-| 23. Crítica concreta | Eliminación, automatización, consolidación y controles contextuales explícitos. |
-| 24. Formato y pasada final | Nueve secciones solicitadas y segunda simplificación implementada. |
+| 1. Simplicidad, no minimalismo | La escena jugable aparece automáticamente; el filtro invisible se corrige, en vez de decorar una lista vacía. |
+| 2. Jerarquía | Create project domina el inicio y Run game la cabecera; Download game folder domina Export. |
+| 3. Quitar antes de agregar | Se retiran acciones duplicadas, WORLD, conteos avanzados y metadatos permanentes antes de ajustar las superficies. |
+| 4. Experiencia ideal primero | Se define nombre → escena útil → editar → probar; las plantillas y paneles existentes sirven a ese recorrido. |
+| 5. Revelación progresiva | Change starting point, selección, Scene options, File details y Code and export details limitan lo visible al contexto. |
+| 6. Defaults como decisiones | Third-person game, My Game, Move y Focus crean una primera experiencia concreta. |
+| 7. Conceptos humanos | Add object, Run game, Saved, Relative to object y File details reemplazan lectura de maquinaria. |
+| 8. Interacción natural | Nombre + Enter, selección del objeto y edición inmediata; añadir abre aquello que se quiere añadir. |
+| 9. Atención | Las acciones comunes están en una sola cabecera; el estado inferior informa y los indicadores aparecen sólo si importan. |
+| 10. Manipulación directa | Gizmos e inputs editan la selección; el cielo se evalúa junto a la escena y los errores revelan su destino. |
+| 11. Reducir modos | La selección determina las herramientas; modo activo y referencias no predeterminadas se indican, y Run permanece accesible entre herramientas. |
+| 12. No reparar con documentación | El primer resultado surge de crear; el selector contextual y las propiedades encontrables evitan un tour o explicación de arquitectura. |
+| 13. Recorrido completo | Se revisan conjuntamente inicio, primer cambio, ejecución, guardado, continuidad y exportación. |
+| 14. Detalles perceptibles | Foco inicial, Enter/IME, busy, cancelación, búsqueda, secciones plegables y valores mixed atienden fallos concretos. |
+| 15. Tipografía y jerarquía visual | Escala contenida, textos breves, espacios y controles legibles sostienen la escena y la acción principal. |
+| 16. Evitar dashboard | Una escena con dos apoyos laterales; no se agregan tarjetas, widgets ni indicadores para representar capacidades. |
+| 17. Visibilidad útil | Código, rutas, metadatos, parámetros y herramientas completas se muestran al solicitarlos o necesitar corregirlos. |
+| 18. Cuestionar la premisa | Se elimina la elección obligatoria de plantilla y el catálogo general al añadir; se consolida la barra de proyecto. |
+| 19. Producto → interacción → interfaz | Resultado jugable, recorrido de edición directa y finalmente distribución/copy; explicado en el apartado 2. |
+| 20. Software con opinión | El primer proyecto propone un juego en tercera persona; otros comienzos siguen disponibles con un paso adicional. |
+| 21. Calidad emocional | Continuidad del trabajo, resultado inicial útil, feedback breve, estados visibles y recuperación reducen incertidumbre. |
+| 22. Revisión A–J | Los diez pasos aparecen en orden en el apartado 2 y desembocan en el recorrido del apartado 5. |
+| 23. Crítica concreta | Los apartados 2–4 identifican qué desaparece, se automatiza, se consolida y pasa a ser contextual. |
+| 24. Formato y pasada final | Están presentes los nueve apartados requeridos; este apartado documenta otra pasada efectiva de eliminación. |
 
-Las capturas y pruebas están en [PRODUCTION-VERIFICATION.md](PRODUCTION-VERIFICATION.md).
+Las implementaciones principales se encuentran en `src/panels/newproject.jsx`,
+`src/panels/menubar.jsx`, `src/panels/scenetools.jsx`, `src/panels/statusbar.jsx`,
+`src/panels/inspector.jsx`, `src/panels/inspector-components.jsx`,
+`src/panels/inspector-scene.jsx`, `src/panels/export.jsx`, `src/panels/play.jsx`,
+`src/ui/modal.jsx`, `src/ui/palette.jsx`, `src/viewport/viewport.jsx`, `src/app.jsx`
+y `src/styles.css`.

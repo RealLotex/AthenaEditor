@@ -11,7 +11,9 @@ function MenuBar(
     onSwitchScene,
     onRenameProject,
     dirty,
-    buildStamp,
+    projectFileName,
+    playBusy,
+    playing,
   },
 ) {
   const [open, setOpen] = useState(null);
@@ -58,6 +60,11 @@ function MenuBar(
     );
   }, [commands]);
 
+  const action = (id) => commands.find((c) => c.id === id);
+  const invoke = (id) => {
+    const command = action(id);
+    if (command && (!command.enabled || command.enabled())) command.run();
+  };
   const item = (c) => (
     <button
       key={c.id}
@@ -105,7 +112,6 @@ function MenuBar(
         (c) =>
           [
             "file.new",
-            "file.link",
             "file.openjson",
             "file.recent",
             "file.save",
@@ -116,6 +122,7 @@ function MenuBar(
             .includes(c.id),
       );
       take("Scenes", (c) => c.id.includes("scene"));
+      take("Project folder", (c) => ["file.link", "file.relink", "file.unlink", "file.scaffold"].includes(c.id));
       take("More options", () => true);
     } else if (g.name === "Edit") {
       take(null, (c) => !c.id.toLowerCase().includes("prefab"));
@@ -145,19 +152,10 @@ function MenuBar(
   return (
     <div className={`a-menubar${nativeTitlebar ? " a-menubar--native" : ""}`} ref={barRef}>
       <div className="a-brand">
-        <span className="a-brand__mark" title="AthEditor" aria-label="AthEditor">⬡</span>
         <div>
           <div className="a-brand__name">
             <input
               className="a-input"
-              style={{
-                height: 17,
-                border: "none",
-                background: "transparent",
-                padding: 0,
-                fontWeight: 700,
-                width: 130,
-              }}
               aria-label="Project name"
               value={project.name}
               onChange={(e) => onRenameProject(e.target.value)}
@@ -205,10 +203,9 @@ function MenuBar(
 
       <div className="a-grow" />
 
-      <div className="a-row" style={{ gap: 5 }}>
+      <div className="a-project-actions">
         {project.scenes.length > 1 && <select
           className="a-select"
-          style={{ width: 150 }}
           value={project.activeSceneId}
           onChange={(e) => onSwitchScene(e.target.value)}
           title="Active scene"
@@ -218,14 +215,16 @@ function MenuBar(
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>}
-        {dirty && (
-          <span
-            title="Unsaved changes"
-            style={{ color: "var(--warn)", fontSize: 14 }}
-          >
-            ●
-          </span>
-        )}
+        {action("file.save") && <button className="a-btn a-btn--ghost" onClick={() => invoke("file.save")}
+          title={projectFileName ? `Save ${projectFileName} (Ctrl+S)` : "Save a project file (Ctrl+S)"}>
+          Save{dirty && <span className="a-save-dot" aria-label="Unsaved changes" />}
+        </button>}
+        {action("file.export") && <button className="a-btn a-btn--ghost a-export-button" onClick={() => invoke("file.export")}>Export…</button>}
+        {action("file.play") && <button className="a-btn a-btn--primary a-run-button" onClick={() => invoke("file.play")}
+          disabled={!!playBusy || !!(action("file.play").enabled && !action("file.play").enabled())}
+          title="Try the open scene in PCSX2 (F5)">
+          {playBusy ? (playing ? "Stopping…" : "Preparing…") : playing ? "Stop game" : "Run game"}
+        </button>}
       </div>
     </div>
   );

@@ -327,7 +327,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
           <div
             className="a-dock-branch"
             style={fixed
-              ? { flex: aCollapsed ? "0 0 36px" : "1" }
+              ? { flex: aCollapsed ? "0 0 40px" : "1" }
               : { flex: `${n.ratio} 1 0` }}
           >
             {node(n.children[0])}
@@ -341,7 +341,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
           <div
             className="a-dock-branch"
             style={fixed
-              ? { flex: bCollapsed ? "0 0 36px" : "1" }
+              ? { flex: bCollapsed ? "0 0 40px" : "1" }
               : { flex: `${1 - n.ratio} 1 0` }}
           >
             {node(n.children[1])}
@@ -367,11 +367,22 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
                 data-dock-tab={id}
                 role="tab"
                 aria-selected={n.active === id && !n.collapsed}
+                tabIndex={n.active === id ? 0 : -1}
                 className={`a-dock-tab${
                   n.active === id ? " a-dock-tab--active" : ""
                 }`}
                 title={`Drag to dock ${DOCK_PANELS[id]}; Alt-drag to float`}
                 onClick={() => activate(id)}
+                onKeyDown={(e) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+                  e.preventDefault(); e.stopPropagation();
+                  const at = n.tabs.indexOf(id);
+                  const next = e.key === "Home" ? 0 : e.key === "End" ? n.tabs.length - 1 :
+                    (at + (e.key === "ArrowRight" ? 1 : -1) + n.tabs.length) % n.tabs.length;
+                  const target = n.tabs[next];
+                  activate(target);
+                  e.currentTarget.parentElement.querySelector(`[data-dock-tab="${target}"]`)?.focus();
+                }}
                 onPointerDown={(e) => start(e, id)}
                 {...events}
               >
@@ -380,18 +391,6 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
             ))}
           </div>
           {options(n.active, n)}
-          <button
-            className="a-dock-collapse"
-            aria-label={`${n.collapsed ? "Expand" : "Collapse"} ${
-              DOCK_PANELS[n.active]
-            } panel`}
-            onClick={() =>
-              change((l) =>
-                updateDockNode(l, n.id, { collapsed: !n.collapsed })
-              )}
-          >
-            {n.collapsed ? "▴" : "▾"}
-          </button>
         </div>
         {n.tabs.map((id) => (
           external.includes(id)

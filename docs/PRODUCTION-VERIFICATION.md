@@ -1,10 +1,22 @@
-# Production review — 2026-10-01
+# Production review — 2026-10-02
 
-The standalone editor is built from the committed source. The local review used
-Deno 2.9.2, a Chromium browser and PCSX2 2.6.3 with the bundled AthenaEnv player.
+The standalone editor is built from the committed source. The current UX review used
+Deno 2.9.2 and a Chromium browser, including Run/Stop through the local PCSX2 launcher.
+The console execution fixtures below were recorded on October 1 with PCSX2 2.6.3
+and the bundled AthenaEnv player; those longer fixtures were not rerun for the UX changes.
 
 ## Changes verified
 
+- A third-person game is the initial project; alternate starting points are optional.
+  Name/Enter, busy state and cancellation preserve a predictable creation flow.
+- New projects enter Focus even after a customized layout. Selection reveals Properties;
+  object/HUD creation uses a scoped picker, with seven common objects shown first.
+- Save, Export and Run remain together across tools. Scene transforms require a selection;
+  scene options and less common properties appear when requested or needed for an error.
+- Property search follows the selection, mixed values are explicit, and changing one axis
+  in a multi-selection preserves each object's other axes. Panel tabs support keyboard navigation.
+- Export shows readiness and contents before code details. Copy appears with the code;
+  Save and continue preserves the pending replacement if saving is cancelled or fails.
 - First-run welcome and Focus workspace; contextual properties and advanced controls.
 - Portable Save includes imported binaries and scripts. Disk backups yield to refreshed
   files; deliberate editor working copies retain precedence.
@@ -26,18 +38,26 @@ Deno 2.9.2, a Chromium browser and PCSX2 2.6.3 with the bundled AthenaEnv player
 
 ## Automated suite
 
-`deno task check`: **497 passed, 0 failed**. The suite covers project migration,
+`deno task check`: **518 passed, 0 failed**. The suite covers project migration,
 generation, hierarchy, physics/shadow math, viewport geometry/resources, fonts, terrain,
 prefabs, assets, history, folder operations, project replacement, saves, launcher isolation
-and exported bundles. Editor callback tests execute the actual command handlers; they do
-not emulate React effects or native picker dialogs.
+and exported bundles. The added UX tests cover creation, dialog focus, cancellation,
+scoped object/HUD choices, contextual actions, selection and shared properties. Editor
+callback tests execute the actual command handlers; they do not emulate React effects
+or native picker dialogs.
 
 ## Browser checks
 
-Verified first run, project creation with name/Enter and a playable template, restoring the
-browser backup, Focus layout, input labels, numeric edits and undo, keyboard opening a menu,
-Sky while retaining the scene, Run/Stop, export summary/details and Escape restoring focus.
-Final session console: **0 warnings/errors**.
+Verified first run, project creation with name/Enter and the default playable template,
+Focus layout, scoped Add object, selecting an added object, contextual transforms, numeric
+edits and undo, Scene options, editing the active camera, Sky beside the scene, Run/Stop,
+export summary/details, initial dialog focus and Escape restoring the opener. Cancelling
+replacement preserved the current project and its unsaved state. The workspace was also
+checked at 1024×768 and 760×680. Final session console: **0 warnings/errors**.
+
+Browser backup recovery and the other production behaviours above also retain their
+October 1 evidence and automated coverage. The screenshots below are from the final
+October 2 build.
 
 The embedded browser did not expose the export download event. The ZIP's actual byte
 structure, scene entries and payloads are covered separately by automated tests. Native
@@ -49,6 +69,9 @@ saves is covered by tests.
 ![Export with details collapsed](verification/export.jpg)
 
 ## Actual console-player execution
+
+The following October 1 fixtures remain relevant because this redesign did not change
+the generated game loop, controller templates or console engine.
 
 `deno run -A tools/verify-templates.js` launched each generated game through the same
 isolated launcher as Run. All **four controller templates passed** settling/gravity,

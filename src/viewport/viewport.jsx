@@ -569,8 +569,8 @@ function Viewport({
         </div>
       )}
       <div className="a-viewport__hud">
-        <span className="a-viewport__chip">{gizmoSpace === "local" ? "LOCAL" : "WORLD"}</span>
-        {snap && <span className="a-viewport__chip">SNAP {snapSize}</span>}
+        {selectedIds.length > 0 && gizmoSpace === "local" && <span className="a-viewport__chip">Relative to object</span>}
+        {selectedIds.length > 0 && snap && <span className="a-viewport__chip">Grid snap · {snapSize}</span>}
         {hoverAxis && <span className="a-viewport__chip">{hoverAxis.toUpperCase()}</span>}
       </div>
     </div>

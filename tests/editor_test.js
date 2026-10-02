@@ -1379,6 +1379,53 @@ Deno.test("first run starts at the welcome screen and creation enters the Focus 
   assertEquals(e.find("DockWorkspace").layout.preset, "Focus");
 });
 
+Deno.test("new projects enter Focus from a customized layout without altering a cancelled replacement", async () => {
+  const e = editor();
+  e.command("view.layout.Unity");
+  e.command("file.new");
+  await e.find("NewProjectModal").onCreate(e.mkProject("Fresh game"), { id: "empty" });
+  e.render();
+  assertEquals(e.find("DockWorkspace").layout.preset, "Focus");
+  e.command("add.empty");
+  e.command("view.layout.Godot");
+  e.command("file.new");
+  const pending = e.find("NewProjectModal").onCreate(e.mkProject("Cancelled"), { id: "empty" });
+  e.render();
+  e.find("ConfirmModal").onClose();
+  await pending;
+  e.render();
+  assertEquals(e.find("DockWorkspace").layout.preset, "Godot");
+  assertEquals(e.project.name, "Fresh game");
+});
+
+Deno.test("object selection returns to properties and scoped add blocks scene shortcuts until dismissed", () => {
+  const e = editor();
+  e.command("add.empty");
+  const id = e.find("Inspector").activeObject.id;
+  e.find("Inspector").onEditScene();
+  e.render();
+  assertEquals(e.find("DockWorkspace").layout.tree.children[1].active, "sceneSettings");
+  e.find("Outliner").onSelect(id, {});
+  e.render();
+  assertEquals(e.find("DockWorkspace").layout.tree.children[1].active, "inspector");
+  assertEquals(e.find("SceneTools").hasSelection, true);
+  e.find("SceneTools").onAdd();
+  e.render();
+  assertEquals(e.find("CommandPalette").scope, "objects");
+  const before = JSON.stringify(e.project);
+  const key = e.find("DockWorkspace").onKeyDown;
+  key({ key: "Delete", target: { nodeType: 1, tagName: "BUTTON" }, preventDefault() {} });
+  assertEquals(JSON.stringify(e.project), before);
+  key({ key: "k", ctrlKey: true, target: {}, preventDefault() {} });
+  e.render();
+  assertEquals(e.find("CommandPalette").scope, null);
+  e.find("CommandPalette").onClose();
+  e.render();
+  e.find("Outliner").onSelect(null);
+  e.render();
+  assertEquals(e.find("SceneTools").hasSelection, false);
+});
+
 Deno.test("cancelling replacement from New preserves unsaved objects and their undo history", async () => {
   const e = editor(), original = JSON.stringify(e.project);
   e.command("add.empty");

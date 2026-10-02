@@ -1,8 +1,10 @@
 function SceneTools(
-  { prefs, gizmoMode, onMode, onPref, onExport, onRun, onSkybox, playBusy, playing },
+  { prefs, gizmoMode, onMode, onPref, hasSelection, onAdd, onFrame, onSceneSettings },
 ) {
   return (
     <div className="a-scene-tools">
+      <button className="a-btn a-btn--ghost" onClick={onAdd}>+ Add object</button>
+      {hasSelection && <div className="a-transform-tools" role="group" aria-label="Transform selected objects">
       {[["translate", "Move", "W"], ["rotate", "Rotate", "E"], [
         "scale",
         "Scale",
@@ -20,10 +22,14 @@ function SceneTools(
           {label}
         </button>
       ))}
-      <button className="a-btn a-btn--sm a-btn--ghost" onClick={onSkybox}>Sky</button>
+      </div>}
+      <span className="a-grow" />
+      <button className="a-btn a-btn--ghost a-btn--sm" onClick={onFrame}>{hasSelection ? "Focus selection" : "Show whole scene"}</button>
       <details className="a-view-options">
-        <summary>View options</summary>
+        <summary>Scene options</summary>
         <div className="a-view-options__pop">
+          <button className="a-btn a-btn--ghost" onClick={(e) => { e.currentTarget.closest("details").open = false; onSceneSettings(); }}>Edit sky and scene…</button>
+          {hasSelection && <>
           <label>
             Move relative to<select
               className="a-select"
@@ -54,6 +60,7 @@ function SceneTools(
                 onPref({ snapSize: Math.max(.01, Number(e.target.value)) })}
             />
           )}
+          </>}
           <label>
             <input
               type="checkbox"
@@ -72,26 +79,6 @@ function SceneTools(
           </label>
         </div>
       </details>
-      <span className="a-grow" />
-      <button
-        className="a-btn a-btn--sm a-btn--ghost"
-        onClick={onExport}
-        title="Export (Ctrl+E)"
-      >
-        Export
-      </button>
-      <button
-        className="a-btn a-btn--primary a-run-button"
-        onClick={onRun}
-        disabled={playBusy}
-        title="Run in PCSX2 (F5)"
-      >
-        {playBusy
-          ? (playing ? "Stopping…" : "Preparing…")
-          : playing
-          ? "■ Stop"
-          : "▶ Run"}
-      </button>
     </div>
   );
 }

@@ -45,8 +45,8 @@ function layoutPreset(name = "Default") {
   let tree;
   if (name === "Focus") {
     return { version: 1, preset: "Focus", nextId: 1, floating: [],
-      tree: split("frame", "row", .79,
-        split("main", "row", .22, group("outline", ["outliner", "assets"]), group("work", ["viewport"])),
+      tree: split("frame", "row", .76,
+        split("main", "row", .24, group("outline", ["outliner", "assets"]), group("work", ["viewport"])),
         group("inspect", ["inspector"])),
       hidden: Object.keys(DOCK_PANELS).filter(id => !["outliner", "assets", "viewport", "inspector"].includes(id)) };
   } else if (name === "Unity") {

@@ -1,6 +1,16 @@
 # Project status
 
-_Last updated: 2026-10-01._
+_Last updated: 2026-10-02._
+
+## October 2 UX redesign
+
+Creation now defaults to a playable third-person game and one required name. Alternatives
+are optional. New projects enter Focus; resumed layouts remain personal. Save, Export and
+Run stay in the header, transformations follow selection, and Add opens common objects
+before specialized types. Properties clear stale search, reveal errors and preserve untouched
+axes in multi-object edits. Camera editing targets the actual camera. Export presents its
+result before code, and project replacement can save before continuing. Dialog and panel
+keyboard navigation, legibility and narrow-window layouts have been reviewed.
 
 ## October production and UX review
 

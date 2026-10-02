@@ -36,37 +36,41 @@ const ALPHA_FAIL = ["ALPHA_FAIL_NO_UPDATE", "ALPHA_FAIL_FB_ONLY", "ALPHA_FAIL_ZB
 // ── project ────────────────────────────────────────────────────────────
 
 function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
-  const [open, setOpen] = useState({ display: true, alpha: false, dirs: false, scenes: true });
+  const [open, setOpen] = useState({ display: true, alpha: false, dirs: false });
   const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const set = (path, value, phase) => onUpdate(path, value, phase);
   const D = project.display || {};
   const AT = D.alphaTest || {};
   const dirs = project.dirs || {};
+  useEffect(() => {
+    if (showAdvanced) setOpen(s => ({ ...s, display: true, alpha: true, dirs: true }));
+  }, [showAdvanced]);
 
   return (
     <>
       <PanelHeader title="Project" />
-      <div className="a-scroll">
+      <div className="a-scroll" key={project.id}>
         <div style={{ padding: 8, borderBottom: "1px solid var(--line)", background: "var(--bg-2)" }}>
           <Field label="Name">
             <TextInput value={project.name} onChange={(v) => set("name", v)} />
           </Field>
-          <div className="a-field__help" style={{ gridColumn: "1 / -1" }}>
-            These settings apply to the whole exported program, not to one scene.
-          </div>
+          {project.scenes.length > 1 && <Field label="Start scene">
+            <Select value={project.startSceneId} onChange={onSetStartScene}
+              options={project.scenes.map(s => ({ value: s.id, label: s.name }))} />
+          </Field>}
+          <Field label="Volume">
+            <NumInput value={project.audio?.volume ?? 100} onChange={(v, p) => set("audio.volume", v, p)} min={0} max={100} step={5} integer />
+          </Field>
         </div>
 
         <Section title="Display" icon="▦" color="var(--accent)" open={open.display} onToggle={() => toggle("display")}>
-          <Field label="Video Mode" help="Emitted only when it is not the console default.">
+          <Field label="Video mode">
             <Select value={D.mode ?? ""} onChange={(v) => set("display.mode", v)} options={VIDEO_MODES} />
           </Field>
-          <Field label="Debug HUD" help="Prints FPS, RAM and VRAM on hardware.">
-            <Checkbox value={!!D.debugHUD} onChange={(v) => set("display.debugHUD", v)} />
-          </Field>
-          <Field label="Volume" help="Master volume, 0 to 100. The engine has no per-sound volume — Sound.setVolume is global.">
-            <NumInput value={project.audio?.volume ?? 100} onChange={(v, p) => set("audio.volume", v, p)} min={0} max={100} step={5} integer />
-          </Field>
-          <Advanced pinned={showAdvanced} count={D.psm === "custom" ? 5 : 3}>
+          <Advanced pinned={showAdvanced}>
+            <Field label="Performance overlay">
+              <Checkbox value={!!D.debugHUD} onChange={(v) => set("display.debugHUD", v)} />
+            </Field>
             <Field label="Framebuffer" help="Colour and depth pixel formats. Set once per program.">
               <Select value={D.psm} onChange={(v) => set("display.psm", v)} options={PSM_OPTIONS} />
             </Field>
@@ -79,11 +83,11 @@ function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
             <Field label="VSync" help="Off tears but can raise throughput.">
               <Checkbox value={D.vsync !== false} onChange={(v) => set("display.vsync", v)} />
             </Field>
-            <Field label="Frame Counter"><Checkbox value={D.frameCounter !== false} onChange={(v) => set("display.frameCounter", v)} /></Field>
+            <Field label="Frame counter"><Checkbox value={D.frameCounter !== false} onChange={(v) => set("display.frameCounter", v)} /></Field>
           </Advanced>
         </Section>
 
-        <Section title="Transparency" icon="◫" color="var(--warn)" open={open.alpha} onToggle={() => toggle("alpha")}>
+        <Section title="Transparency" icon="◫" color="var(--fg-dim)" open={open.alpha || AT.pixelBlend === true} onToggle={() => toggle("alpha")}>
           {(() => {
             const preset = transparencyPresetOf(D);
             const current = TRANSPARENCY_PRESETS.find((p) => p.id === preset);
@@ -110,18 +114,10 @@ function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
                 <div className="a-field__help" style={{ gridColumn: "1 / -1", marginBottom: 6 }}>
                   {current
                     ? current.help
-                    : "These settings do not match any of the presets. Pick one above to go back to a known-good combination."}
+                    : "Custom transparency settings."}
                 </div>
 
-                <Field label="Show the details">
-                  <Checkbox value={!!open.alphaRaw} onChange={() => toggle("alphaRaw")} />
-                </Field>
-                {open.alphaRaw && (
-                  <>
-                    <div className="a-field__help" style={{ gridColumn: "1 / -1", margin: "2px 0 6px" }}>
-                      The hardware controls behind the presets. Changing one by hand switches
-                      the style to Custom.
-                    </div>
+                <Advanced pinned={showAdvanced || AT.pixelBlend === true || preset === "custom"} label="Hardware controls">
                     <Field label="Skip see-through pixels" help="Skips pixels that are too faint to be worth drawing. Saves time on hardware.">
                       <Checkbox value={AT.enabled !== false} onChange={(v) => set("display.alphaTest.enabled", v)} />
                     </Field>
@@ -147,20 +143,15 @@ function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
                     >
                       <Checkbox value={AT.pixelBlend === true} onChange={(v) => set("display.alphaTest.pixelBlend", v)} />
                     </Field>
-                  </>
-                )}
+                </Advanced>
               </>
             );
           })()}
         </Section>
 
-        <Section title="Asset Folders" icon="▤" color="var(--fg-dim)" open={open.dirs} onToggle={() => toggle("dirs")}>
-          <div className="a-field__help" style={{ gridColumn: "1 / -1", marginBottom: 6 }}>
-            Folder names next to the exported program. The Navigator reads the same layout.
-          </div>
+        <Section title="Asset folders" icon="▤" color="var(--fg-dim)" open={open.dirs} onToggle={() => toggle("dirs")}>
           {/* Set once by New Project and then never again — but renaming one is
               the only way to match an existing folder layout, so it stays here. */}
-          <Advanced pinned={showAdvanced} count={5} label="Folder names">
             <Field label="Models"><TextInput mono value={dirs.models} onChange={(v) => set("dirs.models", v)} /></Field>
             <Field label="Textures" help="Searched when a texture is not beside its mesh.">
               <TextInput mono value={dirs.textures} onChange={(v) => set("dirs.textures", v)} />
@@ -168,28 +159,6 @@ function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
             <Field label="Sounds"><TextInput mono value={dirs.sounds} onChange={(v) => set("dirs.sounds", v)} /></Field>
             <Field label="Fonts"><TextInput mono value={dirs.fonts} onChange={(v) => set("dirs.fonts", v)} /></Field>
             <Field label="Scripts"><TextInput mono value={dirs.scripts} onChange={(v) => set("dirs.scripts", v)} /></Field>
-          </Advanced>
-        </Section>
-
-        <Section title="Scenes" icon="⧉" color="var(--info)" open={open.scenes} onToggle={() => toggle("scenes")}>
-          <div className="a-field__help" style={{ gridColumn: "1 / -1", marginBottom: 6 }}>
-            The start scene is what the exported program boots.
-          </div>
-          {project.scenes.map((s) => (
-            <div key={s.id} className="a-row" style={{ marginBottom: 3 }}>
-              <span className="a-grow" style={{ fontSize: 11, color: s.id === project.activeSceneId ? "var(--fg-strong)" : undefined }}>
-                {s.name}
-                {s.id === project.activeSceneId && <span className="a-dim" style={{ fontSize: 9.5 }}> · editing</span>}
-              </span>
-              <button
-                className={`a-btn a-btn--sm${s.id === project.startSceneId ? " a-btn--on" : ""}`}
-                onClick={() => onSetStartScene(s.id)}
-                title={s.id === project.startSceneId ? "This scene boots the program" : "Make this the start scene"}
-              >
-                {s.id === project.startSceneId ? "Start" : "Set start"}
-              </button>
-            </div>
-          ))}
         </Section>
       </div>
     </>
@@ -198,7 +167,7 @@ function ProjectSettings({ project, onUpdate, onSetStartScene, showAdvanced }) {
 
 // ── scene ──────────────────────────────────────────────────────────────
 
-function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTransition, onRemoveTransition, showAdvanced }) {
+function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTransition, onRemoveTransition, showAdvanced, onSelectObject }) {
   const [open, setOpen] = useState({ world: true, camera: false, physics: false, links: false });
   const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const set = (path, value, phase) => onUpdate(path, value, phase);
@@ -206,11 +175,26 @@ function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTr
   const cam = scene.camera || {};
   const others = project.scenes.filter((s) => s.id !== scene.id);
   const linked = new Set((scene.transitions || []).map((t) => t.targetSceneId));
+  const cameraObject = exportableObjects(scene.objects || []).find(o => o.components?.camera);
+  const scriptedCamera = !!cameraObject?.components?.script?.file;
+  const skyEnabled = normalizedSkybox(scene.skybox).enabled;
+  const unlinked = others.filter(s => !linked.has(s.id));
+  const missingExit = (scene.transitions || []).some(t => !others.some(s => s.id === t.targetSceneId));
+  const clippingFields = <>
+    <Field label="Near"><NumInput value={cam.near} onChange={(v, p) => set("camera.near", v, p)} min={0.01} step={0.1} /></Field>
+    <Field label="Far"><NumInput value={cam.far} onChange={(v, p) => set("camera.far", v, p)} min={1} step={10} /></Field>
+  </>;
+  const backgroundField = <Field label="Background color">
+    <Color255Input value={scene.background} onChange={(v, p) => set("background", v, p)} />
+  </Field>;
+  useEffect(() => {
+    if (showAdvanced) setOpen(s => ({ ...s, camera: true, physics: true, links: true }));
+  }, [showAdvanced]);
 
   return (
     <>
       <PanelHeader title="Scene" />
-      <div className="a-scroll">
+      <div className="a-scroll" key={scene.id}>
         <div style={{ padding: 8, borderBottom: "1px solid var(--line)", background: "var(--bg-2)" }}>
           <Field label="Name">
             <TextInput value={scene.name} onChange={(v) => set("name", v)} />
@@ -224,27 +208,32 @@ function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTr
 
         <Section title="Background" icon="◍" color="var(--accent)" open={open.world} onToggle={() => toggle("world")}>
           <SkyboxEditor key={scene.id} scene={scene} files={files} onUpdate={onUpdate} onApply={onApplySkybox} />
-          <Field label="Background color">
-            <Color255Input value={scene.background} onChange={(v, p) => set("background", v, p)} />
-          </Field>
+          {skyEnabled ? <Advanced pinned={showAdvanced} label="Backdrop">{backgroundField}</Advanced> : backgroundField}
         </Section>
 
-        <Section title="Camera Defaults" icon={COMPONENTS.camera.icon} color={COMPONENTS.camera.color} open={open.camera} onToggle={() => toggle("camera")}>
-          <div className="a-field__help" style={{ gridColumn: "1 / -1", marginBottom: 6 }}>
-            Used when the scene has no Camera object. A Camera object overrides these.
-          </div>
-          <Field label="Orbit Rig" help="Built-in left-stick orbit camera. Turn it off when a script drives the camera.">
+        <Section title="Camera" icon={COMPONENTS.camera.icon} color={COMPONENTS.camera.color} open={open.camera} onToggle={() => toggle("camera")}>
+          {cameraObject && <div className="a-row" style={{ marginBottom: 8 }}>
+            <span className="a-grow">{cameraObject.name}</span>
+            {onSelectObject && <button className="a-btn a-btn--sm" onClick={() => onSelectObject(cameraObject.id)}>Edit camera</button>}
+          </div>}
+          {!scriptedCamera && <Field label="Orbit with gamepad">
             <Checkbox value={scene.defaultCameraRig !== false} onChange={(v) => set("defaultCameraRig", v)} />
-          </Field>
-          <Field label="FOV"><NumInput value={cam.fov} onChange={(v, p) => set("camera.fov", v, p)} min={1} max={179} step={1} /></Field>
-          <Advanced pinned={showAdvanced} count={2} label="Clipping">
-            <Field label="Near"><NumInput value={cam.near} onChange={(v, p) => set("camera.near", v, p)} min={0.01} step={0.1} /></Field>
-            <Field label="Far"><NumInput value={cam.far} onChange={(v, p) => set("camera.far", v, p)} min={1} step={10} /></Field>
+          </Field>}
+          {!cameraObject && <>
+          <Field label="Field of view"><NumInput value={cam.fov} onChange={(v, p) => set("camera.fov", v, p)} min={1} max={179} step={1} /></Field>
+          <Advanced pinned={showAdvanced} label="Clipping">
+            {clippingFields}
           </Advanced>
+          </>}
+          {cameraObject && <Advanced pinned={showAdvanced} label="Fallback camera">
+            {scriptedCamera && <Field label="Orbit with gamepad"><Checkbox value={scene.defaultCameraRig !== false} onChange={(v) => set("defaultCameraRig", v)} /></Field>}
+            <Field label="Field of view"><NumInput value={cam.fov} onChange={(v, p) => set("camera.fov", v, p)} min={1} max={179} step={1} /></Field>
+            {clippingFields}
+          </Advanced>}
         </Section>
 
         <Section title="Physics" icon="⬡" color={COMPONENTS.rigidbody.color} open={open.physics} onToggle={() => toggle("physics")}>
-          <Field label="Enabled" help="Creates the ODE world. Rigidbodies are only exported when this is on.">
+          <Field label="Enabled">
             <Checkbox value={ph.enabled} onChange={(v) => set("physics.enabled", v)} />
           </Field>
           {ph.enabled && (
@@ -252,7 +241,7 @@ function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTr
               <Field label="Gravity">
                 <Vec3Input value={ph.gravity} onChange={(v, p) => set("physics.gravity", v, p)} step={0.1} />
               </Field>
-              <Advanced pinned={showAdvanced} count={4} label="Solver">
+              <Advanced pinned={showAdvanced} label="Simulation details">
                 <Field label="Step" help="Seconds per simulation step. 0.016 matches 60 Hz; large values go unstable.">
                   <NumInput value={ph.stepSize} onChange={(v, p) => set("physics.stepSize", v, p)} step={0.001} min={0.001} max={0.1} />
                 </Field>
@@ -266,37 +255,36 @@ function SceneSettings({ scene, project, files, onUpdate, onApplySkybox, onAddTr
                   <NumInput value={ph.erp} onChange={(v, p) => set("physics.erp", v, p)} step={0.05} min={0} max={1} />
                 </Field>
               </Advanced>
-              <div className="a-field__help" style={{ gridColumn: "1 / -1", marginTop: 6 }}>
-                Friction and restitution are fixed by the engine (mu 0.5, bounce 0.1) and cannot be
-                set per body from script.
-              </div>
             </>
           )}
         </Section>
 
-        <Section title="Transitions" icon="⇄" color="var(--info)" open={open.links} onToggle={() => toggle("links")}>
-          <div className="a-field__help" style={{ gridColumn: "1 / -1", marginBottom: 6 }}>
-            Link a scene, then use its exit name with ctx.goToScene(name).
-          </div>
-          {others.length === 0 && <Empty>Only one scene in this project.</Empty>}
-          {others.map((s) => {
-            const index = (scene.transitions || []).findIndex(t => t.targetSceneId === s.id);
-            return <div key={s.id} style={{ marginBottom: 12 }}>
+        {(others.length > 0 || linked.size > 0) && <Section title="Scene exits" icon="⇄" color="var(--fg-dim)" open={open.links || missingExit} onToggle={() => toggle("links")}>
+          {(scene.transitions || []).map((transition, index) => {
+            const target = others.find(s => s.id === transition.targetSceneId);
+            return <div key={transition.id || transition.targetSceneId} style={{ marginBottom: 12 }}>
             <div className="a-row" style={{ marginBottom: 6 }}>
-              <span className="a-grow" style={{ fontSize: 11 }}>{s.name}</span>
+              <span className="a-grow" style={{ fontSize: 11 }}>{target?.name || "Missing scene"}</span>
               <button
-                className={`a-btn a-btn--sm${linked.has(s.id) ? " a-btn--on" : ""}`}
-                onClick={() => (linked.has(s.id) ? onRemoveTransition(s.id) : onAddTransition(s.id))}
+                className="a-btn a-btn--sm a-btn--ghost"
+                aria-label={`Remove exit to ${target?.name || "missing scene"}`}
+                onClick={() => onRemoveTransition(transition.targetSceneId)}
               >
-                {linked.has(s.id) ? "Linked" : "Link"}
+                Remove
               </button>
             </div>
-            {index >= 0 && <Field label="Exit name">
+            {!target && <div className="a-field__err" role="alert">This scene no longer exists. Remove this exit.</div>}
+            <Field label="Exit name">
               <TextInput value={scene.transitions[index].name} onChange={value => set(`transitions.${index}.name`, value)} />
-            </Field>}
+            </Field>
+            <details className="a-disclosure"><summary>Script call</summary><code className="a-mono">ctx.goToScene({JSON.stringify(transition.name)})</code></details>
             </div>;
           })}
-        </Section>
+          {unlinked.length > 0 && <Field label="Destination">
+            <Select value="" onChange={id => { if (id) onAddTransition(id); }} placeholder="Add exit to…"
+              options={unlinked.map(s => ({ value: s.id, label: s.name }))} />
+          </Field>}
+        </Section>}
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 function ExportModal({ result, projectName, onClose, onReveal }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const files = useMemo(
     () => [{ filename: "main.js", content: result.main }, ...(result.sceneFiles || []), ...result.scripts],
     [result],
@@ -27,16 +28,15 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
 
   return (
     <Modal
-      title="Export"
+      title="Export game"
       onClose={onClose}
-      width={Math.min(900, window.innerWidth - 60)}
+      width={Math.min(detailsOpen ? 900 : 560, window.innerWidth - 32)}
+      initialFocus=".a-btn--primary"
       footer={
         <>
           <span className="a-grow a-dim" style={{ fontSize: 10.5, alignSelf: "center" }}>
-            Unzip the game folder and add your console player (athena.elf).
+            Unzip the folder and add your console player (athena.elf).
           </span>
-          <button className="a-btn" onClick={copy}>{copied ? "Copied" : `Copy ${current.filename}`}</button>
-
           <button className="a-btn a-btn--primary" disabled={errors.length > 0} onClick={downloadAll}>
             Download game folder
           </button>
@@ -48,6 +48,11 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
         </>
       }
     >
+      <section className="a-export-summary" aria-labelledby="export-summary-title">
+        <h2 id="export-summary-title">{errors.length ? `Fix ${errors.length} error${errors.length > 1 ? "s" : ""} to export` : "Your game is ready"}</h2>
+        <p className="a-export-summary__name">{projectName}</p>
+        <p className="a-dim">{result.sceneCount || 1} scene{result.sceneCount > 1 ? "s" : ""} · {(result.assets || []).length} assets included</p>
+      </section>
       {(errors.length > 0 || warnings.length > 0) && (
         <div style={{ marginBottom: 11 }}>
           {errors.map((d, i) => (
@@ -70,7 +75,11 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
         </div>
       )}
 
-      <details className="a-disclosure"><summary>Code and export details</summary>
+      <details className="a-disclosure" onToggle={(e) => setDetailsOpen(e.currentTarget.open)}><summary>Code and export details</summary>
+      <div className="a-row" style={{ marginBottom: 12 }}>
+        <span className="a-grow a-dim">Generated files</span>
+        <button className="a-btn a-btn--ghost" onClick={copy}>{copied ? "Copied" : `Copy ${current.filename}`}</button>
+      </div>
       <div className="a-row" style={{ gap: 12, marginBottom: 9, flexWrap: "wrap" }}>
         {Object.entries({
           Objects: result.stats.models,
@@ -105,7 +114,6 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
         {current.content}
       </pre>
       </details>
-      <p>{result.sceneCount || 1} scene{result.sceneCount > 1 ? "s" : ""} · {(result.assets||[]).length} assets included.</p>
       {errors.length > 0 && <p role="status">Fix the errors above, then export again.</p>}
       {shareError && <p role="status">{shareError}</p>}
     </Modal>

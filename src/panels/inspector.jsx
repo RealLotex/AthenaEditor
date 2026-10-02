@@ -21,20 +21,28 @@ function Inspector({
   showAdvanced,
   onUseAsset,
   onEditTerrain,
+  onEditScene,
 }) {
   const [openSections, setOpenSections] = useState({});
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState("");
+  const selectionKey = selectedAsset?.id || selectedUI?.id || activeObject?.id || selection.map(o => o.id).join(":");
+
+  useEffect(() => {
+    setFilter("");
+    setAdding(false);
+  }, [selectionKey]);
 
   const toggle = (k) => setOpenSections((s) => ({ ...s, [k]: s[k] === false }));
   const isOpen = (k) => openSections[k] !== false;
 
   if (selectedAsset) {
-    return <AssetInspector asset={selectedAsset} onUse={onUseAsset} />;
+    return <AssetInspector key={selectedAsset.id || selectedAsset.name} asset={selectedAsset} onUse={onUseAsset} />;
   }
   if (selectedUI) {
     return (
       <UIElementInspector
+        key={selectedUI.id}
         el={selectedUI}
         files={files}
         onUpdate={onUpdateUI}
@@ -50,6 +58,7 @@ function Inspector({
         scene={scene}
         selection={selection}
         files={files}
+        problems={problems}
         showAdvanced={showAdvanced}
         onUpdateComponent={onUpdateComponent}
         onAddComponent={onAddComponent}
@@ -62,7 +71,10 @@ function Inspector({
     return (
       <>
         <PanelHeader title="Properties" />
-        <Empty>Select an object to edit it.</Empty>
+        <Empty>Select an object in the scene.</Empty>
+        {onEditScene && <div style={{ padding: "0 12px" }}>
+          <button className="a-btn a-btn--wide" onClick={onEditScene}>Scene settings</button>
+        </div>}
       </>
     );
   }
@@ -72,13 +84,18 @@ function Inspector({
     objProblems.filter((p) => p.component === key).map((p) => ({
       level: p.level,
       msg: p.message,
+      field: p.field,
     }));
 
-  const keys = COMPONENT_KEYS.filter((k) => obj.components[k]);
-  const shown = filter.trim()
+  const keys = COMPONENT_KEYS.filter((k) => obj.components?.[k]);
+  // A query must never keep filtering after its control disappears.
+  const canFilter = keys.length > 4;
+  const query = canFilter ? filter.trim() : "";
+  const shown = query
     ? keys.filter((k) =>
-      fuzzyScore(filter, COMPONENTS[k].label) > 0 ||
-      (COMPONENTS[k].fields || []).some((f) => fuzzyScore(filter, f.label) > 0)
+      issuesFor(k).some(i => i.level === "error") ||
+      fuzzyScore(query, COMPONENTS[k].label) > 0 ||
+      (COMPONENTS[k].fields || []).some((f) => fuzzyScore(query, f.label) > 0)
     )
     : keys;
 
@@ -86,7 +103,7 @@ function Inspector({
     <>
       <PanelHeader title="Properties" />
 
-      <div className="a-scroll">
+      <div className="a-scroll" key={obj.id}>
         {/* header */}
         <div
           style={{
@@ -95,15 +112,13 @@ function Inspector({
             background: "var(--bg-2)",
           }}
         >
-          <div className="a-row" style={{ marginBottom: 6 }}>
-            <span style={{ color: objColor(obj), fontSize: 15 }}>
-              {objIcon(obj)}
-            </span>
+          <Field label="Name">
             <TextInput
+              key={obj.id}
               value={obj.name}
               onChange={(v) => onRenameObject(obj.id, v)}
             />
-          </div>
+          </Field>
           {obj._prefabId && (
             <p className="a-dim">
               Linked prefab · update or revert from Edit → Prefabs
@@ -130,7 +145,11 @@ function Inspector({
           </details>
         </div>
 
-        {keys.length > 4 && (
+        {objProblems.some(p => !p.component) && <div style={{ padding: "0 12px" }}>
+          <ComponentIssues issues={objProblems.filter(p => !p.component).map(p => ({ level: p.level, msg: p.message }))} />
+        </div>}
+
+        {canFilter && (
           <div
             style={{
               padding: "5px 6px",
@@ -139,6 +158,7 @@ function Inspector({
           >
             <input
               className="a-input"
+              aria-label="Find a property"
               placeholder="Filter properties…"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -160,7 +180,7 @@ function Inspector({
               title={def.label}
               icon={def.icon}
               color={def.color}
-              open={isOpen(key)}
+              open={!!query || worst === "err" || isOpen(key)}
               onToggle={() => toggle(key)}
               actions={
                 <>
@@ -173,6 +193,7 @@ function Inspector({
                     <button
                       className="a-btn a-btn--icon a-btn--sm a-btn--ghost a-btn--danger"
                       title={`Remove ${def.label}`}
+                      aria-label={`Remove ${def.label}`}
                       onClick={() => onRemoveComponent(obj.id, key)}
                     >
                       ✕
@@ -188,7 +209,7 @@ function Inspector({
                 scene={scene}
                 files={files}
                 issues={issues}
-                alwaysAdvanced={showAdvanced}
+                alwaysAdvanced={showAdvanced || !!query}
                 onChange={(field, value, phase) =>
                   onUpdateComponent(obj.id, key, field, value, phase)}
               />
@@ -197,13 +218,13 @@ function Inspector({
           );
         })}
 
-        {shown.length === 0 && filter && (
-          <Empty>No property matches “{filter}”.</Empty>
+        {shown.length === 0 && query && (
+          <Empty>No property matches “{query}”.</Empty>
         )}
 
         <div style={{ padding: 8 }}>
           <button className="a-btn a-btn--wide" onClick={() => setAdding(true)}>
-            + Add Component
+            Add component
           </button>
         </div>
       </div>
@@ -221,20 +242,17 @@ function Inspector({
 
 /** Edits every selected object at once, for fields they have in common. */
 function MultiInspector(
-  { scene, selection, files, onUpdateComponent, onAddComponent, showAdvanced },
+  { scene, selection, files, onUpdateComponent, onAddComponent, showAdvanced, problems },
 ) {
   const shared = COMPONENT_KEYS.filter((k) =>
-    selection.every((o) => o.components[k])
+    selection.every((o) => o.components?.[k])
   );
   const [adding, setAdding] = useState(false);
+  const [openSections, setOpenSections] = useState({});
 
   return (
     <>
-      <PanelHeader title={`Inspector — ${selection.length} selected`}>
-        <button className="a-btn a-btn--sm" onClick={() => setAdding(true)}>
-          + Component
-        </button>
-      </PanelHeader>
+      <PanelHeader title={`${selection.length} objects selected`} />
       <div className="a-scroll">
         <div
           style={{
@@ -244,8 +262,7 @@ function MultiInspector(
           }}
         >
           <div className="a-dim" style={{ fontSize: 11, lineHeight: 1.5 }}>
-            Editing {selection.length}{" "}
-            objects. Changes apply to every selection that has the component.
+            Changes apply to all selected objects.
           </div>
         </div>
 
@@ -256,14 +273,19 @@ function MultiInspector(
         {shared.map((key) => {
           const def = COMPONENTS[key];
           const first = selection[0].components[key];
+          const mixedFields = (def.fields || []).filter(f =>
+            selection.some(o => JSON.stringify(readPath(o.components[key], f.key)) !== JSON.stringify(readPath(first, f.key)))
+          ).map(f => f.key);
+          const issues = (problems || []).filter(p => p.component === key && selection.some(o => o.id === p.objectId))
+            .map(p => ({ level: p.level, msg: `${p.objectName || "Object"}: ${p.message}`, field: p.field }));
           return (
             <Section
               key={key}
-              title={`${def.label} (all)`}
+              title={def.label}
               icon={def.icon}
               color={def.color}
-              open
-              onToggle={() => {}}
+              open={issues.some(i => i.level === "error") || openSections[key] !== false}
+              onToggle={() => setOpenSections(s => ({ ...s, [key]: s[key] === false }))}
             >
               <ComponentFields
                 compKey={key}
@@ -272,26 +294,40 @@ function MultiInspector(
                 scene={scene}
                 files={files}
                 alwaysAdvanced={showAdvanced}
-                onChange={(field, value, phase) => {
+                mixedFields={mixedFields}
+                issues={issues}
+                onChange={(field, value, phase, axes) => {
+                  const fieldDef = def.fields.find(f => f.key === field);
+                  const vector = fieldDef && ["vec3", "vec2xz"].includes(fieldDef.type);
+                  const previous = readPath(first, field);
+                  const changedAxes = vector && value && typeof value === "object"
+                    ? axes || Object.keys(value).filter(axis => value[axis] !== previous?.[axis])
+                    : null;
                   for (const o of selection) {
-                    onUpdateComponent(o.id, key, field, value, phase);
+                    // An X edit must not replace another object's Y and Z
+                    // with the first object's values.
+                    const next = changedAxes
+                      ? { ...readPath(o.components[key], field), ...Object.fromEntries(changedAxes.map(axis => [axis, value[axis]])) }
+                      : value;
+                    onUpdateComponent(o.id, key, field, next, phase);
                   }
                 }}
               />
+              <ComponentIssues issues={issues} />
             </Section>
           );
         })}
 
         <div style={{ padding: 8 }}>
           <button className="a-btn a-btn--wide" onClick={() => setAdding(true)}>
-            + Add To All
+            Add component to all
           </button>
         </div>
       </div>
 
       {adding && (
         <AddComponentMenu
-          obj={{ components: {}, id: null }}
+          obj={{ components: Object.fromEntries(shared.map(k => [k, true])), id: null }}
           onAdd={(k) => {
             for (const o of selection) onAddComponent(o.id, k);
           }}
@@ -344,36 +380,30 @@ function AssetInspector({ asset, onUse }) {
               : "Texture tools…"}
           </button>
         )}
-        <Field label="Type">
-          <div className="a-mono a-dim">{asset.cat}</div>
-        </Field>
-        <Field label="Size">
-          <div className="a-mono a-dim">{fmtBytes(asset.size)}</div>
-        </Field>
-        <Field label="Folder">
-          <div className="a-mono a-dim">{asset.folder || "—"}</div>
-        </Field>
-        {asset.bounds && (
-          <Field
-            label="Bounds"
-            help="Mesh extents — used by Rigidbody auto-fit."
-          >
+        {asset.error && <div className="a-field__err" role="alert">{asset.error}</div>}
+        <details className="a-disclosure">
+          <summary>File details</summary>
+          <Field label="Type">
+            <div className="a-dim">{{ models: "Model", textures: "Image", scripts: "Script", sounds: "Audio", fonts: "Font" }[asset.cat] || asset.cat}</div>
+          </Field>
+          <Field label="Size"><div className="a-dim">{fmtBytes(asset.size)}</div></Field>
+          <Field label="Folder"><div className="a-mono a-dim">{asset.folder || "—"}</div></Field>
+          {asset.bounds && <Field label="Dimensions">
             <div className="a-mono a-dim">
               {["x", "y", "z"].map((a) => asset.bounds.size[a].toFixed(2)).join(
                 " x ",
               )}
             </div>
-          </Field>
-        )}
-        {asset.error && <div className="a-field__err">{asset.error}</div>}
+          </Field>}
+        </details>
         {asset.cat === "scripts" && asset.content && (
-          <>
-            <div className="a-sec__group">Preview</div>
+          <details className="a-disclosure">
+            <summary>Preview script</summary>
             <pre
               className="a-code"
               style={{ maxHeight: 300 }}
             >{asset.content.slice(0, 4000)}</pre>
-          </>
+          </details>
         )}
       </div>
     </>

@@ -136,6 +136,8 @@ function App() {
   const [playing, setPlaying] = useState(false);
   const [playBusy, setPlayBusy] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteScope, setPaletteScope] = useState(null);
+  const openAddPalette = (scope = "objects") => { setPaletteScope(scope); setPaletteOpen(true); };
   const [dirty, setDirty] = useState(false);
   // Mirrored in a ref because adoptProject is an async callback that must not
   // re-create itself on every keystroke — it would tear the modal down.
@@ -255,9 +257,11 @@ function App() {
       setSelectedIds([id]);
       setActiveId(id);
       setSelectedAssetId(null);
+      setSelectedUIId(null);
+      focusPanel("inspector");
       setMainTab("viewport");
     }
-  }, [edit]);
+  }, [edit, focusPanel]);
 
   const undo = useCallback(() => {
     const restored = historyUndo(historyRef.current, projectRef.current);
@@ -416,6 +420,7 @@ function App() {
       setActiveId(null);
       return;
     }
+    focusPanel("inspector");
     if (opts.additive) {
       setSelectedIds((
         prev,
@@ -433,7 +438,7 @@ function App() {
       setSelectedIds([id]);
       setActiveId(id);
     }
-  }, [activeId, scene]);
+  }, [activeId, scene, focusPanel]);
 
   const reveal = useCallback((objectId, sceneId) => {
     if (!objectId && !sceneId) return;
@@ -477,11 +482,10 @@ function App() {
       newId = o.id;
     });
     if (newId) {
-      setSelectedIds([newId]);
-      setActiveId(newId);
+      select(newId);
     }
     toast.ok(`Added ${name}`);
-  }, [edit, toast]);
+  }, [edit, toast, select]);
 
   const deleteSelection = useCallback(() => {
     if (selectedUIId) {
@@ -1843,8 +1847,7 @@ function App() {
           edit((p, sc) => {
             id = addPrototype(p, sc, kind, files).id;
           });
-          setSelectedIds([id]);
-          setActiveId(id);
+          select(id);
           setMainTab("viewport");
         },
       });
@@ -2090,6 +2093,7 @@ function App() {
     saveProject,
     runExport,
     focusPanel,
+    select,
     setMainTab,
     setBottomTab,
     setLayoutPreset,
@@ -2137,8 +2141,10 @@ function App() {
 
       const combo = keyComboOf(e);
 
+      if ((modalRef.current || el?.closest?.('[role="dialog"]')) && combo !== "Ctrl+S") return;
       if (combo === "Ctrl+K") {
         e.preventDefault();
+        setPaletteScope(null);
         setPaletteOpen(true);
         return;
       }
@@ -2146,6 +2152,7 @@ function App() {
         setPaletteOpen(false);
         return;
       }
+      if (paletteOpen) return;
 
       // A dialog is a modal context: "every command is always available" is
       // the wrong rule there. Delete used to delete the objects behind an open
@@ -2153,8 +2160,6 @@ function App() {
       // under it — Modal only intercepts Escape and Tab, and it focuses the ✕
       // button, which is not a text field, so bare keys passed straight
       // through. Escape is handled by Modal itself.
-      if (modalRef.current && combo !== "Ctrl+S") return;
-
       const bare = !e.ctrlKey && !e.metaKey && !e.altKey;
 
       // Bare keys never fire from a text field...
@@ -2194,20 +2199,19 @@ function App() {
   const panelContents = {
     terrain: <TerrainWorkspace key={project.id} scene={scene} object={activeObject} files={files}
       atlasName={terrainAtlasName(project,activeId,diskFiles)} onCreate={createTerrain}
-      onSelect={id=>{setSelectedIds([id]);setActiveId(id);}}
+      onSelect={id => select(id)}
       onApply={(id,data,atlas)=>edit(p=>applyEditorTerrain(p,id,data,diskFiles,atlas))}/>,
     viewport: (
       <>
         <SceneTools
-          onSkybox={() => commands.find(c => c.id === "view.skybox")?.run()}
+          onSceneSettings={() => focusPanel("sceneSettings")}
+          onAdd={() => openAddPalette()}
+          onFrame={() => commands.find(c => c.id === (selectedIds.length ? "view.frame" : "view.frameall"))?.run()}
+          hasSelection={selectedIds.length > 0}
           prefs={prefs}
           gizmoMode={gizmoMode}
           onMode={setGizmoMode}
           onPref={setPref}
-          onExport={runExport}
-          onRun={runGame}
-          playBusy={playBusy}
-          playing={playing}
         />
         <Viewport
           scene={scene}
@@ -2305,7 +2309,7 @@ function App() {
         onReparent={reparent}
         onDelete={deleteObject}
         onDeleteUI={deleteUIObject}
-        onAdd={() => setPaletteOpen(true)}
+        onAdd={() => openAddPalette()}
         selectedUIId={selectedUIId}
         onSelectUI={(id) => {
           setSelectedUIId(id);
@@ -2313,7 +2317,7 @@ function App() {
           setActiveId(null);
           setMainTab("hud");
         }}
-        onAddUI={() => setPaletteOpen(true)}
+        onAddUI={() => openAddPalette("hud")}
         onToggleUIVisible={(id) =>
           edit((p, sc) => {
             const el = sc.uiElements.find((x) => x.id === id);
@@ -2323,6 +2327,7 @@ function App() {
     ),
     inspector: (
       <Inspector
+        onEditScene={() => focusPanel("sceneSettings")}
         onEditTerrain={()=>setMainTab("terrain")}
         onUseAsset={useAsset}
         showAdvanced={prefs.showAdvanced}
@@ -2378,6 +2383,7 @@ function App() {
     ),
     sceneSettings: (
       <SceneSettings
+        onSelectObject={(id) => { select(id, {}); focusPanel("inspector"); }}
         showAdvanced={prefs.showAdvanced}
         scene={scene}
         project={project}
@@ -2447,6 +2453,7 @@ function App() {
           onSelectAsset={(id) => {
             setSelectedAssetId(id);
             if (mainTab === "uv" || mainTab === "scripts") return;
+            focusPanel("inspector");
             setSelectedIds([]);
             setActiveId(null);
             setSelectedUIId(null);
@@ -2472,8 +2479,7 @@ function App() {
               id = copy.id;
             });
             if (id) {
-              setSelectedIds([id]);
-              setActiveId(id);
+              select(id);
             }
           }}
           onDeletePrefab={(pid) =>
@@ -2517,6 +2523,7 @@ function App() {
           onSelectAsset={(id) => {
             setSelectedAssetId(id);
             if (mainTab === "uv" || mainTab === "scripts") return;
+            focusPanel("inspector");
             setSelectedIds([]);
             setActiveId(null);
             setSelectedUIId(null);
@@ -2542,8 +2549,7 @@ function App() {
               id = copy.id;
             });
             if (id) {
-              setSelectedIds([id]);
-              setActiveId(id);
+              select(id);
             }
           }}
           onDeletePrefab={(pid) =>
@@ -2582,6 +2588,9 @@ function App() {
           scene={scene}
           commands={commands}
           dirty={dirty}
+          projectFileName={projectFileName}
+          playBusy={playBusy}
+          playing={playing}
           onSwitchScene={(id) => {
             edit((p) => {
               p.activeSceneId = id;
@@ -2654,6 +2663,7 @@ function App() {
         {paletteOpen && (
           <CommandPalette
             commands={commands}
+            scope={paletteScope}
             onClose={() => setPaletteOpen(false)}
           />
         )}
@@ -2682,17 +2692,12 @@ function App() {
           <ConfirmModal
             title="Replace the project you are working on?"
             danger
-            confirmLabel="Replace it"
+            confirmLabel="Discard changes"
+            onSave={saveProject}
             message={
               <>
-                <p style={{ marginBottom: 8 }}>
-                  You have unsaved changes. Loading <b>{modal.name}</b>{" "}
-                  replaces the whole project and clears the undo history — there
-                  is no way back to what is open now.
-                </p>
-                <p className="a-dim">
-                  Cancel, save with Ctrl+S, and try again if you want to keep
-                  it.
+                <p>
+                  Save your changes before opening <b>{modal.name}</b>.
                 </p>
               </>
             }
@@ -2797,8 +2802,7 @@ function App() {
               setFiles([]);
               resetProjectDestination();
               setPref({ showOverlays: false });
-              setMainTab("viewport");
-              setRightTab("inspector");
+              setLayoutPreset("Focus");
               setSelectedPrefabId(null);
               toast.ok(`Created ${next.name}`);
               return true;

@@ -25,21 +25,25 @@ function fuzzyScore(needle, haystack) {
   return score;
 }
 
-function CommandPalette({ commands, onClose }) {
+function CommandPalette({ commands, scope, onClose }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  const [showAll, setShowAll] = useState(false);
   const listRef = useRef(null);
 
   const results = useMemo(() => {
-    const usable = commands.filter((c) => !c.hidden && (!c.enabled || c.enabled()));
-    if (!query.trim()) return usable.slice(0, 40);
+    const usable = commands.filter((c) => !c.hidden && (!c.enabled || c.enabled()) &&
+      (!scope || (scope === "hud" ? c.id.startsWith("add.ui.") : c.group === "Add" && !c.id.startsWith("add.ui."))));
+    if (!query.trim()) return (scope === "objects" && !showAll
+      ? usable.filter(c => ["add.primitive.cube", "add.primitive.plane", "add.primitive.sphere", "add.terrain", "add.model", "add.light", "add.camera"].includes(c.id))
+      : usable).slice(0, 40);
     return usable
       .map((c) => ({ c, s: Math.max(fuzzyScore(query, c.title), fuzzyScore(query, c.group || "")) }))
       .filter((r) => r.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 40)
       .map((r) => r.c);
-  }, [commands, query]);
+  }, [commands, query, scope, showAll]);
 
   useEffect(() => { setIndex(0); }, [query]);
   useEffect(() => {
@@ -49,12 +53,12 @@ function CommandPalette({ commands, onClose }) {
   const run = (cmd) => { onClose(); cmd.run(); };
 
   return (
-    <div className="a-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="a-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <Modal title={scope ? (scope === "hud" ? "Add HUD element" : "Add object") : "Command palette"}
+      onClose={onClose} width={560} initialFocus=".a-palette__input">
         <input
           className="a-palette__input"
-          autoFocus
-          placeholder="Type a command…"
+          aria-label={scope ? "Find an object to add" : "Find a command"}
+          placeholder={scope ? "Find an object…" : "Type a command…"}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -65,7 +69,7 @@ function CommandPalette({ commands, onClose }) {
           }}
         />
         <div className="a-palette__list" ref={listRef}>
-          {results.length === 0 && <div className="a-palette__empty">No command matches “{query}”.</div>}
+          {results.length === 0 && <div className="a-palette__empty">No {scope ? "object" : "command"} matches “{query}”.</div>}
           {results.map((c, i) => (
             <button
               key={c.id}
@@ -76,15 +80,15 @@ function CommandPalette({ commands, onClose }) {
             >
               <span style={{ width: 16, textAlign: "center", color: c.color }}>{c.icon || "›"}</span>
               <span>
-                {c.group && <span className="a-dim">{c.group} ▸ </span>}
+                {!scope && c.group && <span className="a-dim">{c.group} ▸ </span>}
                 {c.title}
               </span>
               {c.keys && <span className="a-btn__key">{c.keys}</span>}
             </button>
           ))}
         </div>
-      </div>
-    </div>
+        {scope === "objects" && !query.trim() && !showAll && <button className="a-btn a-btn--ghost a-palette__more" onClick={() => { setShowAll(true); setIndex(0); }}>More objects…</button>}
+    </Modal>
   );
 }
 
