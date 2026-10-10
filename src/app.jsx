@@ -9,18 +9,6 @@
 //  for undo and tags the gesture so a drag collapses to one step.
 // ═══════════════════════════════════════════════════════════════════════
 
-// Chords that mean the same thing whether or not the cursor is in a text
-// field. Everything else — Ctrl+A/C/V/X/Z/Y and every bare key — belongs to
-// the field while you are typing in it.
-const TYPING_SAFE_CHORDS = new Set([
-  "Ctrl+S",
-  "Ctrl+Shift+S",
-  "Ctrl+E",
-  "Ctrl+K",
-  "F1",
-  "F5",
-]);
-
 const DEFAULT_PREFS = {
   theme: "dark",
   showOverlays: false,
@@ -32,6 +20,10 @@ const DEFAULT_PREFS = {
   snap: false,
   snapSize: 0.5,
   gizmoSpace: "world",
+  viewportFov: 100,
+  uiAnimations: false,
+  mouseControls: DEFAULT_EDITOR_MOUSE,
+  hotkeys: {},
   lang: null, // null = follow the browser the first time
 };
 
@@ -75,9 +67,10 @@ function App() {
 
   const [diskFiles, setFiles] = useState([]);
   const files = useMemo(() => editorAssets(project, diskFiles), [
-    project,
+    project.assets, project.scripts, project.hiddenAssets,
     diskFiles,
   ]);
+  const filesRef=useRef(files);filesRef.current=files;
   const [loadingAssets, setLoadingAssets] = useState(false);
   // Linked project folder — Export and Save write straight into it.
   const folderRef = useRef(null);
@@ -137,6 +130,10 @@ function App() {
   modalRef.current = modal;
   const [exportResult, setExportResult] = useState(null);
   const [playing, setPlaying] = useState(false);
+  const [cinematicPreview, setCinematicPreview] = useState(null);
+  const [cinematicTime, setCinematicTime] = useState(0);
+  const [timelineSelection,setTimelineSelection]=useState(null);
+  useEffect(()=>setTimelineSelection(null),[selectedIds,selectedUIId,selectedAssetId,project.activeSceneId]);
   const [playBusy, setPlayBusy] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteScope, setPaletteScope] = useState(null);
@@ -151,12 +148,14 @@ function App() {
   const [prefs, setPrefs] = useState(() => {
     const p = loadPrefs(DEFAULT_PREFS);
     if (!p.lang) p.lang = detectLang();
+    p.mouseControls = normalizeEditorMouse(p.mouseControls);
+    p.hotkeys = normalizeEditorHotkeys(p.hotkeys);
     p.layout = p.layout ? normalizeDockLayout(p.layout) : layoutPreset("Focus");
     return p;
   });
   const [mainTab, setMainTabState] = useState(() =>
     dockGroups(prefs.layout.tree).find((g) =>
-      ["viewport", "hud", "uv", "scripts", "terrain"].includes(g.active)
+      ["viewport", "hud", "uv", "scripts", "terrain", "timeline", "game", "events", "environment"].includes(g.active)
     )?.active || "viewport"
   );
   const setPref = useCallback(
@@ -164,7 +163,8 @@ function App() {
     [],
   );
   const focusPanel = useCallback((id) => {
-    if (["viewport", "hud", "uv", "scripts", "terrain"].includes(id)) setMainTabState(id);
+    id=canonicalDockPanel(id);
+    if (["viewport", "hud", "uv", "scripts", "terrain", "timeline", "game", "events", "environment"].includes(id)) setMainTabState(id);
     setPrefs((p) => ({ ...p, layout: activateDockPanel(p.layout, id) }));
   }, []);
   const setMainTab = focusPanel;
@@ -191,6 +191,7 @@ function App() {
   useEffect(() => {
     savePrefs(prefs);
     applyTheme(prefs.theme);
+    document.documentElement.lang=getLang();
   }, [prefs]);
 
   const [toasts, toast, dismissToast] = useToasts();
@@ -218,9 +219,10 @@ function App() {
   // several edits land in one tick.
   const edit = useCallback((mutate, tag = null) => {
     const prev = projectRef.current;
-    const next = deepClone(prev);
-    mutate(next, activeScene(next));
-    if (JSON.stringify(next) === JSON.stringify(prev)) {
+    const draft = cloneProjectDraft(prev);
+    mutate(draft, activeScene(draft));
+    const next = reuseProjectBranches(prev, draft);
+    if (next === prev) {
       if (tag === null) historySeal(historyRef.current);
       return;
     }
@@ -229,6 +231,24 @@ function App() {
     setProject(next);
     setDirty(true);
   }, []);
+
+  // Refresh generated skies once per saved layout. Authored/edited tiles are
+  // excluded, and a late conversion cannot overwrite a new scene or gesture.
+  const skyRefreshRef = useRef(new Set());
+  useEffect(() => {
+    for (const target of project.scenes) {
+      if (!skyboxNeedsSourceRefresh(target, files)) continue;
+      const settings = JSON.stringify(target.skybox), key = `${project.id}:${target.id}:${settings}`;
+      if (skyRefreshRef.current.has(key)) continue;
+      skyRefreshRef.current.add(key);
+      const session = projectSessionRef.current, asset = files.find(f => f.cat === "textures" && f.name === target.skybox.texture);
+      prepareSkyboxLayout(asset, target.skybox).then(prepared => {
+        const current = projectRef.current.scenes.find(s => s.id === target.id);
+        if (session !== projectSessionRef.current || !current || JSON.stringify(current.skybox) !== settings || !skyboxNeedsSourceRefresh(current, filesRef.current)) return;
+        edit(p => { const sc = p.scenes.find(s => s.id === target.id); applySkybox(p, sc, sc.skybox, prepared, filesRef.current); });
+      }).catch(error => toast.warn("Could not refresh the sky original", { sub: error.message }));
+    }
+  }, [project.id, project.scenes, files, edit, toast]);
 
   const createTerrain = async (width=32,depth=32) => {
     const session=projectSessionRef.current, sceneId=activeScene(projectRef.current).id;
@@ -308,23 +328,34 @@ function App() {
   // it is written regardless.
   const lastSaveRef = useRef(Date.now());
   const quotaWarnedRef = useRef(false);
+  const autosavePendingRef = useRef(false);
 
-  const runAutosave = useCallback(() => {
-    const r = saveAutosave(projectRef.current);
-    if (r.ok) {
-      lastSaveRef.current = Date.now();
-      setAutosavedAt(lastSaveRef.current);
-      return;
+  const runAutosave = useCallback(async () => {
+    if (autosavePendingRef.current) return;
+    const snapshot = projectRef.current, session = projectSessionRef.current;
+    autosavePendingRef.current = true;
+    try {
+      await prepareRecoveryPayloads(snapshot).catch(() => {}); // Synchronous saving remains available if a worker fails.
+      if (session !== projectSessionRef.current) return;
+      const r = saveAutosave(snapshot);
+      if (r.ok) {
+        lastSaveRef.current = Date.now();
+        setAutosavedAt(lastSaveRef.current);
+        return;
+      }
+      // Once per session. Repeating it every four seconds would be its own bug.
+      if (quotaWarnedRef.current) return;
+      quotaWarnedRef.current = true;
+      toast.error("Autosave could not write", {
+        sub: r.reason === "quota"
+          ? "The browser's storage is full. Save to a file (Ctrl+S) — nothing is being kept for you."
+          : `Your work is not being autosaved: ${r.message}`,
+        ms: 0,
+      });
+    } finally {
+      autosavePendingRef.current = false;
+      if (projectRef.current !== snapshot) setTimeout(runAutosave, 0);
     }
-    // Once per session. Repeating it every four seconds would be its own bug.
-    if (quotaWarnedRef.current) return;
-    quotaWarnedRef.current = true;
-    toast.error("Autosave could not write", {
-      sub: r.reason === "quota"
-        ? "The browser's storage is full. Save to a file (Ctrl+S) — nothing is being kept for you."
-        : `Your work is not being autosaved: ${r.message}`,
-      ms: 0,
-    });
   }, [toast]);
 
   useEffect(() => {
@@ -383,7 +414,7 @@ function App() {
         "Download the raw copy now — the next edit replaces it.",
       ms: 0,
       action: {
-        label: "Download it",
+        label: tr("Download it"),
         run: () => {
           const blob = new Blob([bad.raw], { type: "application/json" });
           const a = document.createElement("a");
@@ -416,7 +447,13 @@ function App() {
   // and pointing at the real cause.
   const problems = useMemo(() => {
     try {
-      return validateScene(scene, files, project);
+      const result=validateScene(scene, files, project);
+      result.push(...prefabInheritanceProblems(project).map(message=>({level:'error',component:'prefabs',message})));
+      for(const ref of missingAssetReferences(project,files)) {
+        if(result.some(p=>p.objectId===ref.objectId&&p.message.includes(ref.name)))continue;
+        result.push({level:'warn',message:`Missing asset "${ref.name}" — ${ref.label}`,sceneId:ref.sceneId,objectId:ref.objectId,component:ref.component||'assets'});
+      }
+      return result;
     } catch (e) {
       console.error("[validate]", e);
       return [{
@@ -436,6 +473,13 @@ function App() {
       return;
     }
     focusPanel("inspector");
+    // Reveal selection without recording purely navigational tree expansion.
+    setProject(prev=>{
+      const sc=activeScene(prev),parents=[];walk(sc.objects,(o,path)=>{if(o.id===id)parents.push(...path.filter(p=>p.expanded===false).map(p=>p.id));});
+      if(!parents.length)return prev;
+      const draft=cloneProjectDraft(prev);for(const parent of parents)mutObj(activeScene(draft).objects,parent,o=>o.expanded=true);
+      const next=reuseProjectBranches(prev,draft);projectRef.current=next;return next;
+    });
     if (opts.additive) {
       setSelectedIds((
         prev,
@@ -518,7 +562,7 @@ function App() {
     setSelectedIds([]);
     setActiveId(null);
     toast.info(`Deleted ${n} object${n > 1 ? "s" : ""}`, {
-      action: { label: "Undo", run: undo },
+      action: { label: tr("Undo"), run: undo },
     });
   }, [selectedIds, selectedUIId, edit, toast, undo]);
 
@@ -536,7 +580,7 @@ function App() {
       setActiveId(null);
     }
     toast.info(`Deleted ${ids.length} object${ids.length === 1 ? "" : "s"}`, {
-      action: { label: "Undo", run: undo },
+      action: { label: tr("Undo"), run: undo },
     });
   }, [selectedIds, activeId, edit, toast, undo]);
 
@@ -545,7 +589,7 @@ function App() {
       sc.uiElements = sc.uiElements.filter((el) => el.id !== id);
     });
     if (selectedUIId === id) setSelectedUIId(null);
-    toast.info("Deleted HUD element", { action: { label: "Undo", run: undo } });
+    toast.info("Deleted HUD element", { action: { label: tr("Undo"), run: undo } });
   }, [selectedUIId, edit, toast, undo]);
 
   const duplicateSelection = useCallback(() => {
@@ -601,14 +645,26 @@ function App() {
     }, null);
   }, [edit]);
 
-  const updateComponent = useCallback((objId, compKey, field, value, phase) => {
+  const updateComponent = useCallback(async (objId, compKey, field, value, phase) => {
+    let prepared=null,targetScene=null;
+    if(compKey==='water'&&field==='quality'){
+      const object=findObj(scene.objects,objId),asset=files.find(f=>f.cat==='textures'&&f.name===object?.components.model?.textureFile);
+      if(asset?.dataUrl&&!asset.waterMotion?.levels&&!asset.waterQualityLevels&&!(asset.owned&&asset.waterRevision===3&&asset.dataUrl===WATER_MOTION_DATA.frames[0].dataUrl)){
+        targetScene=scene.id;
+        try{prepared=await prepareWaterQualityLevels(asset);}catch(error){toast.error('Water texture could not be resized',{detail:error.message});return;}
+      }
+    }
     edit((p, sc) => {
+      if(targetScene&&sc.id!==targetScene)return;
       const o = findObj(sc.objects, objId);
       if (!o?.components[compKey]) return;
+      if(prepared){const current=p.assets?.find(a=>a.name===prepared.name&&a.cat==='textures');if(current&&current.dataUrl!==prepared.dataUrl)return;putProjectAsset(p,prepared);}
       // `field` may be a dotted path — see readPath/writePath in core/util.js.
       writePath(o.components[compKey], field, value);
+      if (compKey === "rigidbody" && field === "eventPreset") attachEventPreset(p, sc, o, value);
+      if (compKey === "rigidbody" && field === "collisionEvents" && value) sc.physics.enabled = true;
     }, phase === "edit" ? `comp:${objId}:${compKey}:${field}` : null);
-  }, [edit]);
+  }, [edit,scene,files]);
 
   const updateTransform = useCallback((objId, transform, phase) => {
     edit((p, sc) => {
@@ -1497,7 +1553,7 @@ function App() {
       toast.error("Could not run the game", {
         sub: e.message,
         ms: 0,
-        action: { label: "Run settings", run: () => setModal("play") },
+        action: { label: tr("Run settings"), run: () => setModal("play") },
       });
     } finally {
       setPlayBusy(false);
@@ -1541,13 +1597,13 @@ function App() {
       {
         id: "file.new",
         group: "File",
-        title: "New Project…",
+        title: tr("New Project…"),
         icon: "✦",
         keys: "Ctrl+Alt+N",
         run: () => setModal("newProject"),
       },
       {
-        id: "file.recent", group: "File", title: "Recent Projects…",
+        id: "file.recent", group: "File", title: tr("Recent Projects…"),
         run: () => setModal("recentProjects"),
       },
       // Four ways to point the editor at a folder used to be on this menu with
@@ -1575,7 +1631,7 @@ function App() {
       {
         id: "file.unlink",
         group: "File",
-        title: "Unlink Folder",
+        title: tr("Unlink Folder"),
         hidden: !folderName,
         run: unlinkFolder,
       },
@@ -1588,21 +1644,21 @@ function App() {
         id: "file.open",
         group: "File",
         icon: "▤",
-        title: "Import Assets…",
+        title: tr("Import Assets…"),
         run: pickFolder,
         hidden: isFSSupported() && !!folderName,
       },
       {
         id: "file.openjson",
         group: "File",
-        title: "Open Project File…",
+        title: tr("Open Project File…"),
         keys: "Ctrl+O",
         run: openProjectFile,
       },
       {
         id: "file.save",
         group: "File",
-        title: "Save Project",
+        title: tr("Save Project"),
         icon: "▼",
         keys: "Ctrl+S",
         run: saveProject,
@@ -1611,7 +1667,7 @@ function App() {
       {
         id: "file.saveas",
         group: "File",
-        title: "Save Project As…",
+        title: tr("Save Project As…"),
         keys: "Ctrl+Shift+S",
         run: () => saveProject({ saveAs: true }),
       },
@@ -1626,7 +1682,7 @@ function App() {
       {
         id: "file.playSettings",
         group: "File",
-        title: "Run settings…",
+        title: tr("Run settings…"),
         hidden: !canRunLocally,
         run: () => setModal("play"),
       },
@@ -1641,14 +1697,14 @@ function App() {
       {
         id: "file.exportPreview",
         group: "File",
-        title: "Export — Preview Code…",
+        title: tr("Export — Preview Code…"),
         hidden: !folderName,
         run: () => runExport({ preview: true }),
       },
       {
         id: "file.newscene",
         group: "File",
-        title: "New Scene",
+        title: tr("New Scene"),
         sep: true,
         run: () => {
           let id = null;
@@ -1677,7 +1733,7 @@ function App() {
       {
         id: "file.deletescene",
         group: "File",
-        title: "Delete Scene",
+        title: tr("Delete Scene"),
         enabled: () => project.scenes.length > 1,
         run: () => setModal("confirmDeleteScene"),
       },
@@ -1685,7 +1741,7 @@ function App() {
       {
         id: "edit.undo",
         group: "Edit",
-        title: "Undo",
+        title: tr("Undo"),
         icon: "↶",
         keys: "Ctrl+Z",
         run: undo,
@@ -1694,7 +1750,7 @@ function App() {
       {
         id: "edit.redo",
         group: "Edit",
-        title: "Redo",
+        title: tr("Redo"),
         icon: "↷",
         keys: "Ctrl+Shift+Z",
         run: redo,
@@ -1703,7 +1759,7 @@ function App() {
       {
         id: "edit.duplicate",
         group: "Edit",
-        title: "Duplicate",
+        title: tr("Duplicate"),
         keys: "Ctrl+D",
         sep: true,
         enabled: () => selection.length > 0 || !!selectedUI,
@@ -1712,7 +1768,7 @@ function App() {
       {
         id: "edit.copy",
         group: "Edit",
-        title: "Copy",
+        title: tr("Copy"),
         keys: "Ctrl+C",
         enabled: () => selection.length > 0 || !!selectedUI,
         run: () => copySelection(),
@@ -1720,13 +1776,13 @@ function App() {
       {
         id: "edit.paste",
         group: "Edit",
-        title: "Paste",
+        title: tr("Paste"),
         keys: "Ctrl+V",
         enabled: () => !!actionWindow().navigator?.clipboard || clipboardItemCount(clipboardRef.current) > 0,
         run: () => actionWindow().navigator?.clipboard ? pasteSystemClipboard() : clipboardItemCount(clipboardRef.current) && pasteObjects(clipboardRef.current),
       },
       {
-        id: "edit.copyCapture", group: "Edit", title: "Copy scene capture", sep: true,
+        id: "edit.copyCapture", group: "Edit", title: tr("Copy scene capture"), sep: true,
         enabled: () => !!captureRef.current,
         run: async () => {
           try {
@@ -1739,7 +1795,7 @@ function App() {
         },
       },
       {
-        id: "file.shareCapture", group: "File", title: "Share scene capture…",
+        id: "file.shareCapture", group: "File", title: tr("Share scene capture…"),
         enabled: () => !!captureRef.current,
         run: async () => {
           try {
@@ -1751,7 +1807,7 @@ function App() {
       {
         id: "edit.delete",
         group: "Edit",
-        title: "Delete",
+        title: tr("Delete"),
         keys: "Del",
         enabled: () => selectedIds.length > 0 || !!selectedUIId,
         run: deleteSelection,
@@ -1763,7 +1819,7 @@ function App() {
         // palette still finds it.
         id: "edit.deselect",
         group: "Edit",
-        title: "Deselect All",
+        title: tr("Deselect All"),
         keys: "Escape",
         hidden: true,
         enabled: () =>
@@ -1776,7 +1832,7 @@ function App() {
       {
         id: "edit.selectall",
         group: "Edit",
-        title: "Select All",
+        title: tr("Select All"),
         keys: "Ctrl+A",
         sep: true,
         run: () => {
@@ -1788,12 +1844,20 @@ function App() {
       {
         id: "edit.prefab",
         group: "Edit",
-        title: "Save Selection as Prefab",
+        title: tr("Save Selection as Prefab"),
         enabled: () => !!activeObject,
         run: () => {
           edit((p, sc) => savePrefab(p, findObj(sc.objects, activeObject.id)));
           setBottomTab("prefabs");
           toast.ok("Prefab saved");
+        },
+      },
+      {
+        id:'edit.prefabVariant',group:'Edit',title:tr("Save Selection as Prefab Variant"),
+        enabled:()=>!!activeObject?._prefabId,
+        run:()=>{
+          edit((p,sc)=>createPrefabVariant(p,findObj(sc.objects,activeObject.id)));
+          setBottomTab('prefabs');toast.ok('Prefab variant saved');
         },
       },
     ];
@@ -1812,61 +1876,69 @@ function App() {
         title: `Show ${title}`,
         run: () => focusPanel(id),
       })),
+      ...Object.keys(DOCK_PANEL_ALIASES).filter(id=>id!=='projectSettings').map(id=>({
+        id:`view.panel.${id}`,title:`Show ${id}`,hidden:true,run:()=>focusPanel(id),
+      })),
       {
         id: "view.layout.reset",
         group: "View",
-        title: "Reset layout",
+        title: tr("Reset layout"),
         run: () => setLayoutPreset("Focus"),
       },
       {
         id: "tools.uv",
         group: "Tools",
-        title: "Edit UVs",
+        title: tr("Edit UVs"),
         enabled: () => !!activeObject?.components.model,
         run: () => setMainTab("uv"),
       },
       {
         id: "tools.scripts",
         group: "Tools",
-        title: "Edit Scripts",
+        title: tr("Edit Scripts"),
         run: () => setMainTab("scripts"),
       },
       {
         id: "tools.textures",
         group: "Tools",
-        title: "Texture Tools…",
+        title: tr("Texture Tools…"),
         run: () => setModal("textures"),
       },
       {
         id: "tools.bake",
         group: "Tools",
-        title: "Bake Lighting…",
+        title: tr("Bake Lighting…"),
         run: () => setModal("bake"),
       },
       {
         id: "tools.unbake",
         group: "Tools",
-        title: "Restore Original Lighting",
-        hidden: !activeObject?._lightingBake,
-        enabled: () => !!activeObject?._lightingBake,
+        title: tr("Restore Original Lighting"),
+        hidden: !activeObject?._lightingBake && !activeObject?._shadowBake,
+        enabled: () => !!activeObject?._lightingBake || !!activeObject?._shadowBake,
         run: () =>
           edit((p, sc) => {
             const obj = findObj(sc.objects, activeObject.id);
-            obj.components.model = deepClone(obj._lightingBake.model);
+            if(obj._lightingBake)obj.components.model = deepClone(obj._lightingBake.model);
+            if(obj._shadowBake){
+              if(obj._shadowBake.shadow)obj.components.shadow=deepClone(obj._shadowBake.shadow);
+              else delete obj.components.shadow;
+              delete obj._shadowBake;
+            }
             delete obj._lightingBake;
           }),
       },
       {
         id: "file.console",
         group: "File",
-        title: "Prepare Console Folder…",
+        title: tr("Prepare Console Folder…"),
         run: () => setModal("console"),
         enabled: () => isFSSupported(),
       },
       {
         id: "edit.prefabRevert",
         group: "Edit",
-        title: "Revert Prefab Instance",
+        title: tr("Revert Prefab Instance"),
         hidden: !activeObject?._prefabId,
         enabled: () =>
           !!activeObject?._prefabId &&
@@ -1881,7 +1953,7 @@ function App() {
       {
         id: "edit.prefabDetach",
         group: "Edit",
-        title: "Detach Prefab Instance",
+        title: tr("Detach Prefab Instance"),
         hidden: !activeObject?._prefabId,
         enabled: () => !!activeObject?._prefabId,
         run: () =>
@@ -1908,21 +1980,35 @@ function App() {
       });
     }
 
-    cmds.push({id:"add.terrain",group:"Add",title:"Terrain",icon:"▱",run:()=>setMainTab("terrain")});
-    cmds.push({id:"view.terrain",group:"View",title:"Terrain Editor",run:()=>setMainTab("terrain")});
-    cmds.push({id:"view.skybox",group:"View",title:"Sky",icon:"◒",run:()=>focusPanel("sceneSettings")});
+    cmds.push({id:"add.water",group:"Add",title:tr("Water"),icon:"≈",run:async()=>{
+      const target=scene.id;
+      try {
+        const assets=await prepareWaterAssets();let id;
+        edit(p=>{const sc=p.scenes.find(s=>s.id===target);if(sc)id=addWaterObject(p,sc,assets,files).id;});
+        if(id){select(id);setMainTab("viewport");}
+      } catch(error){toast.error("Water could not be created",{detail:error.message});}
+    }});
+    cmds.push({id:"add.terrain",group:"Add",title:tr("Terrain"),icon:"▱",run:()=>setMainTab("terrain")});
+    for(const preset of PARTICLE_PRESETS)cmds.push({id:'add.particles.'+preset,group:'Add',title:{bubbles:'Bubbles',splash:'Splash',fountain:'Fountain'}[preset],icon:'✧',run:async()=>{
+      const target=scene.id;try{const assets=await prepareParticleAssets(preset);let id;edit(p=>{const sc=p.scenes.find(s=>s.id===target);if(sc)id=addParticleObject(p,sc,preset,assets,files).id;});if(id){select(id);setMainTab('viewport');}}
+      catch(e){toast.error('Particles could not be created',{detail:e.message});}
+    }});
+    cmds.push({id:"view.terrain",group:"View",title:tr("Terrain Editor"),run:()=>setMainTab("terrain")});
+    cmds.push({id:"view.timeline",group:"View",title:tr("Timeline / Cinematics"),run:()=>setMainTab("timeline")});
+    cmds.push({id:"view.game",group:"View",title:tr("Game"),run:()=>setMainTab("game")});
+    cmds.push({id:"view.skybox",group:"View",title:tr("Sky"),icon:"◒",run:()=>focusPanel("sceneSettings")});
 
     // Add-object commands, generated from the registry.
     cmds.push({
       id: "add.empty",
       group: "Add",
-      title: "Empty Object",
+      title: tr("Empty Object"),
       icon: "◇",
       run: () => addObject(null),
     });
     for (const key of COMPONENT_KEYS) {
       const d = COMPONENTS[key];
-      if (d.required) continue;
+      if (d.required || key === "water" || key === "particles" || key === "reflection") continue;
       cmds.push({
         id: `add.${key}`,
         group: "Add",
@@ -1954,17 +2040,24 @@ function App() {
     }
 
     cmds.push(
+      {id:'view.lighting',group:'Tools',title:tr("Lighting"),run:()=>focusPanel('environment')},
+      {id:'view.events',group:'Tools',title:tr("Events"),run:()=>focusPanel('events')},
+      {id:'view.sceneProperties',group:'Tools',title:tr("World"),run:()=>focusPanel('sceneSettings')},
+      {id:'view.controls',group:'View',title:tr("Editor controls…"),run:()=>focusPanel('controls')},
+      {id:'view.commands',group:'View',title:tr("Find commands…"),keys:'Ctrl+K',run:()=>{setPaletteScope(null);setPaletteOpen(true);}},
+      {id:'view.panel.projectSettings',group:'File',title:tr("Project settings"),run:()=>focusPanel('projectSettings')},
+      {id:'view.animations',group:'View',title:`UI animations: ${prefs.uiAnimations?'On':'Off'}`,checked:()=>!!prefs.uiAnimations,run:()=>setPref({uiAnimations:!prefs.uiAnimations})},
       {
         id: "view.viewport",
         group: "View",
-        title: "Viewport",
+        title: tr("Viewport"),
         keys: "1",
         run: () => setMainTab("viewport"),
       },
       {
         id: "view.hud",
         group: "View",
-        title: "HUD Editor",
+        title: tr("HUD Editor"),
         keys: "2",
         run: () => setMainTab("hud"),
       },
@@ -1972,7 +2065,7 @@ function App() {
         id: "view.left",
         hidden: true,
         group: "View",
-        title: "Toggle Outliner",
+        title: tr("Toggle Outliner"),
         sep: true,
         run: () =>
           setPref({ layout: toggleDockPanel(prefs.layout, "outliner") }),
@@ -1981,7 +2074,7 @@ function App() {
         id: "view.right",
         hidden: true,
         group: "View",
-        title: "Toggle Inspector",
+        title: tr("Toggle Inspector"),
         run: () =>
           setPref({ layout: toggleDockPanel(prefs.layout, "inspector") }),
       },
@@ -1989,7 +2082,7 @@ function App() {
         id: "view.bottom",
         hidden: true,
         group: "View",
-        title: "Toggle Bottom Panel",
+        title: tr("Toggle Bottom Panel"),
         run: () => {
           const group = dockLocation(prefs.layout, "assets").group;
           if (group) {
@@ -2004,7 +2097,7 @@ function App() {
       {
         id: "view.problems",
         group: "View",
-        title: "Show Problems",
+        title: tr("Show Problems"),
         run: () => {
           setBottomTab("problems");
         },
@@ -2056,21 +2149,29 @@ function App() {
       {
         id: "view.frame",
         group: "View",
-        title: "Frame Selection",
+        title: tr("Frame Selection"),
         keys: "F",
         run: () => frameRef.current?.("selection"),
       },
       {
         id: "view.frameall",
         group: "View",
-        title: "Frame All",
+        title: tr("Frame All"),
         keys: "A",
         run: () => frameRef.current?.("all"),
       },
       {
+        id: "gizmo.select",
+        group: "View",
+        title: tr("Select Tool"),
+        keys: "Q",
+        hidden: true,
+        run: () => setGizmoMode("select"),
+      },
+      {
         id: "gizmo.translate",
         group: "View",
-        title: "Move Tool",
+        title: tr("Move Tool"),
         keys: "W",
         hidden: true,
         run: () => setGizmoMode("translate"),
@@ -2078,7 +2179,7 @@ function App() {
       {
         id: "gizmo.rotate",
         group: "View",
-        title: "Rotate Tool",
+        title: tr("Rotate Tool"),
         keys: "E",
         hidden: true,
         run: () => setGizmoMode("rotate"),
@@ -2086,7 +2187,7 @@ function App() {
       {
         id: "gizmo.scale",
         group: "View",
-        title: "Scale Tool",
+        title: tr("Scale Tool"),
         keys: "R",
         hidden: true,
         run: () => setGizmoMode("scale"),
@@ -2094,7 +2195,7 @@ function App() {
       {
         id: "view.hide",
         group: "View",
-        title: "Hide / Show Selection",
+        title: tr("Hide / Show Selection"),
         keys: "H",
         hidden: true,
         run: () =>
@@ -2109,7 +2210,7 @@ function App() {
       {
         id: "help.docs",
         group: "Help",
-        title: "Help & Shortcuts",
+        title: tr("Help & Shortcuts"),
         icon: "?",
         keys: "F1",
         run: () => setModal("help"),
@@ -2117,7 +2218,7 @@ function App() {
       {
         id: "help.install",
         group: "Help",
-        title: "Install AthEditor…",
+        title: tr("Install AthEditor…"),
         hidden: !installation.available,
         run: () => installation.install(() => setModal("install")),
       },
@@ -2134,7 +2235,7 @@ function App() {
       {
         id: "help.reset",
         group: "Help",
-        title: "Reset Layout",
+        title: tr("Reset Layout"),
         run: () => {
           setLayoutPreset("Focus");
           toast.ok("Layout reset");
@@ -2142,7 +2243,7 @@ function App() {
       },
     );
 
-    return cmds;
+    return editorCommandBindings(cmds, prefs.hotkeys).map(c=>({...c,title:c.id.startsWith('view.panel.')?tr('Show')+' '+tr(DOCK_PANELS[c.id.slice(11)]||c.title):tr(c.title)}));
   }, [
     pickFolder,
     openProjectFile,
@@ -2197,9 +2298,10 @@ function App() {
           el.tagName === "SELECT" || el.isContentEditable);
 
       const combo = keyComboOf(e);
+      const cmd = commandsRef.current.find(c => c.keys && normalizeCombo(c.keys) === combo);
 
-      if ((modalRef.current || el?.closest?.('[role="dialog"]')) && combo !== "Ctrl+S") return;
-      if (combo === "Ctrl+K") {
+      if ((modalRef.current || el?.closest?.('[role="dialog"]')) && cmd?.id !== "file.save") return;
+      if (cmd?.id === "view.commands" && (!typing || e.ctrlKey || e.metaKey || e.altKey)) {
         e.preventDefault();
         setPaletteScope(null);
         setPaletteOpen(true);
@@ -2227,11 +2329,11 @@ function App() {
       // the clipboard alone; Ctrl+Z undid the whole project edit rather than
       // the word. Only the chords that mean the same thing wherever you are
       // keep working from inside a field.
-      if (typing && !TYPING_SAFE_CHORDS.has(combo)) return;
+      if (typing && !['file.save','file.saveas','file.export','view.commands','help.docs','file.play'].includes(cmd?.id)) return;
       // Some browsers/windows never dispatch paste to a non-editable canvas.
       // Read during activation (or use the internal copy); do not also dispatch
       // a native paste for the same chord. Native/context-menu paste remains handled.
-      if (combo === "Ctrl+V") {
+      if (cmd?.id === "edit.paste") {
         const clipboard = actionWindow().navigator?.clipboard;
         if (clipboard?.read || clipboard?.readText || clipboardItemCount(clipboardRef.current)) {
           const paste = commandsRef.current.find(c => c.id === "edit.paste");
@@ -2240,19 +2342,16 @@ function App() {
         return;
       }
 
-      const cmd = commandsRef.current.find((c) =>
-        c.keys && normalizeCombo(c.keys) === combo
-      );
       if (cmd && (!cmd.enabled || cmd.enabled())) {
         e.preventDefault();
         cmd.run();
         return;
       }
-      if (bare && (e.key === "Delete" || e.key === "Backspace")) {
+      if (bare && e.key === "Backspace" && !Object.hasOwn(prefs.hotkeys, 'edit.delete')) {
         e.preventDefault();
         commandsRef.current.find((c) => c.id === "edit.delete")?.run();
       }
-  }, [paletteOpen]);
+  }, [paletteOpen, prefs.hotkeys]);
   useEffect(() => {
     window.addEventListener("keydown", handleEditorKey);
     return () => window.removeEventListener("keydown", handleEditorKey);
@@ -2261,9 +2360,33 @@ function App() {
     if (modal || paletteOpen) window.focus?.();
   }, [modal, paletteOpen]);
 
+  const applyReflections=async(ids,preset='coastal',strength=.5)=>{
+    const target=scene.id;
+    try{
+      const asset=await prepareReflectionAsset(preset,strength);
+      edit(p=>{const sc=p.scenes.find(s=>s.id===target);if(!sc)return;
+        const eligible=ids.map(id=>findObj(sc.objects,id)).filter(o=>o?.components.model&&!o.components.particles);
+        if(!eligible.length)return;const [name]=installGeneratedAssets(p,[asset],files);
+        for(const o of eligible)o.components.reflection={...makeComponent('reflection'),texture:name};
+      });
+    }catch(error){toast.error('Reflections could not be applied',{detail:error.message});}
+  };
+
   // ── render ───────────────────────────────────────────────────────────
   const panelContents = {
-    terrain: <TerrainWorkspace key={project.id} scene={scene} object={activeObject} files={files}
+    controls: <EditorControlsPanel mouse={prefs.mouseControls} hotkeys={prefs.hotkeys} commands={commands} onMouse={value=>setPref({mouseControls:normalizeEditorMouse(value)})} onHotkeys={value=>setPref({hotkeys:value})}/>,
+    environment:<EnvironmentPanel key={scene.id} scene={scene} files={files} selectedIds={selectedIds} onReflect={applyReflections} onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)} onApply={result=>edit(p=>{
+      const sc=p.scenes.find(s=>s.id===result.sceneId);if(!sc)return;
+      for(const output of result.outputs)putProjectAsset(p,output);
+      for(const update of result.updates){const o=findObj(sc.objects,update.id);if(o){o._environmentBake={model:deepClone(update.environmentSource)};o.components.model=update.model;}}
+    })}/>,
+    events: <EventsPanel scene={scene} files={files} project={project} selectedId={activeId} onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)}/>,
+    timeline: <TimelinePanel key={scene.id} scene={scene} files={files} project={project} selectedObjectId={activeId} onProjectEdit={edit} playhead={cinematicTime}
+      onSelectClip={value=>{setTimelineSelection(value);if(value)focusPanel('inspector');}}
+      onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)}
+      onPreview={id=>{setCinematicPreview({sequenceId:id,requestId:uid()});focusPanel("game");}}/>,
+    game: <GameViewport key={scene.id} scene={scene} project={project} files={files} request={cinematicPreview} onTime={setCinematicTime} onCameraChange={id=>updateScene('activeCameraId',id)} onSceneUpdate={updateScene} onEditCamera={id=>{select(id,{});focusPanel('inspector');}}/>,
+    terrain: <TerrainWorkspace key={project.id} scene={scene} object={activeObject} files={files} mouseControls={prefs.mouseControls}
       atlasName={terrainAtlasName(project,activeId,diskFiles)} onCreate={createTerrain}
       onSelect={id => select(id)}
       onApply={(id,data,atlas)=>edit(p=>applyEditorTerrain(p,id,data,diskFiles,atlas))}/>,
@@ -2293,6 +2416,8 @@ function App() {
           snapSize={prefs.snapSize}
           showOverlays={prefs.showOverlays}
           shaded={prefs.shaded}
+          mouseControls={prefs.mouseControls}
+          fieldOfView={prefs.viewportFov}
           onFrameRequest={frameRef}
           onCaptureRequest={captureRef}
           onPlaceAsset={useAsset}
@@ -2395,9 +2520,22 @@ function App() {
     ),
     inspector: (
       <Inspector
+        timelineSelection={timelineSelection} onEditClip={(fn,tag)=>edit((p,sc)=>fn(sc),tag)} onSelectClip={setTimelineSelection}
+        project={project}
         onEditScene={() => focusPanel("sceneSettings")}
         onEditTerrain={()=>setMainTab("terrain")}
         onUseAsset={useAsset}
+        onMoveAsset={(asset,path)=>edit(p=>moveAssetToFolder(p,asset,path))}
+        onDeleteAsset={asset=>{edit(p=>removeProjectAsset(p,asset));setSelectedAssetId(null);}}
+        onReimportAsset={async (asset,file)=>{
+          const projectId=project.id;
+          const result=await readImportedAssets([{file}]);
+          if(!result.assets.length)throw Error('This file could not be read.');
+          if(projectRef.current.id!==projectId)throw Error('The project changed. Choose the asset again.');
+          if(!editorAssets(projectRef.current,filesRef.current).some(f=>f.id===asset.id&&f.name===asset.name))throw Error('The asset was removed. Choose an asset again.');
+          edit(p=>replaceProjectAsset(p,asset,result.assets[0]));
+          toast.ok(`Reimported ${asset.name}`);
+        }}
         showAdvanced={prefs.showAdvanced}
         scene={scene}
         selection={selection}
@@ -2407,7 +2545,7 @@ function App() {
         problems={problems}
         files={files}
         onUpdateComponent={updateComponent}
-        onAddComponent={(id, key) =>
+        onAddComponent={(id, key) => key==='reflection'?applyReflections([id]):
           edit((p, sc) =>
             mutObj(sc.objects, id, (o) => {
               if (!o.components[key]) {
@@ -2422,6 +2560,7 @@ function App() {
               }
             })
           )}
+        onResetComponent={(id,key)=>edit((p,sc)=>mutObj(sc.objects,id,o=>{o.components[key]=makeComponent(key);} ))}
         onRemoveComponent={(id, key) =>
           edit((p, sc) =>
             mutObj(sc.objects, id, (o) => {
@@ -2451,6 +2590,11 @@ function App() {
     ),
     sceneSettings: (
       <SceneSettings
+        onWideCamera={() => edit((p, sc) => {
+          const camera = resolveSceneCamera(sc).obj;
+          if (camera) camera.components.camera.fov = 100;
+          else sc.camera.fov = 100;
+        })}
         onSelectObject={(id) => { select(id, {}); focusPanel("inspector"); }}
         showAdvanced={prefs.showAdvanced}
         scene={scene}
@@ -2503,10 +2647,10 @@ function App() {
       <>
         {files.length > 0 && <div className="a-library-actions">
           <button className="a-btn a-btn--ghost a-btn--sm" onClick={pickFolder}>
-            Import assets…
-          </button>
+            {tr("Import assets…")}</button>
         </div>}
         <Navigator
+          project={project}
           revealAssetName={mainTab === "uv"
             ? activeObject?.components.model?.file
             : null}
@@ -2515,6 +2659,8 @@ function App() {
           files={files}
           prefabs={project.prefabs}
           tab="assets"
+          assetFolders={project.assetFolders}
+          onCreateFolder={path=>edit(p=>createAssetFolder(p,path))}
           onTab={setBottomTab}
           loading={loadingAssets}
           selectedAssetId={selectedAssetId}
@@ -2550,18 +2696,8 @@ function App() {
               select(id);
             }
           }}
-          onDeletePrefab={(pid) =>
-            edit((p) => {
-              p.prefabs = p.prefabs.filter((x) => x._pid !== pid);
-              for (const sc of p.scenes) {
-                for (const obj of allObjects(sc.objects)) {
-                  if (obj._prefabId === pid) {
-                    delete obj._prefabId;
-                    delete obj._prefabBase;
-                  }
-                }
-              }
-            })}
+          onCreateVariant={pf=>edit(p=>createPrefabVariant(p,placePrefab(p.prefabs.find(base=>base._pid===pf._pid),[])))}
+          onDeletePrefab={pid=>edit(p=>deletePrefab(p,pid))}
         />
       </>
     ),
@@ -2573,10 +2709,10 @@ function App() {
             disabled={!activeObject}
             onClick={() => commands.find((c) => c.id === "edit.prefab")?.run()}
           >
-            Save selection as prefab
-          </button>
+            {tr("Save selection as prefab")}</button>
         </div>
         <Navigator
+          project={project}
           revealAssetName={mainTab === "uv"
             ? activeObject?.components.model?.file
             : null}
@@ -2620,18 +2756,8 @@ function App() {
               select(id);
             }
           }}
-          onDeletePrefab={(pid) =>
-            edit((p) => {
-              p.prefabs = p.prefabs.filter((x) => x._pid !== pid);
-              for (const sc of p.scenes) {
-                for (const obj of allObjects(sc.objects)) {
-                  if (obj._prefabId === pid) {
-                    delete obj._prefabId;
-                    delete obj._prefabBase;
-                  }
-                }
-              }
-            })}
+          onCreateVariant={pf=>edit(p=>createPrefabVariant(p,placePrefab(p.prefabs.find(base=>base._pid===pf._pid),[])))}
+          onDeletePrefab={pid=>edit(p=>deletePrefab(p,pid))}
         />
       </>
     ),
@@ -2647,7 +2773,10 @@ function App() {
   };
 
   return (
-    <div className="a-app">
+    <div className={`a-app${prefs.uiAnimations?' a-app--motion':''}`}
+      onClickCapture={prefs.uiAnimations?animateEditorAction:undefined}
+      onChangeCapture={prefs.uiAnimations?animateEditorAction:undefined}
+      onKeyDownCapture={prefs.uiAnimations?e=>{if(['Enter',' '].includes(e.key))animateEditorAction(e);}:undefined}>
       {welcome ? <WelcomeScreen onCreate={() => setModal("newProject")} onOpen={openProjectFile}
         recentProjects={recentProjects} onRecent={entry => openProjectHandle(entry.handle, entry)} /> : <>
       <PanelBoundary name="The menu bar" resetKey={project}>
@@ -2675,6 +2804,7 @@ function App() {
       </PanelBoundary>
 
       <DockWorkspace
+        uiAnimations={prefs.uiAnimations}
         resetWindowsKey={windowReset}
         projectName={project.name}
         onKeyDown={handleEditorKey}
@@ -2686,7 +2816,7 @@ function App() {
         onChange={(layout) => setPref({ layout })}
         onActive={(id) => {
           if (
-            ["viewport", "hud", "uv", "scripts", "terrain"].includes(id)
+            ["viewport", "hud", "uv", "scripts", "terrain", "timeline", "game", "events", "environment"].includes(id)
           ) setMainTabState(id);
         }}
         panels={Object.fromEntries(
@@ -2764,14 +2894,14 @@ function App() {
         {modal === "shareFile" && shareFile && <ShareFileModal file={shareFile} onClose={() => { setModal(null); setShareFile(null); }} />}
         {modal?.kind === "confirmReplace" && (
           <ConfirmModal
-            title="Replace the project you are working on?"
+            title={tr("Replace the project you are working on?")}
             danger
             confirmLabel="Discard changes"
             onSave={saveProject}
             message={
               <>
                 <p>
-                  Save your changes before opening <b>{modal.name}</b>.
+                  {tr("Save your changes before opening ")}<b>{modal.name}</b>.
                 </p>
               </>
             }
@@ -2784,24 +2914,21 @@ function App() {
         )}
         {modal?.kind === "confirmOverwrite" && (
           <ConfirmModal
-            title="Overwrite changed files?"
+            title={tr("Overwrite changed files?")}
             danger
             confirmLabel="Overwrite"
             message={
               <>
                 <p style={{ marginBottom: 8 }}>
-                  These files in <b>{folderName}/</b>{" "}
-                  differ from what the editor is about to write:
-                </p>
+                  {tr("These files in ")}<b>{folderName}/</b>{" "}
+                  {tr("differ from what the editor is about to write:")}</p>
                 <pre className="a-code" style={{ marginBottom: 8 }}>
                 {modal.conflicts.map((c) =>
                   `${c.path}   — ${c.kind === "handwritten" ? "not written by this editor" : "edited outside the editor"}`
                 ).join("\n")}
                 </pre>
                 <p>
-                  Exporting replaces them. Files that already match are left
-                  alone.
-                </p>
+                  {tr("Exporting replaces them. Files that already match are left alone.")}</p>
               </>
             }
             onConfirm={() => modal.resolve(true)}
@@ -2835,7 +2962,11 @@ function App() {
                   for (const update of result.updates) {
                     const obj = findObj(sc.objects, update.id);
                     if (obj) {
-                      obj.components.model = update.model;
+                      if(update.model)obj.components.model = update.model;
+                      if(update.shadow){
+                        obj._shadowBake={shadow:deepClone(update.shadowSource)};
+                        obj.components.shadow=update.shadow;
+                      }
                       if (update.bakeSource) {
                         obj._lightingBake = {
                           model: deepClone(update.bakeSource),
@@ -2906,7 +3037,7 @@ function App() {
         )}
         {modal === "confirmDeleteScene" && (
           <ConfirmModal
-            title="Delete scene"
+            title={tr("Delete scene")}
             danger
             confirmLabel="Delete"
             message={`Delete "${scene.name}" and everything in it? This can be undone with Ctrl+Z.`}
@@ -2937,29 +3068,6 @@ function App() {
       </PanelBoundary>
     </div>
   );
-}
-
-/** "Ctrl+Shift+Z" in any casing/order -> the canonical form keyComboOf emits. */
-function normalizeCombo(spec) {
-  const parts = spec.split("+").map((s) => s.trim());
-  const mods = { Ctrl: false, Alt: false, Shift: false };
-  let key = "";
-  for (const p of parts) {
-    const lower = p.toLowerCase();
-    if (lower === "ctrl" || lower === "cmd" || lower === "meta") {
-      mods.Ctrl = true;
-    } else if (lower === "alt") mods.Alt = true;
-    else if (lower === "shift") mods.Shift = true;
-    else key = p;
-  }
-  if (key.toLowerCase() === "del") key = "Delete";
-  if (key.length === 1) key = key.toUpperCase();
-  const out = [];
-  if (mods.Ctrl) out.push("Ctrl");
-  if (mods.Alt) out.push("Alt");
-  if (mods.Shift) out.push("Shift");
-  out.push(key);
-  return out.join("+");
 }
 
 // AppBoundary is the outermost thing rendered: if App itself cannot render,

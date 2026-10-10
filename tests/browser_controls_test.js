@@ -1,8 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import * as esbuild from "npm:esbuild@0.24.0";
 
-const source = (await Promise.all(
-  ["ui/primitives.jsx", "ui/popover.js", "panels/menubar.jsx", "panels/fonts.jsx"].map(async (
+const localizationSource = (await Promise.all(["core/i18n.js","core/ui-translations.js"].map(path=>Deno.readTextFile(new URL(`../src/${path}`,import.meta.url))))).join("\n");
+const source = localizationSource + "\n" + (await Promise.all(
+  ["ui/primitives.jsx", "ui/icons.jsx", "ui/popover.js", "panels/menubar.jsx", "panels/fonts.jsx"].map(async (
     path,
   ) =>
     (await esbuild.transform(
@@ -16,6 +17,8 @@ function controls(window = {}, navigator = {}) {
   const slots = [], effects = [], document = {};
   let cursor = 0;
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Fragment: "fragment",
     createElement: (type, props, ...children) => ({
       type,
@@ -74,6 +77,18 @@ function findControl(tree, predicate) {
   }
   return null;
 }
+
+Deno.test('scene switcher exposes the current scene and uses the existing switch/create commands',()=>{
+  const c=controls(),switched=[],created=[],scene={id:'one',name:'Opening'},other={id:'two',name:'Town'};
+  const tree=c.render('MenuBar',{scene,project:{name:'Story',scenes:[scene,other]},commands:[{id:'file.newscene',run:()=>created.push(true)}],onSwitchScene:id=>switched.push(id)});
+  assert(findControl(tree,n=>n?.props?.['aria-label']==='Current scene: Opening'));
+  assertEquals(findControl(tree,n=>n?.props?.['aria-current']==='true').props.children.includes('Opening'),true);
+  const popup={open:true},event={currentTarget:{closest:()=>popup}};
+  findControl(tree,n=>n?.type==='button'&&n.props.children.includes('Town')).props.onClick(event);
+  assertEquals(switched,['two']);assertEquals(popup.open,false);
+  findControl(tree,n=>n?.type==='button'&&n.props.children.includes('New scene…')).props.onClick(event);
+  assertEquals(created,[true]);
+});
 
 Deno.test("installed font access runs only on click and imports the selected face; refusal keeps file import available", async () => {
   let calls = 0, received;
@@ -215,6 +230,7 @@ Deno.test("title bar tracks project and unsaved state and reacts to overlay visi
   const c = controls({}, { windowControlsOverlay: overlay });
   const props = {
     project: { name: "Test", scenes: [] },
+    scene: {id:'scene',name:'Opening'},
     commands: [],
     dirty: true,
   };
@@ -233,6 +249,6 @@ Deno.test("title bar tracks project and unsaved state and reacts to overlay visi
   );
   c.runEffects();
   assertEquals(c.document.title, "Test — AthEditor");
-  cleanups[1]();
+  cleanups.filter(Boolean).forEach(cleanup=>cleanup());
   assertEquals(removed, registered);
 });

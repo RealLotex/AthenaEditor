@@ -20,6 +20,8 @@ function editor(browser = {}, fileStorage, savedProject, startAtWelcome = false)
   const downloads = [];
   let cursor = 0;
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Component: class {},
     Fragment: "fragment",
     createElement: (type, props, ...children) => ({
@@ -97,6 +99,12 @@ function editor(browser = {}, fileStorage, savedProject, startAtWelcome = false)
     if (node.type?.name === "DockWorkspace") {
       for (const panel of Object.values(node.props.panels)) {
         const hit = find(name, panel);
+        if (hit) return hit;
+      }
+    }
+    if (node.type?.name === "EditorPageTabs") {
+      for (const page of node.props.tabs) {
+        const hit = find(name, page.content);
         if (hit) return hit;
       }
     }
@@ -1395,6 +1403,17 @@ Deno.test("HUD gestures and deletion can be undone without an empty step", () =>
   assertEquals(e.project.scenes[0].uiElements[0].text, "Score");
 });
 
+Deno.test("timeline edits support undo/redo and Game preview preserves project data", () => {
+  const e=editor(),sequence={id:'cinematic',name:'Intro',event:{type:'sceneStart'},tracks:[{id:'dialogue',type:'dialogue',name:'Dialogue',clips:[{id:'line',name:'Line',start:0,duration:2,text:'Hello'}]}]};
+  e.find('TimelinePanel').onEdit(sc=>sc.sequences.push(sequence));e.render();
+  e.find('TimelinePanel').onEdit(sc=>sc.sequences[0].tracks[0].clips[0].start=1,'drag:line');e.render();
+  e.find('TimelinePanel').onEdit(sc=>sc.sequences[0].tracks[0].clips[0].start=2,'drag:line');e.render();
+  e.command('edit.undo');assertEquals(e.project.scenes[0].sequences[0].tracks[0].clips[0].start,0);
+  e.command('edit.redo');assertEquals(e.project.scenes[0].sequences[0].tracks[0].clips[0].start,2);
+  const before=JSON.stringify(e.project);e.find('TimelinePanel').onPreview('cinematic');e.render();assertEquals(e.find('GameViewport').request.sequenceId,'cinematic');assertEquals(JSON.stringify(e.project),before);
+  e.command('edit.undo');e.command('edit.undo');assertEquals(e.project.scenes[0].sequences,[]);
+});
+
 Deno.test("outliner deletion removes a subtree and can be undone", () => {
   const e = editor();
   e.command("add.empty");
@@ -1611,4 +1630,15 @@ Deno.test("scene exits get distinct defaults and their names can be edited with 
   assertEquals(e.project.scenes[0].transitions[0].name, "Exit A");
   e.command("edit.undo");
   assertEquals(e.project.scenes[0].transitions[0].name, original);
+});
+
+Deno.test('color previews coalesce as one undo step, retain asset identities, and consecutive commits remain separate',()=>{
+  const e=editor(),sun=e.project.scenes[0].objects.find(o=>o.components.light),initial={...sun.components.light.ambient},assets=e.project.assets;
+  e.find('Outliner').onSelect(sun.id);e.render();
+  const apply=(value,phase)=>{e.find('Inspector').onUpdateComponent(sun.id,'light','ambient',value,phase);e.render();};
+  const final={r:.8,g:.2,b:.1};
+  apply({r:.2,g:.1,b:.1},'edit');apply(final,'edit');apply(final,'commit');
+  assert(e.project.assets===assets);e.command('edit.undo');assertEquals(e.project.scenes[0].objects.find(o=>o.id===sun.id).components.light.ambient,initial);
+  e.command('edit.redo');assertEquals(e.project.scenes[0].objects.find(o=>o.id===sun.id).components.light.ambient,final);
+  apply({r:.1,g:.9,b:.5},'edit');apply({r:.1,g:.9,b:.5},'commit');e.command('edit.undo');assertEquals(e.project.scenes[0].objects.find(o=>o.id===sun.id).components.light.ambient,final);
 });

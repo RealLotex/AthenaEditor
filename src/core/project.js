@@ -68,6 +68,10 @@ const mkScene = (name) => ({
   skybox: { enabled: false, preset: "", texture: "", rotation: 0, brightness: 1 },
   // Used when the scene has no Camera object. A Camera object overrides it.
   camera: { fov: 60, near: 1.0, far: 4000.0 },
+  activeCameraId: null,
+  sequences: [],
+  eventRules: [],
+  eventVariables: {},
   // The built-in orbit rig on the left stick. Turn it off when a script owns
   // the camera, otherwise the two fight over it every frame.
   defaultCameraRig: true,
@@ -82,6 +86,24 @@ const mkScene = (name) => ({
   // Named exits exposed to behaviour scripts through ctx.goToScene(name).
   transitions: [],
 });
+
+function normalizeEventRules(rules){
+  return (Array.isArray(rules)?rules:[]).filter(r=>r&&typeof r==='object').map(r=>{
+    r.id||=uid();r.name||='Event';r.enabled??=true;r.once??=false;r.event=fillDefaults(r.event&&typeof r.event==='object'?r.event:{},{type:'sceneStart',objectId:'',otherId:'',name:'',seconds:3,sequenceId:''});
+    r.conditions=Array.isArray(r.conditions)?r.conditions.filter(n=>n&&typeof n==='object'):[];r.actions=Array.isArray(r.actions)?r.actions.filter(n=>n&&typeof n==='object'):[];
+    for(const n of [...r.conditions,...r.actions])n.id||=uid();return r;
+  });
+}
+
+// Game and export resolve the same camera, including nested world transforms.
+// Old projects select the first exported camera until an explicit choice is made.
+function resolveSceneCamera(scene) {
+  const cameras=exportableObjects(scene.objects||[]).filter(o=>o.components.camera);
+  const obj=cameras.find(o=>o.id===scene.activeCameraId)||cameras[0]||null;
+  const defaults=scene.camera||{fov:60,near:1,far:4000},settings=obj?.components.camera||defaults;
+  return {obj,cameras,position:obj?worldTransforms(scene.objects).get(obj.id).position:{x:0,y:2,z:10},
+    target:obj?settings.target:{x:0,y:0,z:0},fov:settings.fov??defaults.fov,near:settings.near??defaults.near,far:settings.far??defaults.far};
+}
 
 // ── project ────────────────────────────────────────────────────────────
 
@@ -206,6 +228,9 @@ const mkProject = (name) => {
     scripts: [],
     prefabs: [],
     assets: [],
+    assetFolders: [],
+    hiddenAssets: [],
+    sequenceLibrary: [],
     scenes: [scene],
     startSceneId: scene.id,   // which scene main.js boots
     activeSceneId: scene.id,  // which scene is open in the editor
@@ -344,6 +369,9 @@ function reassignIds(obj) {
 /** Copy a set of subtrees, keeping named references within that copied set. */
 function cloneObjects(sources, existing) {
   const copies = sources.map((o) => reassignIds(deepClone(o)));
+  const originals = allObjects(sources), cloned = allObjects(copies);
+  const ids = new Map(originals.map((o,i)=>[o.id,cloned[i].id]));
+  remapObjectReferences(copies,ids);
   const taken = allObjects(existing).map((o) => ({ name: o.name }));
   const renamed = new Map();
   walk(copies, (o) => {
@@ -361,6 +389,18 @@ function cloneObjects(sources, existing) {
     }
   });
   return copies;
+}
+
+function remapObjectReferences(objects, ids) {
+  const change = (holder,key) => {if(holder && ids.has(holder[key]))holder[key]=ids.get(holder[key]);};
+  walk(objects,o=>{
+    change(o.components.rigidbody,'eventOtherId');
+    for(const rule of o.components.events?.rules || []) {
+      change(rule.event,'objectId');change(rule.event,'otherId');
+      for(const condition of rule.conditions || [])change(condition,'objectId');
+      for(const action of rule.actions || [])change(action,'objectId');
+    }
+  });
 }
 
 // ── world transforms ───────────────────────────────────────────────────
@@ -463,6 +503,7 @@ function migrateProject(project, notes = []) {
   project.scenes = Array.isArray(project.scenes) ? project.scenes : [];
   if (!project.scenes.length) project.scenes = [mkScene("MainScene")];
   project.assets = Array.isArray(project.assets) ? project.assets : [];
+  for (const key of ['assetFolders', 'hiddenAssets', 'sequenceLibrary']) project[key] = Array.isArray(project[key]) ? project[key] : [];
   // Refresh only untouched built-in skies from earlier editor revisions.
   // Custom uploads and images edited by the texture tools keep their pixels.
   if (typeof SKYBOX_PRESET_IMAGES !== "undefined") {
@@ -546,6 +587,15 @@ function migrateProject(project, notes = []) {
     scene.objects = Array.isArray(scene.objects) ? scene.objects : [];
     scene.uiElements = Array.isArray(scene.uiElements) ? scene.uiElements : [];
     scene.transitions = Array.isArray(scene.transitions) ? scene.transitions : [];
+    scene.sequences = Array.isArray(scene.sequences) ? scene.sequences.filter(s=>s&&typeof s==='object') : [];
+    scene.eventRules=normalizeEventRules(scene.eventRules);
+    scene.eventVariables=scene.eventVariables&&typeof scene.eventVariables==='object'&&!Array.isArray(scene.eventVariables)?scene.eventVariables:{};
+    for(const s of scene.sequences){
+      s.id ||= uid();s.name ||= "Cinematic";
+      s.event=fillDefaults(s.event&&typeof s.event==='object'?s.event:{}, {type:"manual",seconds:3,name:"",objectId:"",otherId:""});
+      s.tracks=Array.isArray(s.tracks)?s.tracks.filter(t=>t&&typeof t==='object'):[];
+      for(const t of s.tracks){t.id ||= uid();t.name ||= t.type;t.clips=Array.isArray(t.clips)?t.clips.filter(c=>c&&typeof c==='object'):[];for(const c of t.clips)c.id ||= uid();}
+    }
     for (const k of Object.keys(sceneTemplate)) {
       if (k === "id" || k === "name" || k === "objects" || k === "uiElements" || k === "transitions") continue;
       if (scene[k] === undefined) scene[k] = deepClone(sceneTemplate[k]);
@@ -569,6 +619,7 @@ function migrateProject(project, notes = []) {
       for (const key of Object.keys(o.components)) {
         if (!COMPONENTS[key]) { delete o.components[key]; continue; }
         migrateComponent(key, o.components[key]);
+        if(key==='events')o.components.events.rules=normalizeEventRules(o.components.events.rules);
       }
     });
 
@@ -587,13 +638,19 @@ function migrateProject(project, notes = []) {
   }
 
   project.version = PROJECT_VERSION;
+  if(typeof repairedEventPresetSource==='function')for(const script of [...(project.scripts||[]),...(project.assets||[]).filter(f=>f.cat==='scripts')])script.content=repairedEventPresetSource(script.content);
   if(typeof upgradeTerrainGeometry === "function")upgradeTerrainGeometry(project);
+  if(typeof upgradeWaterAssets === "function")upgradeWaterAssets(project);
   return project;
 }
 
 function editorAssets(project, external = []) {
   const byName=new Map(external.map((f)=>[f.name,f]));
-  for(const f of project.assets||[])if(f.owned !== false || !byName.has(f.name))byName.set(f.name,f);
+  for(const f of project.assets||[]) {
+    if(f.owned !== false || !byName.has(f.name))byName.set(f.name,f);
+    else byName.set(f.name,{...byName.get(f.name),id:f.id||byName.get(f.name).id,libraryFolder:f.libraryFolder});
+  }
   for(const s of project.scripts||[])if(s.edited||!byName.has(s.name))byName.set(s.name,{id:`script:${s.name}`,cat:"scripts",size:s.content.length,...s});
-  return [...byName.values()];
+  const hidden = new Set(project.hiddenAssets || []);
+  return [...byName.values()].filter(f => !hidden.has(f.name));
 }

@@ -23,7 +23,7 @@ function UVWorkspace({ object, files, onApply }) {
     setChanged(true);
   };
   if (!object?.components.model) {
-    return <Empty>Select a model in the scene to edit its UVs.</Empty>;
+    return <Empty>{tr("Select a model in the scene to edit its UVs.")}</Empty>;
   }
   if (!mesh) {
     return (
@@ -43,15 +43,14 @@ function UVWorkspace({ object, files, onApply }) {
           disabled={!changed}
           onClick={() => onApply(object.id, writeMeshOBJ(mesh, object.name))}
         >
-          Apply UVs
-        </button>
+          {tr("Apply UVs")}</button>
       </div>
       <div className="a-workspace__body">
         <div className="a-uv-stage">
           <svg
             viewBox="-24 -24 560 560"
             role="img"
-            aria-label="UV map"
+            aria-label={tr("UV map")}
             onClick={() => setSelected([])}
           >
             <rect x="0" y="0" width="512" height="512" fill="#242b34" />
@@ -95,10 +94,8 @@ function UVWorkspace({ object, files, onApply }) {
         </div>
         <aside className="a-workspace__options">
           <p className="a-dim">
-            Click a triangle to select it. Shift-click adds to the selection.
-            Transforms affect all UVs when nothing is selected.
-          </p>
-          <Field label="Projection" stack>
+            {tr("Click a triangle to select it. Shift-click adds to the selection. Transforms affect all UVs when nothing is selected.")}</p>
+          <Field label={tr("Projection")} stack>
             <select
               className="a-select"
               defaultValue=""
@@ -111,7 +108,7 @@ function UVWorkspace({ object, files, onApply }) {
                 e.target.value = "";
               }}
             >
-              <option value="">Choose projection…</option>
+              <option value="">{tr("Choose projection…")}</option>
               {["box", "xy", "xz", "yz"].map((v) => <option key={v}>{v}
               </option>)}
             </select>
@@ -127,10 +124,9 @@ function UVWorkspace({ object, files, onApply }) {
               }
             }}
           >
-            Pack triangle islands
-          </button>
+            {tr("Pack triangle islands")}</button>
           <details className="a-disclosure">
-            <summary>Transform UVs</summary>
+            <summary>{tr("Transform UVs")}</summary>
             {[["x", "Horizontal offset"], ["y", "Vertical offset"], [
               "scale",
               "Scale",
@@ -155,8 +151,7 @@ function UVWorkspace({ object, files, onApply }) {
                   ),
                 ], { ...offset, angle: offset.angle * Math.PI / 180 }))}
             >
-              Transform
-            </button>
+              {tr("Transform")}</button>
           </details>
           {error && <p className="a-error">{error}</p>}
         </aside>
@@ -194,7 +189,7 @@ function ScriptWorkspace(
   return (
     <div className="a-workspace">
       <div className="a-workspace__bar">
-        <strong>Scripts</strong>
+        <strong>{tr("Scripts")}</strong>
         <span className="a-dim">{name}</span>
         <span className="a-grow" />
         {object && name && (
@@ -202,7 +197,7 @@ function ScriptWorkspace(
             className="a-btn a-btn--primary"
             onClick={() => onAttach(object.id, name)}
           >
-            Attach to {object.name}
+            {tr("Attach to ")}{object.name}
           </button>
         )}
       </div>
@@ -210,21 +205,21 @@ function ScriptWorkspace(
         <aside className="a-workspace__options">
           <select
             className="a-select"
-            aria-label="Script"
+            aria-label={tr("Script")}
             value={name}
             onChange={(e) => {
               onSeal?.();
               setName(e.target.value);
             }}
           >
-            <option value="">Choose script…</option>
+            <option value="">{tr("Choose script…")}</option>
             {scripts.map((s) => <option key={s.name}>{s.name}</option>)}
           </select>
           <details className="a-disclosure" open={!scripts.length}>
-            <summary>New script</summary>
+            <summary>{tr("New script")}</summary>
             <input
               className="a-input"
-              aria-label="New script name"
+              aria-label={tr("New script name")}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
@@ -247,13 +242,10 @@ function ScriptWorkspace(
                 }
               }}
             >
-              Create script
-            </button>
+              {tr("Create script")}</button>
           </details>
           <p className="a-dim">
-            Edits are stored in this project automatically. Save the project to
-            keep a copy on disk. Scripts run in the exported game.
-          </p>
+            {tr("Edits are stored in this project automatically. Save the project to keep a copy on disk. Scripts run in the exported game.")}</p>
           <p role="status">{message}</p>
         </aside>
         {asset
@@ -261,7 +253,7 @@ function ScriptWorkspace(
             <div className="a-script-code">
               <pre aria-hidden="true">{draft.split('\n').map((_,i)=>i+1).join('\n')}</pre>
               <textarea
-                aria-label="Script code"
+                aria-label={tr("Script code")}
                 spellCheck={false}
                 value={draft}
                 onChange={(e) => update(e.target.value)}
@@ -284,7 +276,7 @@ function ScriptWorkspace(
               />
             </div>
           )
-          : <Empty>Create a script to start writing game behaviour.</Empty>}
+          : <Empty>{tr("Create a script to start writing game behaviour.")}</Empty>}
       </div>
     </div>
   );

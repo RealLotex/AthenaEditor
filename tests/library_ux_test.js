@@ -3,12 +3,15 @@ import * as esbuild from "npm:esbuild@0.24.0";
 import { load } from "./_load.js";
 
 const A = await load();
-const source = (await esbuild.transform(await Deno.readTextFile(new URL("../src/panels/navigator.jsx", import.meta.url)), { loader: "jsx" })).code;
+const localizationSource = (await Promise.all(["core/i18n.js","core/ui-translations.js"].map(path=>Deno.readTextFile(new URL(`../src/${path}`,import.meta.url))))).join("\n");
+const source = localizationSource + "\n" + (await esbuild.transform(await Deno.readTextFile(new URL("../src/panels/navigator.jsx", import.meta.url)), { loader: "jsx" })).code;
 
 function library(props) {
   const slots = [], effects = [];
   let cursor = 0, tree;
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Fragment: "fragment",
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
     useState(value) {
@@ -24,11 +27,11 @@ function library(props) {
       slots[index] = deps;
     },
   };
-  const Navigator = new Function("React", "useState", "useRef", "useMemo", "useEffect", "assetFolderTree", "assetLibraryFolder", "ASSET_CATEGORY_LABELS", "fmtBytes", "MODEL_DRAG_TYPE", "Empty", "Modal", "TrashIcon",
+  const Navigator = new Function("React", "useState", "useRef", "useMemo", "useEffect", "assetFolderTree", "assetLibraryFolder", "ASSET_CATEGORY_LABELS", "fmtBytes", "MODEL_DRAG_TYPE", "Empty", "Modal", "TrashIcon", "AssetThumbnail", "normalizeLibraryFolder",
     source + "\nreturn Navigator;")(
       React, React.useState, React.useRef, React.useMemo, React.useEffect,
       A.assetFolderTree, A.assetLibraryFolder, A.ASSET_CATEGORY_LABELS, A.fmtBytes, A.MODEL_DRAG_TYPE,
-      function Empty() {}, function Modal() {}, function TrashIcon() {},
+      function Empty() {}, function Modal() {}, function TrashIcon() {}, function AssetThumbnail() {}, A.normalizeLibraryFolder,
     );
   const all = node => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(all) : [node, ...all(node.props.children)];
   const render = () => {
@@ -51,7 +54,7 @@ Deno.test("the library starts with every asset, folder filters include descendan
   const props = { compact: true, tab: "assets", files, prefabs: [], onSelectAsset() {} };
   const ui = library(props);
   assertEquals(ui.assets.map(asset => asset["aria-label"]), ["chair.obj", "grass.png", "hero.obj"]);
-  const folder = () => ui.find(node => node.type === "select");
+  const folder = () => ui.find(node => node.props['aria-label'] === 'Filter assets by folder');
   folder().onChange({ target: { value: "Models" } }); ui.render();
   assertEquals(ui.assets.map(asset => asset["aria-label"]), ["chair.obj", "hero.obj"]);
   props.selectedAssetId = "a"; ui.render();
@@ -64,11 +67,11 @@ Deno.test("the library starts with every asset, folder filters include descendan
 Deno.test("asset search spans folders and revealing a referenced asset clears the previous filter", () => {
   const props = { compact: true, tab: "assets", files: [...files, ...Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, name: `logic${i}.js`, cat: "scripts", size: 10 }))], prefabs: [] };
   const ui = library(props);
-  ui.find(node => node.type === "select").onChange({ target: { value: "Models" } }); ui.render();
+  ui.find(node => node.props['aria-label'] === 'Filter assets by folder').onChange({ target: { value: "Models" } }); ui.render();
   ui.find(node => node.props["aria-label"] === "Search assets").onChange({ target: { value: "grass" } }); ui.render();
   assertEquals(ui.assets.map(asset => asset["aria-label"]), ["grass.png"]);
   props.revealAssetName = "hero.obj"; ui.render();
-  assertEquals(ui.find(node => node.type === "select").value, "");
+  assertEquals(ui.find(node => node.props['aria-label'] === 'Filter assets by folder').value, "");
   assertEquals(ui.find(node => node.props["aria-label"] === "Search assets").value, "");
   assert(ui.assets.some(asset => asset["aria-label"] === "hero.obj"));
 });

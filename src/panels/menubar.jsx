@@ -21,6 +21,7 @@ function MenuBar(
   const [nativeTitlebar, setNativeTitlebar] = useState(false);
   const barRef = useRef(null);
   const focusMenu = useRef(null);
+  useDetailsPopovers(barRef,'.a-scene-switcher, .a-language-picker');
 
   useEffect(() => {
     document.title = `${project.name}${dirty ? " *" : ""} — AthEditor`;
@@ -59,11 +60,13 @@ function MenuBar(
   }, [open]);
 
   const groups = useMemo(() => {
-    const order = ["File", "Edit", "Add", "Tools", "View", "Help"];
+    const order = ["File", "Edit", "Add", "Scene", "View", "Help"];
     const byGroup = new Map(order.map((g) => [g, []]));
     for (const c of commands) {
-      if (c.hidden || !c.group || !byGroup.has(c.group)) continue;
-      byGroup.get(c.group).push(c);
+        if (c.hidden || !c.group || ['view.panel.viewport','view.panel.game','view.panel.timeline','view.panel.terrain','view.panel.hud','view.panel.problems'].includes(c.id)) continue;
+      const sceneAction=c.group==='Tools'||['view.terrain','view.timeline','view.skybox','view.hud','file.play','file.playSettings'].includes(c.id)||c.group==='File'&&c.id.includes('scene');
+      const group=sceneAction?'Scene':c.group;
+      if(byGroup.has(group))byGroup.get(group).push(c);
     }
     return order.map((g) => ({ name: g, items: byGroup.get(g) })).filter((g) =>
       g.items.length
@@ -81,6 +84,7 @@ function MenuBar(
       key={c.id}
       className="a-menu__item"
       disabled={c.enabled ? !c.enabled() : false}
+      aria-pressed={c.checked?c.checked():undefined}
       onClick={() => {
         setOpen(null);
         barRef.current?.querySelector(`[data-menu="${open}"]`)?.focus();
@@ -111,11 +115,13 @@ function MenuBar(
             "add.primitive.plane",
             "add.primitive.sphere",
             "add.terrain",
+            "add.water",
             "add.empty",
             "add.light",
             "add.camera",
           ].includes(c.id),
       );
+      take("Particle effects", (c) => c.id.startsWith("add.particles."));
       take("HUD elements", (c) => c.id.startsWith("add.ui."));
       take("More objects", () => true);
     } else if (g.name === "File") {
@@ -139,7 +145,13 @@ function MenuBar(
     } else if (g.name === "Edit") {
       take(null, (c) => !c.id.toLowerCase().includes("prefab"));
       take("Prefabs", () => true);
+    } else if(g.name==='Scene'){
+      take(null,c=>['view.sceneProperties','view.skybox','view.lighting','view.events','view.terrain','view.timeline','view.hud'].includes(c.id));
+      take('Play',c=>c.id.startsWith('file.play'));
+      take('Scenes',c=>c.id.includes('scene'));
+      take('Selected object',()=>true);
     } else if (g.name === "View") {
+      take('Editor tabs',c=>c.id.startsWith('view.panel.')||['view.viewport','view.game','view.problems'].includes(c.id));
       take(
         "Layout presets",
         (c) => c.id.startsWith("view.layout.") && c.id !== "view.layout.reset",
@@ -147,11 +159,6 @@ function MenuBar(
       take(
         null,
         (c) => ["view.frame", "view.frameall", "view.problems"].includes(c.id),
-      );
-      take("Workspaces", (c) => ["view.viewport", "view.hud", "view.terrain"].includes(c.id));
-      take(
-        "Panels",
-        (c) => c.id.startsWith("view.panel."),
       );
       take("View settings", () => true);
     } else if (g.name === "Help") {
@@ -188,18 +195,29 @@ function MenuBar(
         }
       }}>
       <div className="a-brand">
+        <EditorIcon name="cube" size={30}/>
         <div>
           <div className="a-brand__name">
             <input
               className="a-input"
-              aria-label="Project name"
+              aria-label={tr("Project name")}
               value={project.name}
               onChange={(e) => onRenameProject(e.target.value)}
-              title="Project name"
+              title={tr("Project name")}
             />
           </div>
         </div>
       </div>
+      <span className="a-header-divider"/>
+      <details className="a-scene-switcher">
+        <summary aria-label={`${tr('Current scene')}: ${scene.name}`} title={tr("Current scene")}><EditorIcon name="cube" size={18}/><span>{scene.name}</span><EditorIcon name="chevron" size={15}/></summary>
+        <div className="a-scene-switcher__pop">
+          <div className="a-menu-label">{tr("Scenes")}</div>
+          {project.scenes.map(s=><button key={s.id} className="a-menu__item" aria-current={s.id===scene.id?'true':undefined} onClick={e=>{e.currentTarget.closest('details').open=false;onSwitchScene(s.id);}}><EditorIcon name="cube" size={18}/>{s.name}{s.id===scene.id&&<span className="a-grow"/>}{s.id===scene.id&&'✓'}</button>)}
+          <button className="a-menu__item" onClick={e=>{e.currentTarget.closest('details').open=false;invoke('file.newscene');}}><EditorIcon name="plus" size={18}/>{tr("New scene…")}</button>
+        </div>
+      </details>
+      <span className="a-header-divider"/>
 
       {groups.map((g) => (
         <div className="a-menu" key={g.name}>
@@ -215,18 +233,18 @@ function MenuBar(
               setOpen(open === g.name ? null : g.name);
             }}
           >
-            {g.name}
+            {tr(g.name==='Add'?'Create':g.name)}
           </button>
           {open === g.name && (
             <div className="a-menu__pop">
               {sections(g).map((section, i) =>
                 section.label
-                  ? (
-                    <details className="a-menu-disclosure" key={section.label}>
-                      <summary>{section.label}</summary>
+                  ? (g.name==='Add'&&section.label==='More objects'||section.label==='Layout presets'||section.label==='Language'?(
+                    <details className="a-menu-disclosure" key={tr(section.label)}>
+                      <summary>{tr(section.label)}</summary>
                       {section.items.map(item)}
                     </details>
-                  )
+                  ):<div className="a-menu-section" key={tr(section.label)}><div className="a-menu-section__label">{tr(section.label)}</div>{section.items.map(item)}</div>)
                   : (
                     <React.Fragment key={i}>
                       {section.items.map(item)}
@@ -241,27 +259,23 @@ function MenuBar(
       <div className="a-grow" />
 
       <div className="a-project-actions">
-        {project.scenes.length > 1 && <select
-          className="a-select"
-          value={project.activeSceneId}
-          onChange={(e) => onSwitchScene(e.target.value)}
-          title="Active scene"
-          aria-label="Current scene"
-        >
-          {project.scenes.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>}
+        {['undo','redo'].map(name=>action(`edit.${name}`)&&<button key={name} className="a-btn a-btn--ghost a-header-history" aria-label={name==='undo'?tr("Undo"):tr("Redo")} title={name==='undo'?tr("Undo (Ctrl+Z)"):tr("Redo (Ctrl+Shift+Z)")} disabled={action(`edit.${name}`).enabled?!action(`edit.${name}`).enabled():false} onClick={()=>invoke(`edit.${name}`)}><EditorIcon name={name}/></button>)}
         {action("file.save") && <button className="a-btn a-btn--ghost" onClick={() => invoke("file.save")}
-          title={projectFileName ? `Save ${projectFileName} (Ctrl+S)` : "Save a project file (Ctrl+S)"}>
-          Save{dirty && <span className="a-save-dot" aria-label="Unsaved changes" />}
+          title={projectFileName ? `Save ${projectFileName} (Ctrl+S)` : tr("Save a project file (Ctrl+S)")}>
+          <EditorIcon name="save" size={18}/>{tr("Save")}{dirty && <span className="a-save-dot" aria-label={tr("Unsaved changes")} />}
         </button>}
-        {action("file.export") && <button className={`a-btn ${canRunLocally ? "a-btn--ghost" : "a-btn--primary"} a-export-button`} onClick={() => invoke("file.export")}>{canRunLocally ? "Export…" : "Export game…"}</button>}
-        {canRunLocally && action("file.play") && <button className="a-btn a-btn--primary a-run-button" onClick={() => invoke("file.play")}
+        {canRunLocally && action("file.play") && <button className="a-btn a-run-button" onClick={() => invoke("file.play")}
           disabled={!!playBusy || !!(action("file.play").enabled && !action("file.play").enabled())}
-          title="Try the open scene in PCSX2 (F5)">
-          {playBusy ? (playing ? "Stopping…" : "Preparing…") : playing ? "Stop game" : "Run game"}
+          title={tr("Try the open scene in PCSX2 (F5)")}>
+          <EditorIcon name={playing?'stop':'play'} size={18}/>{playBusy ? (playing ? "Stopping…" : "Preparing…") : playing ? tr("Stop game") : tr("Play")}
         </button>}
+        {action("file.export") && <button className="a-btn a-btn--primary a-export-button" onClick={() => invoke("file.export")}><EditorIcon name="export" size={19}/>{tr("Export Game…")}</button>}
+        <details className="a-language-picker">
+          <summary className="a-btn a-btn--ghost" title={t('common.language')} aria-label={t('common.language')}>🌐 {LANGS.find(l=>l.id===getLang())?.label}</summary>
+          <div className="a-language-picker__pop">
+            {LANGS.map(l=><button key={l.id} className="a-menu__item" aria-pressed={getLang()===l.id} onClick={e=>{e.currentTarget.closest('details').open=false;invoke(`help.lang.${l.id}`);}}>{l.label}{getLang()===l.id&&' ✓'}</button>)}
+          </div>
+        </details>
       </div>
     </div>
   );

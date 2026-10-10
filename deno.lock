@@ -2,10 +2,13 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/encoding@1": "1.0.11",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@1": "1.1.6",
-    "npm:esbuild@0.24.0": "0.24.0"
+    "npm:esbuild@0.24.0": "0.24.0",
+    "npm:pngjs@7.0.0": "7.0.0",
+    "npm:typescript@5.9.3": "5.9.3"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -13,6 +16,9 @@
       "dependencies": [
         "jsr:@std/internal@^1.0.12"
       ]
+    },
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
     },
     "@std/internal@1.0.14": {
       "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
@@ -174,6 +180,13 @@
         "@esbuild/win32-x64"
       ],
       "scripts": true,
+      "bin": true
+    },
+    "pngjs@7.0.0": {
+      "integrity": "sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow=="
+    },
+    "typescript@5.9.3": {
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
       "bin": true
     }
   }

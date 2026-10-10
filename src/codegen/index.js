@@ -7,12 +7,6 @@
 //    everything -> the frame loop   (nothing is declared inside it)
 // ═══════════════════════════════════════════════════════════════════════
 
-const PSM_PRESETS = {
-  CT32_Z32: ["Screen.CT32", "Screen.Z32"],
-  CT32_Z24: ["Screen.CT32", "Screen.Z24"],
-  CT16S_Z16S: ["Screen.CT16S", "Screen.Z16S"],
-};
-
 function generateProject(project, uploadedFiles = [], { sceneId } = {}) {
   const scenes = project.scenes || [], files = editorAssets(project, uploadedFiles);
   const entry = scenes.find(s => s.id === (sceneId || project.startSceneId)) || scenes[0];
@@ -57,6 +51,7 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   }
 
   const ir = resolveScene(project, scene, editorAssets(project, uploadedFiles));
+  const hasFlows=ir.eventFlows.enabled,hasEvents=ir.cinematics.enabled||hasFlows||ir.scripts.files.length||ir.physics.anyEvents;
   const e = new Emitter();
 
   // ── header ───────────────────────────────────────────────────────────
@@ -100,7 +95,7 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.nl();
   // Wrap the existing screen surfaces once, shared by sky and shadow passes.
   // Screen.initBuffers creates JS wrappers; it does not allocate extra VRAM.
-  if (ir.skybox || ir.shadowPasses.length) {
+  if (ir.skybox || ir.shadows.length || ir.fogModels.length || ir.models.some(m=>m.rd.water||m.particles)) {
     e.w(`Screen.initBuffers();`);
     e.w(`const _mainDepth = Screen.getBuffer(Screen.DEPTH_BUFFER);`);
     e.nl();
@@ -147,10 +142,16 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   // ── resources ────────────────────────────────────────────────────────
   emitLights(e, ir);
   emitRenderDatas(e, ir);
+  if(ir.fogModels.length||ir.models.some(m=>m.particles))e.w(matFromEuler.toString());
+  if(ir.fogModels.length||ir.renderDatas.some(rd=>rd.refTex))emitEnvironmentSetup(e,ir);
+  emitWaterSetup(e, ir);
+  if(ir.renderDatas.some(rd=>rd.flipbook)||ir.models.some(m=>m.particles?.flipbook))emitFlipbookSetup(e,ir);
+  if(ir.models.some(m=>m.particles))emitParticleSetup(e,ir);
   emitSkyboxSetup(e, ir);
   emitSounds(e, ir);
   emitPhysicsSetup(e, ir);   // before shadows: enableRaycast needs ode_space
   emitShadowSetup(e, ir);
+  if(ir.shadows.some(s=>s.cachedCaustics&&s.receivers))emitWaterReceiverSetup(e,ir);
   emitUI(e, ir);
   // The release's main.js requires reload at outer scope: destroying the VM
   // inside a behaviour's call stack leaks live objects and can hang. Queue
@@ -159,6 +160,10 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.w(`function goToScene(name) {`);
   e.block(b => {
     const used = new Set();
+    for (const id of new Set(ir.cinematics?.enabled||hasFlows ? project.scenes.map(s=>s.id) : ir.eventActions.filter(a => a.preset === "changeScene").map(a => a.body.rb.eventSceneId))) {
+      const path = scenePaths.get(id);
+      b.w(`if (name === "${jsStr(id)}") { _nextScene = "${jsStr(project.scenes.length > 1 ? path : "main.js")}"; return true; }`);
+    }
     for (const transition of scene.transitions || []) {
       if (typeof transition.name !== "string" || !transition.name.trim()) {
         e.diagnostics.push({ level: "error", message: "An exit has no name. Enter its name in Scene settings → Transitions." });
@@ -174,7 +179,16 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   });
   e.w(`}`);
   emitCtx(e, ir);
+  if(ir.models.some(m=>m.particles))emitParticleCtx(e,ir);
   emitCtxUI(e, ir);
+  emitObjectLifetime(e, ir);
+  if (ir.canDestroy) e.w(`ctx.destroyObject = destroyObject;`);
+  emitEventPresetCtx(e, ir);
+  if (ir.cinematics?.enabled) emitCinematics(e, ir);
+  else if(hasEvents) {
+    emitSceneEventsRuntime(e,ir);
+  }
+  if(hasFlows){emitEventFlows(e,ir);if(!ir.cinematics.enabled)e.w(`let _cinematicExitPending=false;`);}
 
   // ── behaviours ───────────────────────────────────────────────────────
   if (ir.scripts.bindings.length) {
@@ -189,12 +203,13 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   }
 
   e.w(`let pad = Pads.get();`);
+  if (hasEvents) e.w(`ctx.events.emit("sceneStart");`);
   e.w(`let lx = 0.0, ly = 0.0;`);
   e.nl();
 
   // ── frame loop ───────────────────────────────────────────────────────
   e.section("Frame loop");
-  const frameHas3D = !!(ir.models.length || ir.shadows.length || ir.skybox || ir.scripts.files.length);
+  const frameHas3D = !!(ir.models.length || ir.shadows.length || ir.skybox || ir.scripts.files.length || ir.cinematics?.enabled);
   if (!frameHas3D) e.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
   // The module must finish evaluating before its VM can be freed.
   // Screen.display runs frames from js_std_loop after module evaluation;
@@ -203,9 +218,25 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
   e.w(`Screen.clearColor(gray);`);
   e.w(`Screen.display(() => {`);
   e.block((b) => {
-    b.w(`if (_nextScene !== null) std.reload(_nextScene);`);
+    if (ir.cinematics?.enabled || hasFlows) {
+      b.w(`if (_nextScene !== null && !_cinematicExitPending) { _cinematicExitPending=true;ctx.events.emit("beforeSceneEnd"); }`);
+      // Dispose the bus to remove callbacks/timers. The flow runner owns only
+      // JS data; retain its references until std.reload frees the VM. Calling
+      // its in-context dispose here hangs the release during GC (native fixture).
+      b.w(`if (_nextScene !== null && ${ir.cinematics.enabled?'!ctx.cinematics.playing':'true'}${hasFlows?' && !ctx.eventFlows.running':''}) { ctx.events.dispose(); ${ir.cinematics.enabled?'ctx.cinematics.dispose(); _cinematicAdapter.dispose();ctx.cinematics=null;':''}ctx.events=null; ${ir.physics.enabled ? "_disposePhysics(); " : ""}std.reload(_nextScene); return; }`);
+      b.w(`ctx.events.update(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+      if(ir.cinematics.enabled)b.w(`ctx.cinematics.update(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+      if(hasFlows)b.w(`ctx.eventFlows.update(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+      if(ir.canDestroy&&!ir.physics.enabled)b.w(`_flushDestroyedObjects();`);
+    } else {
+      if(ir.scripts.files.length || ir.physics.anyEvents) {
+        b.w(`if (_nextScene !== null) { ctx.events.emit("beforeSceneEnd");ctx.events.dispose(); }`);
+        b.w(`if (_nextScene === null) ctx.events.update(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+      }
+      b.w(ir.physics.enabled ? `if (_nextScene !== null) { _disposePhysics(); std.reload(_nextScene); }` : `if (_nextScene !== null) std.reload(_nextScene);`);
+    }
     b.w(`pad.update();`);
-    if (ir.scripts.files.length) {
+    if (hasEvents) {
       b.w(`ctx.pad = pad;`);
       b.w(`ctx.frame++;`);
     }
@@ -213,24 +244,34 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
 
     const camScripted = !!ir.camera.obj?.components?.script?.file;
     if (scene.defaultCameraRig !== false && !camScripted) {
+      if (ir.cinematics?.enabled || hasFlows) b.w(`if (${ir.cinematics.enabled?'!ctx.cinematics.playing && ':''}_nextScene === null) {`);
       b.comment("Default orbit camera — add a Script to the Camera object to take over");
       b.w(`lx = ((pad.lx > 25 || pad.lx < -25) ? pad.lx : 0) / 1024.0;`);
       b.w(`ly = ((pad.ly > 25 || pad.ly < -25) ? pad.ly : 0) / 1024.0;`);
       b.w(`if (lx !== 0.0 || ly !== 0.0) Camera.orbit(lx, ly);`);
       b.w(`if (pad.pressed(Pads.R2)) Camera.zoom(0.2);`);
       b.w(`else if (pad.pressed(Pads.L2)) Camera.zoom(-0.2);`);
+      if (ir.cinematics?.enabled || hasFlows) b.w(`}`);
       b.nl();
     }
-    b.w(`if (pad.justPressed(Pads.TRIANGLE)) std.reload("main.js");`);
+    b.w(hasEvents ? `if (pad.justPressed(Pads.TRIANGLE)) _nextScene = "main.js";` : ir.physics.enabled ? `if (pad.justPressed(Pads.TRIANGLE)) { _disposePhysics(); std.reload("main.js"); }` : `if (pad.justPressed(Pads.TRIANGLE)) std.reload("main.js");`);
     b.nl();
 
     if (ir.scripts.bindings.length) {
+      if (ir.cinematics?.enabled) b.w(`if (!ctx.cinematics.playing) {`);
       b.comment("Behaviour updates");
       const done = new Set();
       for (const bind of ir.scripts.bindings) {
         if (done.has(bind.entry.alias)) continue;
         done.add(bind.entry.alias);
-        b.w(`update_${bind.entry.alias}(ctx, pad);`);
+        const owners = ir.scripts.bindings.filter(x => x.entry === bind.entry);
+        const conditions=[];
+        if(ir.cinematics?.enabled)conditions.push('!ctx.cinematics.playing');
+        if(ir.cinematics.enabled||hasFlows)conditions.push('_nextScene === null');
+        if(hasFlows&&!owners.some(x=>x.isUI))conditions.push(`(${owners.map(x=>`_isObjectEnabled("${jsStr(x.obj.id)}")`).join(' || ')})`);
+        if(ir.canDestroy&&!owners.some(x=>x.isUI))conditions.push(`(${owners.map(x => `_isObjectAlive("${jsStr(x.obj.id)}")`).join(" || ")})`);
+        const guard=conditions.length?`if (${conditions.join(' && ')}) `:'';
+        b.w(`${guard}update_${bind.entry.alias}(ctx, pad);`);
       }
       b.nl();
 
@@ -240,17 +281,27 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
       if (movable.length) {
         b.comment("ctx.<name>.x/y/z shortcut — write those and the object follows");
         for (const m of movable) {
-          b.w(`if (ctx.${m.ctxKey}.x !== undefined) ${m.modelVN}.position = ` +
+          b.w(`if (${ir.cinematics?.enabled ? '!ctx.cinematics.playing && ' : ''}${hasFlows?`_isObjectEnabled("${jsStr(m.obj.id)}") && `:''}${ir.canDestroy ? `!${m.modelVN}._destroyed && ` : ""}ctx.${m.ctxKey}.x !== undefined) ${m.modelVN}.position = ` +
             `{x: ctx.${m.ctxKey}.x, y: ctx.${m.ctxKey}.y || 0, z: ctx.${m.ctxKey}.z || 0};`);
         }
         b.nl();
       }
     }
 
+    if (ir.cinematics?.enabled && ir.scripts.bindings.length) b.w(`}`);
+    // Resume simulation when the last clip releases its captured transforms.
+    // Keep the final body/model sync before disposing ODE: suppressing that
+    // step reproducibly hangs cinematic reload in the bundled release ELF.
+    if ((ir.cinematics?.enabled||hasFlows) && ir.physics.enabled) b.w(`if (${ir.cinematics.enabled?'!ctx.cinematics.playing':'_nextScene === null'}) {`);
     emitPhysicsStep(b, ir);
+    if ((ir.cinematics?.enabled||hasFlows) && ir.physics.enabled) b.w(`}`);
 
     b.comment("Rendering");
     if (frameHas3D) b.w(`Camera.update();`);
+    if (ir.models.some(m=>m.rd.water)) b.w(`_updateWater(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+    if(ir.renderDatas.some(rd=>rd.flipbook))b.w(`_updateTextureAnimations(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+    if(ir.models.some(m=>m.particles))b.w(`_updateParticleSystems(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
+    if(ir.fogModels.length)b.w(`_updateFog(${project.display?.mode === "PAL" ? "0.02" : "1/60"});`);
     b.nl();
     emitSkyboxDraw(b, ir);
 
@@ -265,15 +316,22 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
     }
     b.nl();
 
+    if(ir.renderDatas.some(rd=>rd.refTex))emitReflectionWarmup(b,ir);
     emitModelDraws(b, ir);
+    if (ir.cinematics?.enabled) b.w(`_cinematicDrawParticles();`);
     emitShadowDraws(b, ir);
+    emitWaterDraws(b, ir);
+    if(ir.models.some(m=>m.particles))emitParticleDraws(b,ir);
+    if(ir.fogModels.length)emitFogDraws(b,ir);
 
     if (frameHas3D) b.w(`Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);`);
     b.nl();
 
     if (ir.ui.length) { b.w(`drawUI();`); b.nl(); }
+    if (ir.cinematics?.enabled) b.w(`_cinematicDrawUI();`);
 
     if (showOverlay) {
+      if(ir.cinematics?.enabled) b.w(`font.scale = 0.6;`);
       b.w(`if (++_hudFrame >= 15) {`);
       b.block(h => {
         h.w(`_hudFrame = 0;`);
@@ -297,9 +355,14 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
     main: e.toString(),
     scripts: [...new Map([...ir.scripts.files, ...editorAssets(project, uploadedFiles).filter(f => f.cat === "scripts" && typeof f.content === "string")].map(f => [f.name, f])).values()].map(f => ({ filename: `${ir.dirs.scripts}/${f.name}`, content: f.content })),
     assets: [...editorAssets(project, uploadedFiles).filter(f => f.cat !== "scripts" && (f.content !== undefined || f.dataUrl)).map(f => ({filename: `${project.dirs?.[f.cat] || f.folder || f.cat}/${f.name}`, content:f.content, dataUrl:f.dataUrl})),
-      ...(ir.skybox ? [{ filename: `${ir.dirs.models}/${ir.skybox.mesh}`, content: skyboxMeshOBJ() }] : [])],
+      ...ir.fogMeshes.map(f=>({filename:`${ir.dirs.models}/${f.name}`,content:f.content})),
+      ...ir.waterGeneratedAssets.filter(a=>a.cat==='models').map(f=>({filename:`${ir.dirs.models}/${f.name}`,content:f.content,dataUrl:f.dataUrl})),
+      ...ir.textures.filter(t=>t.asset).map(t=>({filename:`${ir.dirs.textures}/${t.file}`,dataUrl:t.asset.dataUrl})),
+      ...(ir.skybox ? [{ filename: `${ir.dirs.models}/${ir.skybox.mesh}`, content: ir.skybox.tiles.length ? skyboxTiledMeshOBJ(ir.skybox.materialFile, ir.skybox.upperOnly, 32, 16, ir.skybox.textureSize, ir.skybox.backdropMode) : skyboxMeshOBJ() },
+        ...(ir.skybox.backdropMesh ? [{filename:`${ir.dirs.models}/${ir.skybox.backdropMesh}`,content:skyboxBackdropOBJ(ir.skybox)}] : []),
+        ...(ir.skybox.tiles.length ? [{ filename: `${ir.dirs.models}/${ir.skybox.materialFile}`, content: ir.skybox.tiles.map((name, i) => `newmtl Sky${i}\nKa 1 1 1\nKd 1 1 1\nd 1\nmap_Kd ../${ir.dirs.textures}/${name}\n`).join("\n") }] : [])] : [])],
     diagnostics: [...ir.diagnostics, ...e.diagnostics, ...exportAssetProblems(scene, uploadedFiles, project),
-      ...validateScene(scene, uploadedFiles, project).filter(d => d.level === "error")],
+      ...validateScene(scene, uploadedFiles, project).filter(d => d.level === "error" || d.component === "vram")],
     stats: {
       models: ir.models.length,
       renderDatas: ir.renderDatas.length,

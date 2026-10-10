@@ -26,43 +26,43 @@ function PlaySettingsModal({ onClose, onReady, localAvailable = true, onExport }
   };
   return (
     <Modal
-      title={localAvailable ? "Run in PCSX2" : "Run on your computer"}
+      title={localAvailable ? tr("Run in PCSX2") : tr("Run on your computer")}
       onClose={onClose}
       width={530}
       canDismiss={!busy}
       footer={
         <>
           <span className="a-grow" />
-          <button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>{localAvailable ? "Cancel" : "Close"}</button>
-          {!localAvailable && <button className="a-btn a-btn--primary" onClick={onExport}>Export game…</button>}
+          <button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>{localAvailable ? tr("Cancel") : tr("Close")}</button>
+          {!localAvailable && <button className="a-btn a-btn--primary" onClick={onExport}>{tr("Export game…")}</button>}
           {settings && (
             <button
               className="a-btn a-btn--primary"
               disabled={busy || !settings.pcsx2?.trim() || !settings.runtime?.trim()}
               onClick={save}
             >
-              {busy ? "Preparing…" : "Run game"}
+              {busy ? tr("Preparing…") : tr("Run game")}
             </button>
           )}
         </>
       }
     >
       {!localAvailable && <>
-        <p className="a-run-status">Open <strong>Start AthEditor.vbs</strong> in your editor folder to try your game in PCSX2.</p>
-        <p className="a-dim">You can keep editing and export your game here.</p>
+        <p className="a-run-status">{tr("Open ")}<strong>{tr("Start AthEditor.vbs")}</strong> {tr("in your editor folder to try your game in PCSX2.")}</p>
+        <p className="a-dim">{tr("You can keep editing and export your game here.")}</p>
       </>}
-      {loading && <p role="status">Checking PCSX2…</p>}
+      {loading && <p role="status">{tr("Checking PCSX2…")}</p>}
       {settings && (
         <>
           <p className="a-run-status">
             {settings.available
-              ? "The current scene is ready to play."
-              : "Choose PCSX2 and the console player to run your game."}
+              ? tr("The current scene is ready to play.")
+              : tr("Choose PCSX2 and the console player to run your game.")}
           </p>
           <details className="a-disclosure" open={!settings.available}>
-            <summary>Run settings</summary>
+            <summary>{tr("Run settings")}</summary>
             <label className="a-setting-label">
-              PCSX2 executable<input
+              {tr("PCSX2 executable")}<input
                 className="a-input"
                 value={settings.pcsx2}
                 onChange={(e) =>
@@ -70,7 +70,7 @@ function PlaySettingsModal({ onClose, onReady, localAvailable = true, onExport }
               />
             </label>
             <label className="a-setting-label">
-              Console player<input
+              {tr("Console player")}<input
                 className="a-input"
                 value={settings.runtime}
                 onChange={(e) =>
@@ -78,8 +78,7 @@ function PlaySettingsModal({ onClose, onReady, localAvailable = true, onExport }
               />
             </label>
             <p className="a-dim">
-              PCSX2 needs a configured BIOS and HostFS enabled. These paths are remembered on this computer.
-            </p>
+              {tr("PCSX2 needs a configured BIOS and HostFS enabled. These paths are remembered on this computer.")}</p>
           </details>
         </>
       )}

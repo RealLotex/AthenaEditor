@@ -22,6 +22,7 @@ export async function runConsoleFixture(generated, { timeoutMs = 45000, complete
       if (complete(log)) return log;
       await new Promise(r => setTimeout(r, 250));
     }
-    throw Error("The console fixture did not report completion.");
+    const log = await Deno.readTextFile(join(directory, "probe.log")).catch(() => "");
+    throw Error("The console fixture did not report completion.\n" + log.slice(-4000));
   } finally { await request("stop", {}).catch(() => {}); }
 }

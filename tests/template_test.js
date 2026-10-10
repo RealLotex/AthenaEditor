@@ -6,13 +6,14 @@ import { load, PURE_MODULES } from "./_load.js";
 const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/components.js",
   "core/skybox.js", "codegen/skybox.js",
-  "core/project.js", "core/validate.js",
+  "core/imagesize.js", "core/vram.js",
+  "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js",
   "templates/assets.js",
   "templates/firstperson.js", "templates/thirdperson.js", "templates/sidescroller.js",
   "templates/topdown.js", "templates/registry.js",
-  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/lights.js",
-  "codegen/sounds.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
-  "codegen/ctx.js", "codegen/index.js",
+  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/environment.js", "codegen/water.js", "codegen/lights.js",
+  "codegen/sounds.js", "codegen/object-lifetime.js", "codegen/event-presets.js", "codegen/events.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
+  "codegen/ctx.js", "codegen/cinematics.js", "codegen/event-flows.js", "codegen/index.js",
 ]);
 
 const templateBy = (id) => A.PROJECT_TEMPLATES.find((t) => t.id === id);
@@ -470,6 +471,9 @@ function sideScrollerRuntime() {
   const ground = { _name: "Ground" }, player = { _name: "Player", _ctxKey: "player", getPosition: () => [-6, 0.5, 0] };
   const contacts = new Function("ctx", "ODE", "_odeEventPairs", `
     let _odeLegacyContacts = false;
+    let _odeEventFrame = 1;
+    const _odeEventStates = new Map();
+    ${A.ODE_EVENTS_RUNTIME}
     const _odeBoundGeoms = [_odeEventPairs[0][1]], _odeBoundPositions = [], _odeBoundNumber = new Float64Array(1);
     const _odeEventBounds = [[0, -1, 0.502]];
     function ode_onCollide(c) { ${braced(main, main.indexOf("function ode_onCollide"))} }
@@ -499,8 +503,8 @@ function sideScrollerRuntime() {
 
 Deno.test("release ELF numeric contacts allow jumping from the ground and platforms", () => {
   const r = sideScrollerRuntime();
-  r.contact({ geom1: 8042112, geom2: 8041008, normal: [0, 1, 0] });
   r.setHits([{ normal: [0, -1, 0], position: [-6, 0, 0], depth: 0.003 }]);
+  r.contact({ geom1: 8042112, geom2: 8041008, normal: [0, 1, 0] });
   r.poll();
   assertEquals(r.ctx.player.lastHit, "Ground");
   r.update(true);
@@ -530,8 +534,9 @@ Deno.test("release ELF numeric contacts allow jumping from the ground and platfo
   assertEquals(r.velocity()[1], 6.5);
   assertStringIncludes(r.main, "[ground_geom, player_geom],");
   assertStringIncludes(r.main, "[player_geom, platform1_geom],");
-  assert(r.main.indexOf("if (_odeLegacyContacts) _odePollContacts();") <
-    r.main.indexOf("ode_world.stepWithContacts("), "poll before solving contacts");
+  assert(r.main.includes("if (!_odeLegacyContacts) {"), "numeric callback polls only once per native step");
+  assert(r.main.indexOf("_odeLegacyContacts = true;") <
+    r.main.indexOf("_odePollContacts();"), "arm guard before polling to prevent recursion");
 });
 
 Deno.test("newer JS geom contacts allow jumping without fallback queries", () => {

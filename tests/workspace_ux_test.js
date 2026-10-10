@@ -1,9 +1,11 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import * as esbuild from "npm:esbuild@0.24.0";
 
-const source = (await Promise.all([
+const localizationSource = (await Promise.all(["core/i18n.js","core/ui-translations.js"].map(path=>Deno.readTextFile(new URL(`../src/${path}`,import.meta.url))))).join("\n");
+const source = localizationSource + "\n" + (await Promise.all([
   "ui/modal.jsx",
   "ui/popover.js",
+  "ui/icons.jsx",
   "ui/palette.jsx",
   "panels/scenetools.jsx",
 ].map(async (path) => {
@@ -17,6 +19,8 @@ function componentHarness(component, props, dom = {}) {
   const slots = [], effects = [];
   let cursor = 0, tree;
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Fragment: "fragment",
     createElement: (type, props, ...children) => ({
       type,
@@ -97,6 +101,7 @@ const COMMON_OBJECTS = [
   ["add.primitive.plane", "Plane"],
   ["add.primitive.sphere", "Sphere"],
   ["add.terrain", "Terrain"],
+  ["add.water", "Water"],
   ["add.model", "Model"],
   ["add.light", "Light"],
   ["add.camera", "Camera"],
@@ -144,7 +149,7 @@ function search(ui, text) {
   ui.render();
 }
 
-Deno.test("Add object starts with seven common choices and More objects reveals the other usable objects", () => {
+Deno.test("Add object exposes water with the common choices and More objects reveals the other usable objects", () => {
   const ui = componentHarness("CommandPalette", {
     commands: commands(),
     scope: "objects",
@@ -231,7 +236,7 @@ Deno.test("HUD add excludes scene objects and a general palette keeps file, obje
   assertEquals(events, ["close", "file.save"]);
 });
 
-Deno.test("scene transformation controls appear only for a selection and preserve their actions", () => {
+Deno.test("scene tools stay visible, disable transforms without a selection and preserve their actions", () => {
   const events = [];
   const props = {
     prefs: {
@@ -250,30 +255,26 @@ Deno.test("scene transformation controls appear only for a selection and preserv
     onSceneSettings() {},
   };
   const ui = componentHarness("SceneTools", props);
-  assertEquals(
-    ui.find((node) =>
-      node.props.role === "group" &&
-      node.props["aria-label"] === "Transform selected objects"
-    ),
-    undefined,
-  );
-  assertEquals(ui.find((node) => node.type === "select"), undefined);
+  assert(ui.find(node=>node.props['aria-label']==='Scene tools'));
+  assert(ui.find(node=>node.props['aria-label']==='Move').disabled);
+  assert(!ui.find(node=>node.props['aria-label']==='Select').disabled);
+  assertEquals(ui.find(node=>node.props['aria-label']==='Transform space').value,'world');
   assertEquals(
     ui.find((node) => node.props["aria-label"] === "Snap step"),
     undefined,
   );
   ui.find((node) =>
-    node.type === "button" && node.props.children.includes("+ Add object")
+    node.type === "button" && node.props['aria-label']==='Add object'
   ).onClick();
   ui.find((node) =>
-    node.type === "button" && node.props.children.includes("Show whole scene")
+    node.type === "button" && node.props['aria-label']==='Show whole scene'
   ).onClick();
   assertEquals(events, ["add", "frame"]);
   props.hasSelection = true;
   ui.render();
   assert(
     ui.find((node) =>
-      node.props["aria-label"] === "Transform selected objects"
+      node.props["aria-label"] === "Scene tools"
     ),
   );
   assertEquals(
@@ -281,6 +282,7 @@ Deno.test("scene transformation controls appear only for a selection and preserv
     true,
   );
   ui.find((node) => node.props.title === "Scale (R)").onClick();
+  assert(!ui.find(node=>node.props['aria-label']==='Move').disabled);
   assert(ui.find((node) => node.type === "select"));
   assert(ui.find((node) => node.props["aria-label"] === "Snap step"));
   assertEquals(events, ["add", "frame", "scale"]);

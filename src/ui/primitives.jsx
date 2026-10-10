@@ -10,8 +10,10 @@
 //     one undo step, because every edit carries the same `tag`.
 // ═══════════════════════════════════════════════════════════════════════
 
-const { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } =
+const { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect, useContext } =
   React;
+
+const PanelActivityContext=React.createContext(true);
 
 /** Field row: label on the left, control on the right, help underneath. */
 function Field({ label, help, error, required, stack, children, htmlFor }) {
@@ -60,6 +62,7 @@ function NumInput(
 ) {
   const [draft, setDraft] = useState(null);
   const drag = useRef(null);
+  const skipBlur=useRef(false);
   const shown = draft !== null ? draft : formatNum(value);
 
   const clampVal = useCallback((n) => {
@@ -72,9 +75,8 @@ function NumInput(
 
   const commit = (raw) => {
     setDraft(null);
-    const n = parseFloat(raw);
-    if (Number.isFinite(n)) onChange(clampVal(n), "commit");
-    else onChange(clampVal(0), "commit");
+    const n = parseEditorNumber(raw);
+    if (n !== null) onChange(clampVal(n), "commit");
   };
 
   const onPointerDown = (e) => {
@@ -121,12 +123,14 @@ function NumInput(
         title={title}
         value={shown}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
+        onBlur={(e) => {if(skipBlur.current){skipBlur.current=false;return;}commit(e.target.value);}}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
+            e.preventDefault();skipBlur.current=true;
             commit(e.currentTarget.value);
             e.currentTarget.blur();
           } else if (e.key === "Escape") {
+            e.preventDefault();e.stopPropagation();skipBlur.current=true;
             setDraft(null);
             e.currentTarget.blur();
           } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -197,7 +201,7 @@ function Vec3Input(
             locked ? " a-btn--on" : " a-btn--ghost"
           }`}
           onClick={() => setLocked((l) => !l)}
-          title={locked ? "Uniform scale on" : "Uniform scale off"}
+          title={locked ? tr("Uniform scale on") : tr("Uniform scale off")}
         >
           {locked ? "⛓" : "⛓"}
         </button>
@@ -230,6 +234,7 @@ function TextInput(
   { value, onChange, placeholder, mono, invalid, onEnter, id },
 ) {
   const [draft, setDraft] = useState(null);
+  const skipBlur=useRef(false);
   return (
     <input
       id={id}
@@ -240,16 +245,19 @@ function TextInput(
       placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={(e) => {
+        if(skipBlur.current){skipBlur.current=false;return;}
         setDraft(null);
         onChange(e.target.value, "commit");
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
+          skipBlur.current=true;
           setDraft(null);
           onChange(e.currentTarget.value, "commit");
           onEnter?.();
           e.currentTarget.blur();
         } else if (e.key === "Escape") {
+          e.preventDefault();e.stopPropagation();skipBlur.current=true;
           setDraft(null);
           e.currentTarget.blur();
         }
@@ -258,7 +266,7 @@ function TextInput(
   );
 }
 
-function Select({ value, onChange, options, placeholder, showHelp = false }) {
+function Select({ value, onChange, options, placeholder, showHelp = false, label, disabled=false }) {
   const opts = options || [];
   const known = opts.some((o) => String(o.value) === String(value));
   const hint = opts.find((o) => String(o.value) === String(value))?.help;
@@ -266,6 +274,8 @@ function Select({ value, onChange, options, placeholder, showHelp = false }) {
     <>
       <select
         className="a-select"
+        disabled={disabled}
+        aria-label={label}
         value={value ?? ""}
         onChange={(e) => {
           const raw = e.target.value;
@@ -318,8 +328,8 @@ function EyeDropperButton({ onPick }) {
     <button
       type="button"
       className="a-btn a-btn--icon a-btn--ghost a-btn--sm"
-      aria-label="Pick color from screen"
-      title="Pick color from screen"
+      aria-label={tr("Pick color from screen")}
+      title={tr("Pick color from screen")}
       onClick={async (event) => {
         if (controller.current) return;
         const pending = new AbortController();
@@ -342,6 +352,27 @@ function EyeDropperButton({ onPick }) {
   </>;
 }
 
+/** The native swatch stays responsive; project updates share one bounded gesture. */
+function ColorSwatch({hex,onPreview,onCommit}) {
+  const input=useRef(null),callbacks=useRef({onPreview,onCommit}),gesture=useRef(null);
+  callbacks.current={onPreview,onCommit};
+  useEffect(()=>{
+    const node=input.current,view=node.ownerDocument.defaultView;
+    const controller=createColorGesture(
+      value=>callbacks.current.onPreview(value),value=>callbacks.current.onCommit(value),
+      {schedule:fn=>view.setTimeout(fn,50),cancel:id=>view.clearTimeout(id)},
+    );
+    gesture.current=controller;
+    const finish=()=>controller.finish(node.value);
+    node.addEventListener('change',finish);
+    return ()=>{node.removeEventListener('change',finish);controller.dispose();gesture.current=null;};
+  },[]);
+  useEffect(()=>{if(input.current&&!gesture.current?.active)input.current.value=hex;},[hex]);
+  return <input ref={input} type="color" defaultValue={hex} aria-label={tr("Choose color")}
+    style={{width:26,height:22,padding:0,border:'1px solid var(--line)',borderRadius:'var(--radius)',background:'none',cursor:'pointer'}}
+    onInput={e=>gesture.current?.input(e.currentTarget.value)} onBlur={e=>gesture.current?.finish(e.currentTarget.value)}/>;
+}
+
 /** 0..1 float colour, as the Lights and Shadows APIs expect. */
 function Color01Input({ value, onChange, alpha }) {
   const c = value || { r: 0, g: 0, b: 0, a: 1 };
@@ -351,28 +382,9 @@ function Color01Input({ value, onChange, alpha }) {
   }`;
   return (
     <div className="a-row" style={{ gap: 4 }}>
-      <input
-        type="color"
-        value={hex}
-        style={{
-          width: 26,
-          height: 22,
-          padding: 0,
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
-          background: "none",
-          cursor: "pointer",
-        }}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            ...c,
-            r: parseInt(v.slice(1, 3), 16) / 255,
-            g: parseInt(v.slice(3, 5), 16) / 255,
-            b: parseInt(v.slice(5, 7), 16) / 255,
-          }, "edit");
-        }}
-      />
+      <ColorSwatch hex={hex}
+        onPreview={hex=>onChange(colorWithHex(c,hex,1),"edit")}
+        onCommit={hex=>onChange(colorWithHex(c,hex,1),"commit")}/>
       <div
         className={`a-vec a-vec--${alpha ? 2 : 1} a-grow`}
         style={alpha ? undefined : { gridTemplateColumns: "1fr" }}
@@ -383,7 +395,7 @@ function Color01Input({ value, onChange, alpha }) {
             step={0.05}
             min={0}
             max={1}
-            title="Alpha 0..1"
+            title={tr("Alpha 0..1")}
             onChange={(n, p) => onChange({ ...c, a: n }, p)}
           />
         )}
@@ -396,7 +408,7 @@ function Color01Input({ value, onChange, alpha }) {
             fontFamily: "var(--font-mono)",
           }}
         >
-          {alpha ? "alpha" : hex}
+          {alpha ? tr("alpha") : hex}
         </div>
       </div>
       <EyeDropperButton onPick={(hex) => onChange(colorWithHex(c, hex, 1), "commit")} />
@@ -414,35 +426,16 @@ function Color255Input({ value, onChange }) {
   }`;
   return (
     <div className="a-row" style={{ gap: 4 }}>
-      <input
-        type="color"
-        value={hex}
-        style={{
-          width: 26,
-          height: 22,
-          padding: 0,
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
-          background: "none",
-          cursor: "pointer",
-        }}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            ...c,
-            r: parseInt(v.slice(1, 3), 16),
-            g: parseInt(v.slice(3, 5), 16),
-            b: parseInt(v.slice(5, 7), 16),
-          }, "edit");
-        }}
-      />
+      <ColorSwatch hex={hex}
+        onPreview={hex=>onChange(colorWithHex(c,hex,255),"edit")}
+        onCommit={hex=>onChange(colorWithHex(c,hex,255),"commit")}/>
       <NumInput
         value={c.a ?? 128}
         step={4}
         min={0}
         max={255}
         integer
-        title="Alpha 0..255 (128 = opaque on PS2)"
+        title={tr("Alpha 0..255 (128 = opaque on PS2)")}
         onChange={(n, p) => onChange({ ...c, a: n }, p)}
       />
       <EyeDropperButton onPick={(hex) => onChange(colorWithHex(c, hex, 255), "commit")} />
@@ -472,12 +465,11 @@ function AssetSelect(
         placeholder={placeholder}
       />
       {missing && (
-        <div className="a-field__err">Not in the loaded project folder.</div>
+        <div className="a-field__err">{tr("Not in the loaded project folder.")}</div>
       )}
       {!options.length && !value && showImportHint && (
         <div className="a-field__help">
-          No {cat} loaded — use File ▸ Import Assets From Folder.
-        </div>
+          {tr("No ")}{cat} {tr("loaded — use File ▸ Import Assets From Folder.")}</div>
       )}
     </>
   );
@@ -512,8 +504,7 @@ function ObjectSelect(
       />
       {missing && (
         <div className="a-field__err">
-          No object named "{value}" in this scene.
-        </div>
+          {tr("No object named \"")}{value}{tr("\" in this scene.")}</div>
       )}
     </>
   );
@@ -553,34 +544,7 @@ const Kbd = ({ children }) => <span className="a-kbd">{children}</span>;
  */
 function Advanced({ pinned, count, children, label = "Advanced" }) {
   const [open, setOpen] = useState(false);
-  if (!pinned && !open) {
-    return (
-      <button
-        className="a-adv__more"
-        style={{ gridColumn: "1 / -1" }}
-        onClick={() => setOpen(true)}
-      >
-        {label}
-        {count ? ` (${count})` : ""}
-      </button>
-    );
-  }
-  return (
-    <>
-      <div className="a-sec__group a-sec__group--adv">
-        {label}
-        {!pinned && (
-          <button
-            className="a-adv__hide"
-            onClick={() => setOpen(false)}
-          >
-            hide
-          </button>
-        )}
-      </div>
-      {children}
-    </>
-  );
+  return <Section title={`${label}${count ? ` (${count})` : ''}`} open={pinned || open} onToggle={()=>{if(!pinned)setOpen(value=>!value);}}>{children}</Section>;
 }
 function TrashIcon() {
   return (
@@ -598,4 +562,16 @@ function TrashIcon() {
       <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" />
     </svg>
   );
+}
+function animateEditorAction(event) {
+  const control=event.target?.closest?.('button,input,select,summary,[role="tab"],[role="treeitem"],.cin-clip');
+  if(!control?.animate || control.disabled)return;
+  control.getAnimations?.().filter(a=>a.id==='editor-action').forEach(a=>a.cancel());
+  const animation=control.animate([{filter:'brightness(1.16)'},{filter:'brightness(1)'}],{duration:110,easing:'ease-out'});animation.id='editor-action';
+}
+function EditorPageTabs({value,onChange,tabs,label}) {
+  const active=tabs.find(t=>t.id===value)||tabs[0];
+  return <div className="a-editor-pages"><div className="a-editor-pages__tabs" role="tablist" aria-label={label}>
+    {tabs.map(tab=><button key={tab.id} className={`a-btn a-btn--sm${active.id===tab.id?' a-btn--primary':''}`} role="tab" aria-selected={active.id===tab.id} onClick={()=>onChange(tab.id)}>{tab.label}</button>)}
+  </div><div className="a-editor-pages__body" role="tabpanel" aria-label={active.label}>{active.content}</div></div>;
 }

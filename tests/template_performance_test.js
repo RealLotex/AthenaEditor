@@ -106,9 +106,10 @@ Deno.test("side-scroller only rebuilds its rotation when facing changes", () => 
 
 function contactRuntime(project) {
   const ir = A.resolveScene(project, project.scenes[0], []), e = new A.Emitter();
+  A.emitPhysicsEvents(e, ir);
   A.emitContactCallback(e, ir);
   const geoms = Object.fromEntries(ir.physics.bodies.map(b => [b.geomVN,
-    { _name: b.obj.name, _ctxKey: b.ctxKey, position: [b.world.position.x, b.world.position.y, b.world.position.z],
+    { _id: b.obj.id, _name: b.obj.name, _ctxKey: b.ctxKey, position: [b.world.position.x, b.world.position.y, b.world.position.z],
       getPosition() { return this.position; } }]));
   const queries = [], ctx = { player: {} };
   const runtime = new Function("ODE", "ctx", ...Object.keys(geoms), e.toString() +

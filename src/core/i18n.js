@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  I18N
 //
-//  Scope: the Help pages and the dialogs around them. The rest of the editor
-//  chrome is still English only — translating all of it is roadmap item 20,
-//  and doing it before the UI settles would just mean re-translating.
+//  Help keys and editor phrases share one language preference. Project names,
+//  filenames, scripts and authored dialogue remain user data.
 //
 //  t("some.key") looks in the active language, falls back to English, then to
 //  the literal fallback argument, then to the key itself. A missing string is
@@ -185,4 +184,15 @@ function t(key, fallback) {
   const table = UI_STRINGS[_lang] || UI_STRINGS.en;
   const tpl = TEMPLATE_STRINGS[_lang] || TEMPLATE_STRINGS.en;
   return table[key] ?? tpl[key] ?? UI_STRINGS.en[key] ?? TEMPLATE_STRINGS.en[key] ?? fallback ?? key;
+}
+
+function tr(text) {
+  if(typeof text!=='string'||_lang==='en')return text;
+  const key=text.trim(),row=Object.hasOwn(EDITOR_TRANSLATIONS,key)?EDITOR_TRANSLATIONS[key]:null;
+  if(!row)return text;
+  return text.replace(key,row[_lang==='es'?0:1]);
+}
+
+function localizeEditorOptions(options) {
+  return (options||[]).map(option=>typeof option==='object'?{...option,label:tr(option.label),help:tr(option.help)}:{value:option,label:tr(String(option))});
 }

@@ -2,31 +2,37 @@ import { assert, assertAlmostEquals, assertEquals, assertStringIncludes } from "
 import { load } from "./_load.js";
 const A = await load();
 
-Deno.test("ten offline presets are distinct, opaque 2:1 PNG panoramas with matching seams", async () => {
+Deno.test("ten detailed panoramas double both dimensions, remain opaque and fit T8 memory with seamless poles", async () => {
   assertEquals(A.SKYBOX_PRESETS.length, 10);
   const images = new Set();
   for (const preset of A.SKYBOX_PRESETS) {
     const asset = A.skyboxPresetAsset(preset.id);
     images.add(asset.dataUrl);
     const binary = atob(asset.dataUrl.split(",")[1]), bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-    assertEquals(A.imageSize(bytes), { width: 512, height: 256, format: "png" });
+    assertEquals(A.imageSize(bytes), { width: 1024, height: 512, format: "png" });
+    assertEquals(bytes[24], 8); assertEquals(bytes[25], 3, "indexed color saves native VRAM");
+    assertEquals(asset.image.bpp, 8);
+    let palette, alpha;
     const chunks = []; let at = 8;
     while (at < bytes.length) {
       const view = new DataView(bytes.buffer), size = view.getUint32(at), type = new TextDecoder().decode(bytes.subarray(at + 4, at + 8));
       assertEquals(A.pngCRC(bytes.subarray(at + 4, at + 8 + size)), view.getUint32(at + 8 + size));
       if (type === "IDAT") chunks.push(bytes.subarray(at + 8, at + 8 + size));
+      if (type === "PLTE") palette = bytes.subarray(at + 8, at + 8 + size);
+      if (type === "tRNS") alpha = bytes.subarray(at + 8, at + 8 + size);
       at += size + 12;
     }
     const pixels = new Uint8Array(await new Response(new Blob(chunks).stream().pipeThrough(new DecompressionStream("deflate"))).arrayBuffer());
-    assertEquals(pixels.length, (512 * 4 + 1) * 256);
-    for (let y = 0; y < 256; y++) {
-      const start = y * 2049 + 1;
-      assertEquals(pixels.slice(start, start + 4), pixels.slice(start + 511 * 4, start + 512 * 4), `${preset.id} seam at row ${y}`);
-      for (let x = 0; x < 512; x++) assertEquals(pixels[start + x * 4 + 3], 255);
+    assertEquals(pixels.length, 1025 * 512);
+    assertEquals(palette.length, 768); assertEquals(alpha.length, 256);
+    for (let y = 0; y < 512; y++) {
+      const start = y * 1025 + 1;
+      assertEquals(pixels[start], pixels[start + 1023], `${preset.id} seam at row ${y}`);
+      for (let x = 0; x < 1024; x++) assertEquals(alpha[pixels[start + x]], 255);
     }
-    if (["clouds", "sunset", "dusk", "aurora", "storm"].includes(preset.id)) {
-      const zenith = pixels.slice(1, 5);
-      for (let x = 1; x < 512; x++) assertEquals(pixels.slice(1 + x * 4, 5 + x * 4), zenith, `${preset.id} zenith must have one colour in every longitude`);
+    for (const row of [0, 511]) {
+      const start = row * 1025 + 1;
+      for (let x = 1; x < 1024; x++) assertEquals(pixels[start + x], pixels[start], `${preset.id} pole ${row} must converge`);
     }
   }
   assertEquals(images.size, 10);
@@ -53,7 +59,7 @@ Deno.test("selection preserves controls, deduplicates images, avoids filename co
   A.applySkybox(p, sc, sc.skybox, asset, disk);
   assertEquals(p.assets.length, 1);
   const restored = A.migrateProject(JSON.parse(JSON.stringify(p)));
-  assertEquals(A.activeScene(restored).skybox, { enabled: true, rotation: 45, brightness: .65, preset: "aurora", texture: "skybox_aurora_2.png" });
+  assertEquals(A.activeScene(restored).skybox, A.normalizedSkybox({ enabled: true, rotation: 45, brightness: .65, preset: "aurora", texture: "skybox_aurora_2.png" }));
   assertEquals(A.normalizedSkybox({ rotation: Infinity, brightness: NaN }).rotation, 0);
   assertEquals(A.normalizedSkybox({ brightness: 9 }).brightness, 1);
   assertEquals(A.mkScene().skybox.enabled, false);
@@ -139,9 +145,9 @@ Deno.test("custom skies validate format and shape, flatten alpha, and resize bef
   globalThis.FileReader = class { result = output; readAsDataURL() { queueMicrotask(() => this.onload()); } };
   try {
     const asset = await A.importSkyboxTexture({ name: "My panorama.webp", type: "image/webp", size: 4096 });
-    assertEquals(asset.image, { width: 512, height: 256, bpp: 32, format: "png" });
+    assertEquals(asset.image, { width: 1024, height: 512, bpp: 32, format: "png" });
     assertEquals(asset.skyboxLabel, "My panorama"); assertEquals(asset.editKind, "skybox");
-    assertEquals(operations, ["#000", ["flatten", 0, 0, 512, 256], ["resize", 0, 0, 512, 256]]);
+    assertEquals(operations, ["#000", ["flatten", 0, 0, 1024, 512], ["resize", 0, 0, 1024, 512]]);
     const rejects = async (file, text) => { let error; try { await A.importSkyboxTexture(file); } catch (e) { error = e; } assert(error); assertStringIncludes(error.message, text); };
     await rejects({ name: "fake.png", type: "text/html", size: 5 }, "PNG");
     await rejects({ name: "huge.png", type: "image/png", size: 33 * 1024 * 1024 }, "32 MB");

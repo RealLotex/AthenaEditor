@@ -238,7 +238,7 @@ Deno.test("rigidbodies are skipped, with a warning, when scene physics is off", 
 const shadowProject = (patch = {}) =>
   project((s) => {
     s.objects.push(obj("Hero", { model: { file: "hero.obj" } }));
-    s.objects.push(obj("HeroShadow", { shadow: { caster: "Hero", ...patch } }));
+    s.objects.push(obj("HeroShadow", { shadow: { caster: "Hero", raycast: false, ...patch } }));
   });
 
 Deno.test("raycast shadows without colliders never reference a missing ODE space", () => {
@@ -247,7 +247,7 @@ Deno.test("raycast shadows without colliders never reference a missing ODE space
   const { main, diagnostics } = gen(p);
   assert(!main.includes("enableRaycast("));
   assert(!main.includes("ode_space"));
-  assert(diagnostics.some((d) => d.level === "error" && /exported collider/.test(d.message)));
+  assert(diagnostics.some((d) => d.level === "warn" && /receiver collider/.test(d.message)));
 });
 
 Deno.test("texture shadows can follow their named caster", () => {
@@ -282,7 +282,8 @@ Deno.test("enableRaycast is (space, enable, length)", () => {
     s.objects.push(obj("HeroShadow", { shadow: { caster: "Hero", raycast: true, rayLength: 12 } }));
   });
   const { main } = gen(p);
-  assertStringIncludes(main, "enableRaycast(ode_space, 1, 12.0)");
+  assertStringIncludes(main, "enableRaycast(heroshadow_shadowspace, 1, 12.0)");
+  assert(!main.includes("enableRaycast(ode_space"));
 });
 
 Deno.test("the shadow pass is generated AND called, and the frame is still cleared", () => {
@@ -451,7 +452,9 @@ Deno.test("blob shadows need no offscreen pass", () => {
   });
   const { main } = gen(p);
   assert(!/_shadowPass/.test(main));
-  assert(!/Screen\.initBuffers/.test(main));
+  assertStringIncludes(main,'Screen.initBuffers();');
+  assert(!/new RenderTarget/.test(main));
+  assertStringIncludes(main,'Screen.setParam(Screen.ALPHA_TEST_REF,0)');
   assertStringIncludes(main, "new Shadows.Projector(");
   assertStringIncludes(main, "_shadow.render();");
 });

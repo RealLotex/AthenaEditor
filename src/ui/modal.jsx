@@ -79,8 +79,8 @@ function Modal({ title, onClose, width = 420, footer, children, initialFocus, ca
           <button
             className="a-btn a-btn--icon a-btn--ghost"
             onClick={onClose}
-            title="Close (Esc)"
-            aria-label="Close dialog"
+            title={tr("Close (Esc)")}
+            aria-label={tr("Close dialog")}
             disabled={!canDismiss}
           >
             ✕
@@ -124,7 +124,7 @@ function ConfirmModal(
       initialFocus={onSave ? ".a-modal__foot .a-btn--primary" : undefined}
       footer={
         <>
-          <button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>Cancel</button>
+          <button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>{tr("Cancel")}</button>
           <button
             className={`a-btn ${danger || onSave ? "a-btn--danger" : "a-btn--primary"}`}
             disabled={busy}
@@ -136,7 +136,7 @@ function ConfirmModal(
             {confirmLabel}
           </button>
           {onSave && <button className="a-btn a-btn--primary" disabled={busy} onClick={saveAndContinue}>
-            {busy ? "Saving…" : saveLabel}
+            {busy ? tr("Saving…") : saveLabel}
           </button>}
         </>
       }

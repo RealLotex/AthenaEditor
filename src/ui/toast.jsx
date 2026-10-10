@@ -57,7 +57,7 @@ function Toasts({ toasts, onDismiss }) {
               {t.action.label}
             </button>
           )}
-          <button className="a-node__btn" onClick={() => onDismiss(t.id)} title="Dismiss">✕</button>
+          <button className="a-node__btn" onClick={() => onDismiss(t.id)} title={tr("Dismiss")}>✕</button>
         </div>
       ))}
     </div>

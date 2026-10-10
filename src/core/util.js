@@ -12,6 +12,31 @@ const clamp = (n, lo, hi) => (n < lo ? lo : n > hi ? hi : n);
 const deepClone = (o) =>
   typeof structuredClone === "function" ? structuredClone(o) : JSON.parse(JSON.stringify(o));
 
+// Project drafts contain JSON data. Reuse immutable string payloads instead of
+// copying megabytes of encoded assets through structuredClone on every gesture.
+function cloneProjectDraft(value) {
+  if(Array.isArray(value))return value.map(cloneProjectDraft);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,cloneProjectDraft(item)]));
+  return value;
+}
+
+// Reconcile unchanged branches so history, asset revisions and previews share
+// the same immutable data. Returning prev also detects an edit with no changes.
+function reuseProjectBranches(prev,next) {
+  if(prev===next)return prev;
+  if(!prev||!next||typeof prev!=='object'||typeof next!=='object'||Array.isArray(prev)!==Array.isArray(next))return next;
+  const keys=Object.keys(next),sameKeys=Object.keys(prev).length===keys.length;
+  let unchanged=sameKeys;
+  for(const key of keys){next[key]=reuseProjectBranches(prev[key],next[key]);if(!Object.hasOwn(prev,key)||next[key]!==prev[key])unchanged=false;}
+  return unchanged?prev:next;
+}
+
+function parseEditorNumber(raw) {
+  const text=String(raw).trim().replace(',','.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text))return null;
+  const value=Number(text);return Number.isFinite(value)?value:null;
+}
+
 // ── numeric emission ───────────────────────────────────────────────────
 // Everything that reaches generated PS2 source goes through these. A NaN or
 // an Infinity in the output is a syntax error on hardware, so they are

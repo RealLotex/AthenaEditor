@@ -7,7 +7,7 @@
 //  shipped with no UI at all.
 // ═══════════════════════════════════════════════════════════════════════
 
-function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, alwaysAdvanced, mixedFields = [] }) {
+function ComponentFields({ compKey, comp, obj, scene, project, files, onChange, onOpenScript, issues, alwaysAdvanced, mixedFields = [] }) {
   const def = COMPONENTS[compKey];
   const [open, setOpen] = useState(false);
   if (!def) return null;
@@ -41,7 +41,7 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
     }
     return groups.map((g) => (
       <React.Fragment key={g.name || "_"}>
-        {g.name && <div className="a-sec__group">{g.name}</div>}
+        {g.name && <div className="a-sec__group">{tr(g.name)}</div>}
         {g.fields.map((f) => (
           <FieldControl
             key={f.key}
@@ -51,9 +51,11 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
             comp={comp}
             obj={obj}
             scene={scene}
+            project={project}
             files={files}
             error={errorFor(f.key)}
             mixed={mixedFields.includes(f.key)}
+            onOpenScript={onOpenScript}
             showHelp={showAdvanced && !!f.advanced}
             onChange={(v, phase, axes) => onChange(f.key, v, phase, axes)}
           />
@@ -64,34 +66,21 @@ function ComponentFields({ compKey, comp, obj, scene, files, onChange, issues, a
 
   return (
     <>
+      {compKey==='water'&&<WaterQualityControls comp={comp} obj={obj} files={files} onChange={onChange} mixedFields={mixedFields}/>}
       {render(everyday)}
       {advanced.length > 0 && (
-        showAdvanced
-          ? (
-            <>
-              <div className="a-sec__group a-sec__group--adv">
-                Advanced
-                {!alwaysAdvanced && !advancedHasError && (
-                  <button className="a-adv__hide" aria-label={`Hide advanced ${def.label} settings`} aria-expanded="true" onClick={() => setOpen(false)}>Hide</button>
-                )}
-              </div>
-              {render(advanced)}
-            </>
-          )
-          : (
-            <button className="a-adv__more" aria-expanded="false" onClick={() => setOpen(true)}>
-              Advanced
-            </button>
-          )
+        <Section title={tr("Advanced")} open={showAdvanced} onToggle={()=>{if(!alwaysAdvanced&&!advancedHasError)setOpen(value=>!value);}}>{showAdvanced && render(advanced)}</Section>
       )}
     </>
   );
 }
 
-function FieldControl({ field: f, value, comp, obj, scene, files, error, onChange, showHelp, mixed }) {
-  const common = { label: `${f.label}${mixed ? " · mixed" : ""}`, help: showHelp ? f.help : undefined, error, required: f.required };
+function FieldControl({ field: f, value, comp, obj, scene, project, files, error, onChange, onOpenScript, showHelp, mixed }) {
+  const common = { label: `${tr(f.label)}${mixed ? ' · '+tr('mixed') : ''}`, help: showHelp ? tr(f.help) : undefined, error, required: f.required };
 
   switch (f.type) {
+    case 'eventRules':
+      return <EventRulesEditor rules={value||[]} ownerId={obj.id} scene={scene} project={project} files={files} onChange={onChange}/>;
     case "vec3":
       return (
         <Field {...common}>
@@ -121,8 +110,8 @@ function FieldControl({ field: f, value, comp, obj, scene, files, error, onChang
       );
     case "bool":
       return (
-        <Field {...common}>
-          <Checkbox value={value} onChange={onChange} />
+        <Field {...common} label={f.inlineLabel ? undefined : common.label} stack={f.inlineLabel}>
+          <Checkbox value={value} onChange={onChange} label={f.inlineLabel ? common.label : undefined} />
         </Field>
       );
     case "text":
@@ -134,13 +123,14 @@ function FieldControl({ field: f, value, comp, obj, scene, files, error, onChang
     case "enum":
       return (
         <Field {...common}>
-          <Select value={value} onChange={onChange} options={f.options} showHelp={showHelp} />
+          <Select value={value} onChange={onChange} options={localizeEditorOptions(f.options)} showHelp={showHelp} />
         </Field>
       );
     case "asset":
       return (
         <Field {...common}>
           <AssetSelect value={value} onChange={onChange} files={files} cat={f.cat} />
+          {f.key === "eventScript" && value && onOpenScript && <button className="a-btn a-btn--sm" onClick={() => onOpenScript(value)}>{tr("Edit Script")}</button>}
         </Field>
       );
     case "objectRef":
@@ -149,6 +139,21 @@ function FieldControl({ field: f, value, comp, obj, scene, files, error, onChang
           <ObjectSelect value={value} onChange={onChange} scene={scene} filter={f.filter} selfId={obj.id} />
         </Field>
       );
+    case "objectIdRef":
+      return <Field {...common}><Select value={value || ""} onChange={onChange} options={[
+        { value: "", label: f.placeholder || "Any object" },
+        ...exportableObjects(scene?.objects || []).filter(o => o.id !== obj.id && o.components.rigidbody)
+          .map(o => ({ value: o.id, label: o.name })),
+      ]} /></Field>;
+    case "sceneRef":
+      return <Field {...common}><Select value={value || ""} onChange={onChange} options={[
+        { value: "", label: tr("Choose a scene…") },
+        ...(project?.scenes || []).map(s => ({ value: s.id, label: s.name })),
+      ]} /></Field>;
+    case "sequenceRef":
+      return <Field {...common}><Select value={value||""} onChange={onChange} options={[
+        {value:"",label:tr("Choose a sequence…")},...(scene.sequences||[]).map(s=>({value:s.id,label:s.name})),
+      ]}/></Field>;
     case "rgb01":
       return (
         <Field {...common}>
@@ -209,19 +214,19 @@ function AddComponentMenu({ obj, onAdd, onClose }) {
     const d = COMPONENTS[k];
     if (d.required || obj.components[k]) return false;
     if (!query.trim()) return true;
-    return fuzzyScore(query, `${d.label} ${k} ${purpose[k] || ""}`) > 0;
+    return fuzzyScore(query, `${tr(d.label)} ${k} ${tr(purpose[k] || "")}`) > 0;
   });
 
   return (
-    <Modal title="Add component" onClose={onClose} width={340}>
+    <Modal title={tr("Add component")} onClose={onClose} width={340}>
       <input
-        className="a-input" placeholder="Search components…"
-        aria-label="Search components"
+        className="a-input" placeholder={tr("Search components…")}
+        aria-label={tr("Search components")}
         value={query} onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && available[0]) { onAdd(available[0]); onClose(); } }}
         style={{ marginBottom: 9 }}
       />
-      {available.length === 0 && <Empty>{query.trim() ? `No component matches “${query}”.` : "Every component is already on this object."}</Empty>}
+      {available.length === 0 && <Empty>{query.trim() ? `No component matches “${query}”.` : tr("Every component is already on this object.")}</Empty>}
       {available.map((k) => {
         const d = COMPONENTS[k];
         const missingDep = (d.requires || []).find((r) => !obj.components[r]);
@@ -234,11 +239,11 @@ function AddComponentMenu({ obj, onAdd, onClose }) {
           >
             <span aria-hidden="true" style={{ color: "var(--fg-dim)", fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{d.icon}</span>
             <span style={{ flex: 1 }}>
-              <span style={{ display: "block", color: "var(--fg-strong)", fontWeight: 600 }}>{d.label}</span>
-              {purpose[k] && <span className="a-dim" style={{ display: "block", fontSize: 11 }}>{purpose[k]}</span>}
+              <span style={{ display: "block", color: "var(--fg-strong)", fontWeight: 600 }}>{tr(d.label)}</span>
+              {purpose[k] && <span className="a-dim" style={{ display: "block", fontSize: 11 }}>{tr(purpose[k])}</span>}
               {missingDep && (
                 <span style={{ display: "block", fontSize: 10, color: "var(--fg-dim)" }}>
-                  Also adds {COMPONENTS[missingDep].label}
+                  {tr("Also adds ")}{tr(COMPONENTS[missingDep].label)}
                 </span>
               )}
             </span>

@@ -18,6 +18,7 @@ const DOC_ORDER = [
   { id: "templates", section: "editor", icon: "✦" },
   { id: "scripting", section: "scripting", icon: "⌨" },
   { id: "physics", section: "scripting", icon: "⬡" },
+  { id: "cinematics", section: "scripting", icon: "▶" },
   { id: "shadows", section: "scripting", icon: "◐" },
   { id: "hud", section: "scripting", icon: "▭" },
   { id: "engineNotes", section: "engine", icon: "!" },

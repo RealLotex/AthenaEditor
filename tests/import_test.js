@@ -4,7 +4,7 @@ const modules = [
   "core/util.js",
   "core/math.js",
   "core/project.js",
-  "core/imagesize.js",
+  "core/imagesize.js", "core/vram.js",
   "core/fsaccess.js",
   "editor/mesh.js",
   "editor/assets.js",

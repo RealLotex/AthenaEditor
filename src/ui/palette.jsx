@@ -35,7 +35,7 @@ function CommandPalette({ commands, scope, onClose }) {
     const usable = commands.filter((c) => !c.hidden && (!c.enabled || c.enabled()) &&
       (!scope || (scope === "hud" ? c.id.startsWith("add.ui.") : c.group === "Add" && !c.id.startsWith("add.ui."))));
     if (!query.trim()) return (scope === "objects" && !showAll
-      ? usable.filter(c => ["add.primitive.cube", "add.primitive.plane", "add.primitive.sphere", "add.terrain", "add.model", "add.light", "add.camera"].includes(c.id))
+      ? usable.filter(c => ["add.primitive.cube", "add.primitive.plane", "add.primitive.sphere", "add.terrain", "add.water", "add.model", "add.light", "add.camera"].includes(c.id))
       : usable).slice(0, 40);
     return usable
       .map((c) => ({ c, s: Math.max(fuzzyScore(query, c.title), fuzzyScore(query, c.group || "")) }))
@@ -53,12 +53,12 @@ function CommandPalette({ commands, scope, onClose }) {
   const run = (cmd) => { onClose(); cmd.run(); };
 
   return (
-    <Modal title={scope ? (scope === "hud" ? "Add HUD element" : "Add object") : "Command palette"}
+    <Modal title={tr(scope ? (scope === "hud" ? "Add HUD element" : "Add object") : "Command palette")}
       onClose={onClose} width={560} initialFocus=".a-palette__input">
         <input
           className="a-palette__input"
-          aria-label={scope ? "Find an object to add" : "Find a command"}
-          placeholder={scope ? "Find an object…" : "Type a command…"}
+          aria-label={scope ? tr("Find an object to add") : tr("Find a command")}
+          placeholder={scope ? tr("Find an object…") : tr("Type a command…")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -69,7 +69,7 @@ function CommandPalette({ commands, scope, onClose }) {
           }}
         />
         <div className="a-palette__list" ref={listRef}>
-          {results.length === 0 && <div className="a-palette__empty">No {scope ? "object" : "command"} matches “{query}”.</div>}
+          {results.length === 0 && <div className="a-palette__empty">{tr("No ")}{scope ? tr("object") : tr("command")} {tr("matches “")}{query}”.</div>}
           {results.map((c, i) => (
             <button
               key={c.id}
@@ -80,14 +80,14 @@ function CommandPalette({ commands, scope, onClose }) {
             >
               <span style={{ width: 16, textAlign: "center", color: c.color }}>{c.icon || "›"}</span>
               <span>
-                {!scope && c.group && <span className="a-dim">{c.group} ▸ </span>}
+                {!scope && c.group && <span className="a-dim">{tr(c.group)} ▸ </span>}
                 {c.title}
               </span>
               {c.keys && <span className="a-btn__key">{c.keys}</span>}
             </button>
           ))}
         </div>
-        {scope === "objects" && !query.trim() && !showAll && <button className="a-btn a-btn--ghost a-palette__more" onClick={() => { setShowAll(true); setIndex(0); }}>More objects…</button>}
+        {scope === "objects" && !query.trim() && !showAll && <button className="a-btn a-btn--ghost a-palette__more" onClick={() => { setShowAll(true); setIndex(0); }}>{tr("More objects…")}</button>}
     </Modal>
   );
 }

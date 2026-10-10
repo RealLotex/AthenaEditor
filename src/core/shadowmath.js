@@ -150,3 +150,32 @@ function shadowMatrixFor(proj, ground, groundY = 0) {
     ground.x, groundY + proj.L.y, ground.z, 1,
   ];
 }
+
+/** Native rays begin half their length above the decal along +L (shadows.c).
+ * Follow all three coordinates so a high platform remains within the query.
+ * The grid's horizontal basis keeps each ray on its silhouette projection. */
+function shadowRayMatrixFor(proj, origin, rayLength) {
+  const half = Math.max(0.01, num(rayLength, 12)) / 2;
+  return shadowMatrixFor(proj, {
+    x: origin.x - proj.L.x * half,
+    z: origin.z - proj.L.z * half,
+  }, origin.y - proj.L.y * half);
+}
+
+/** Exclude the caster's subtree and its enclosing physics actor. A model is
+ * often a child of the player root, with the Rigidbody on that root. */
+function shadowReceiverBodies(objects, bodies, casterId) {
+  const parents = new Map(), byId = new Map();
+  const visit = (list, parent = null) => { for (const o of list) { parents.set(o.id, parent); byId.set(o.id, o); visit(o.children || [], o); } };
+  visit(objects);
+  const excluded = new Set();
+  const exclude = o => { if (!o) return; excluded.add(o.id); for (const c of o.children || []) exclude(c); };
+  const caster = byId.get(casterId);
+  exclude(caster);
+  let actor = parents.get(casterId);
+  while (actor) {
+    if (bodies.some(b => b.obj.id === actor.id)) { exclude(actor); break; }
+    actor = parents.get(actor.id);
+  }
+  return bodies.filter(b => !b.isTrigger && b.shape !== 'ray' && !b.obj.components?.water && !excluded.has(b.obj.id));
+}

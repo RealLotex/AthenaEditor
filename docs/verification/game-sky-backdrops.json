@@ -1,0 +1,154 @@
+[
+  {
+    "passed": true,
+    "backdropMode": "solid",
+    "camera": {
+      "fov": 55,
+      "near": 1,
+      "far": 4000,
+      "position": {
+        "x": 0,
+        "y": 4.75,
+        "z": 7.51
+      },
+      "target": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      }
+    },
+    "tag": "SKY",
+    "textures": [
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      },
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      }
+    ],
+    "corners": 5952,
+    "lowerCorners": 0,
+    "backdropCorners": 288,
+    "maxColorError": 1.4608981580011005e-8
+  },
+  {
+    "passed": true,
+    "backdropMode": "gradient",
+    "camera": {
+      "fov": 55,
+      "near": 1,
+      "far": 4000,
+      "position": {
+        "x": 0,
+        "y": 4.75,
+        "z": 7.51
+      },
+      "target": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      }
+    },
+    "tag": "SKY",
+    "textures": [
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      },
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      }
+    ],
+    "corners": 5952,
+    "lowerCorners": 0,
+    "backdropCorners": 288,
+    "maxColorError": 2.6179294954076227e-8
+  },
+  {
+    "passed": true,
+    "backdropMode": "foggy",
+    "camera": {
+      "fov": 55,
+      "near": 1,
+      "far": 4000,
+      "position": {
+        "x": 0,
+        "y": 4.75,
+        "z": 7.51
+      },
+      "target": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      }
+    },
+    "tag": "SKY",
+    "textures": [
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      },
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      }
+    ],
+    "corners": 5952,
+    "lowerCorners": 0,
+    "backdropCorners": 672,
+    "maxColorError": 2.6179294954076227e-8
+  },
+  {
+    "passed": true,
+    "backdropMode": "mirror",
+    "camera": {
+      "fov": 55,
+      "near": 1,
+      "far": 4000,
+      "position": {
+        "x": 0,
+        "y": 4.75,
+        "z": 7.51
+      },
+      "target": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      }
+    },
+    "tag": "SKY",
+    "textures": [
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      },
+      {
+        "width": 1024,
+        "height": 512,
+        "bpp": 16,
+        "nearest": true
+      }
+    ],
+    "corners": 11904,
+    "lowerCorners": 384,
+    "backdropCorners": 0,
+    "maxColorError": 0
+  }
+]

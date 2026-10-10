@@ -1,18 +1,25 @@
 // Layout preferences are independent of the game project and its undo history.
 const DOCK_PANELS = {
   viewport: "Scene",
+  timeline: "Timeline",
+  game: "Game",
   hud: "HUD",
-  uv: "UV",
   terrain: "Terrain",
   scripts: "Scripts",
   outliner: "Objects",
   inspector: "Properties",
-  sceneSettings: "Scene settings",
+  sceneSettings: "World",
+  environment: "Lighting",
+  events: "Events",
   projectSettings: "Project",
-  assets: "Assets",
+  controls: "Controls",
+  uv: "UV",
   prefabs: "Prefabs",
+  assets: "Assets",
   problems: "Problems",
 };
+const DOCK_PANEL_ALIASES={world:'sceneSettings',lighting:'environment'};
+const canonicalDockPanel=id=>DOCK_PANEL_ALIASES[id]||id;
 const LAYOUT_PRESETS = ["Focus", "Default", "Unity", "Unreal 4", "Unreal 5", "Godot"];
 
 function layoutPreset(name = "Default") {
@@ -30,25 +37,24 @@ function layoutPreset(name = "Default") {
     ratio,
     children: [a, b],
   });
-  const view = group("work", ["viewport", "hud", "uv", "scripts"]);
+  const view = group("work", ["viewport", "game", "timeline", "hud", "scripts"]);
   const outline = group("outline", ["outliner"]);
   const inspect = group("inspect", [
     "inspector",
     "sceneSettings",
-    "projectSettings",
   ]);
   const assets = group(
     "library",
-    ["assets", "prefabs", "problems"],
+    ["assets", "problems"],
     name === "Unreal 5",
   );
   let tree;
   if (name === "Focus") {
     return { version: 1, preset: "Focus", nextId: 1, floating: [],
       tree: split("frame", "row", .76,
-        split("main", "row", .24, group("outline", ["outliner", "assets"]), group("work", ["viewport"])),
-        group("inspect", ["inspector"])),
-      hidden: Object.keys(DOCK_PANELS).filter(id => !["outliner", "assets", "viewport", "inspector"].includes(id)) };
+        split("main", "row", .24, group("outline", ["outliner", "assets"]), group("work", ["viewport","game"])),
+        group("inspect", ["inspector","sceneSettings"])),
+      hidden: Object.keys(DOCK_PANELS).filter(id => !["outliner", "assets", "viewport", "game", "inspector", "sceneSettings"].includes(id)) };
   } else if (name === "Unity") {
     tree = split(
       "frame",
@@ -103,7 +109,7 @@ function layoutPreset(name = "Default") {
     preset: LAYOUT_PRESETS.includes(name) ? name : "Default",
     tree,
     floating: [],
-    hidden: ["terrain"],
+    hidden: Object.keys(DOCK_PANELS).filter(id => !dockGroups(tree).some(group => group.tabs.includes(id))),
     nextId: 1,
   };
 }
@@ -125,13 +131,13 @@ function normalizeDockLayout(value) {
     ) return null;
     nodeIds.add(node.id);
     if (node.type === "group" && Array.isArray(node.tabs)) {
-      const tabs = node.tabs.filter(take);
+      const tabs = node.tabs.map(canonicalDockPanel).filter(take);
       return tabs.length
         ? {
           type: "group",
           id: node.id,
           tabs,
-          active: tabs.includes(node.active) ? node.active : tabs[0],
+          active: tabs.includes(canonicalDockPanel(node.active)) ? canonicalDockPanel(node.active) : tabs[0],
           collapsed: !!node.collapsed,
         }
         : null;
@@ -149,7 +155,7 @@ function normalizeDockLayout(value) {
     };
   };
   const tree = read(value.tree);
-  const floating = (Array.isArray(value.floating) ? value.floating : []).filter(
+  const floating = (Array.isArray(value.floating) ? value.floating : []).map(f=>f?{...f,panel:canonicalDockPanel(f.panel)}:f).filter(
     (f) => f && take(f.panel),
   ).map((f) => ({
     panel: f.panel,
@@ -163,7 +169,7 @@ function normalizeDockLayout(value) {
     width: clamp(num(f.width, 420), 240, 4096),
     height: clamp(num(f.height, 340), 160, 4096),
   }));
-  const hidden = (Array.isArray(value.hidden) ? value.hidden : []).filter(take);
+  const hidden = (Array.isArray(value.hidden) ? value.hidden : []).map(canonicalDockPanel).filter(take);
   hidden.push(...Object.keys(DOCK_PANELS).filter((id) => !used.has(id)));
   const lastId = Math.max(
     0,
@@ -182,6 +188,7 @@ function normalizeDockLayout(value) {
 }
 
 function dockLocation(layout, panel) {
+  panel=canonicalDockPanel(panel);
   const group = dockGroups(layout.tree).find((g) => g.tabs.includes(panel));
   return group
     ? { group }
@@ -191,6 +198,7 @@ function dockLocation(layout, panel) {
 }
 
 function removeDockPanel(layout, panel) {
+  panel=canonicalDockPanel(panel);
   const remove = (node) => {
     if (!node) return null;
     if (node.type === "group") {
@@ -250,6 +258,7 @@ function redockPanel(layout, panel) {
 }
 
 function activateDockPanel(layout, panel) {
+  panel=canonicalDockPanel(panel);
   if (!DOCK_PANELS[panel]) return layout;
   const next = deepClone(layout), location = dockLocation(next, panel);
   if (location.group) {
@@ -289,6 +298,7 @@ function moveDockPanel(
   edge = "center",
   rect = {},
 ) {
+  panel=canonicalDockPanel(panel);
   if (!DOCK_PANELS[panel]) return layout;
   const next = deepClone(layout), source = dockLocation(next, panel);
   const home = dockPanelHome(layout, panel);
@@ -366,6 +376,7 @@ function moveDockPanel(
 }
 
 function closeDockPanel(layout, panel) {
+  panel=canonicalDockPanel(panel);
   if (!DOCK_PANELS[panel]) return layout;
   const next = deepClone(layout);
   removeDockPanel(next, panel);
@@ -375,6 +386,7 @@ function closeDockPanel(layout, panel) {
 }
 
 function toggleDockPanel(layout, panel) {
+  panel=canonicalDockPanel(panel);
   const location = dockLocation(layout, panel);
   return location.hidden || location.group?.collapsed
     ? activateDockPanel(layout, panel)

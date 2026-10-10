@@ -112,3 +112,39 @@ const isPowerOfTwo = (n) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
  * image_loaders.c:134 picks for anything with colour.
  */
 const textureBytes = (w, h, bpp = 32) => Math.max(0, w) * Math.max(0, h) * (bpp / 8);
+
+// Read the storage format, not PNG sample precision or compressed file size.
+// image_loaders.c keeps indexed PNG/BMP palettes, but expands RGB PNG to CT32.
+function textureFormatOfAsset(entry) {
+  const b = entry?.bytes || bytesFromDataUrl(entry?.dataUrl, 64);
+  if (!b) return null;
+  if (b[0] === 137 && b[1] === 80 && b.length >= 26) return b[25] === 3 ? (b[24] <= 4 ? "T4" : "T8") : "CT32";
+  if (b[0] === 66 && b[1] === 77 && b.length >= 30) {
+    const depth = le16(b, le32(b, 14) === 12 ? 24 : 28);
+    return ({ 4: "T4", 8: "T8", 16: "CT16", 24: "CT24", 32: "CT32" })[depth] || "CT32";
+  }
+  if (b[0] === 255 && b[1] === 216) return "CT24";
+  return imageSize(b, entry?.name)?.format === "tga" ? "CT32" : null;
+}
+
+// Matches graphics.c:athena_vram_surface_size: 256-byte blocks, GS swizzle
+// alignment, and 24-bit surfaces occupy the same blocks as 32-bit surfaces.
+function gsSurfaceBytes(width, height, format = "CT32") {
+  if (!(width > 0 && height > 0)) return 0;
+  const psm = format.replace(/^Screen\./, ""), indexed4 = psm === "T4", indexed8 = psm === "T8";
+  const sixteen = /^(CT|Z)16S?$/.test(psm), signed = /16S$/.test(psm);
+  let w = Math.ceil(width / (indexed4 ? 32 : sixteen || indexed8 ? 16 : 8));
+  let h = Math.ceil(height / (indexed4 || indexed8 ? 16 : 8));
+  let a, b;
+  if (!sixteen && !indexed4) [a, b] = w <= 2 && h <= 1 ? [1, 1] : w <= 4 && h <= 2 ? [2, 2] : w <= 8 && h <= 4 ? [4, 4] : [8, 4];
+  else if (!signed) [a, b] = w <= 1 && h <= 2 ? [1, 1] : w <= 2 && h <= 4 ? [2, 2] : w <= 4 && h <= 8 ? [4, 4] : [4, 8];
+  else [a, b] = w <= 1 && h <= 2 ? [1, 1] : w <= 2 && h <= 2 ? [2, 2] : w <= 2 && h <= 8 ? [2, 8] : [4, 8];
+  return Math.ceil(w / a) * a * Math.ceil(h / b) * b * 256;
+}
+
+function textureVRAMBytes(entry) {
+  const size = imageSizeOfAsset(entry), format = textureFormatOfAsset(entry);
+  if (!size || !format) return null;
+  const palette = format === "T4" ? gsSurfaceBytes(8, 2) : format === "T8" ? gsSurfaceBytes(16, 16) : 0;
+  return gsSurfaceBytes(size.width, size.height, format) + palette;
+}

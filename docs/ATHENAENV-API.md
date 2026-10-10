@@ -1,5 +1,64 @@
 # AthenaEnv API — verified reference
 
+## Water, pooled particles, fog and reflection maps (verified 2026-10-09)
+
+`reference/AthenaEnvSourceFiles/src/js_api/ath_render.c` exposes borrowed ArrayBuffers
+through `RenderData.vertices`: positions, normals, UVs and colors use four floats per
+corner. Typed views can update these buffers in place. Do not replace the `vertices`
+property for shared geometry: its setter frees native allocations used by clones.
+Retain position W = 1: the VU matrix multiply includes that lane when applying object
+and camera translation. Clearing a particle pool's position buffer must not leave W zero.
+
+In the no-lights VU pipeline, material diffuse RGBA is added to vertex RGBA. Set material
+RGB to zero for authored vertex colors. `updateMaterial` retains/resets diffuse alpha to
+one; effective opacity therefore requires vertex alpha `opacity - 1`. Opaque baked colors
+use vertex alpha zero. Water, fog and particle fixtures verify this against the released ELF.
+
+Submit a particle emitter as one mesh with independent corner/color lanes per quad.
+The renderer queues REF packets that borrow buffers: rewriting one quad for several draws
+can change earlier submissions before DMA consumes them. Fixed pools avoid this and use
+one draw per emitter. `material_indices.end` is inclusive: a pool of N quads ends at
+`N * 6 - 1`. Change a full snapshot with the existing material count; growing native
+material/material-index arrays through their setters is unsafe in this release.
+
+Timeline emitter clips sample that existing pool at clip age, suspend its independent
+clock and restore its prior time/playback on exit. They create no legacy mesh pool or
+additional native RenderObject. Scrubbing uses the same deterministic motion function.
+
+Reflection maps use `setTexture(index, image)` and each material's `ref_texture_id`.
+Append at the next contiguous index, preserving the full material snapshot/count.
+The native reflection pass uses fixed additive intensity; the editor encodes strength
+in the shared map. Prime its upload once with an invisible Image draw. Reapply requested
+filtering after constructors, which reset filters to LINEAR.
+
+The release has no fog binding. Static OBJ fog overlays use material-free mesh copies,
+no texture mapping and per-corner fog alpha. Their independent color/geometry buffers
+add RAM and draws but no texture VRAM. Use the existing depth buffer with writes masked,
+GEQUAL comparison and alpha-test reference zero, then restore the project settings.
+The same alpha/depth handling preserves soft particle/shadow edges and translucent water.
+
+Native timing probes exposed incorrect comparisons between mixed float32/float64 tags
+in this QuickJS fork. Promote clock, interval and lifetime values through reusable
+Float64Array slots before comparisons, as the event timer does. Browser/Deno arithmetic
+alone does not expose the failure; timer-driven particle bursts and animated water were
+checked in PCSX2. These findings do not establish general scene-reload safety: the coastal
+probe fails during reload even with a baseline that disables the new effects.
+
+## Cinematic font and particle compatibility (verified 2026-10-06)
+
+`src/fntsys.c` sizes font DMA packets with `count_nonascii`, whose implementation
+in `src/strUtils.c` divides non-ASCII UTF-8 bytes by two. Three-/four-byte characters
+can produce incorrect packet sizes; an ellipsis reproducibly hangs the bundled ELF
+in PCSX2. Cinematic export prepares text lines, maps common punctuation to ASCII,
+preserves two-byte accented text, and rejects remaining unsupported glyphs.
+
+The RenderObject constructor's `transform` Matrix4 wraps a pointer inside the native
+object, while the Matrix4 finalizer frees that pointer. Additional particle objects
+reproducibly corrupt cleanup on scene reload in the release. Cinematic particles use
+plain pooled transforms and borrow the source RenderObject for their draw pass,
+restoring its position/scale afterwards. The complete particle/scene-transition fixture
+passes with this approach. The editor does not patch the bundled engine.
+
 ## Render settings and sky depth (verified 2026-10-02)
 
 The official `latest` ELF is pinned by SHA-256 in
@@ -196,16 +255,17 @@ The callback receives **one contact object**, not two geoms:
 The source binding returns JS geom objects in `geom1`/`geom2`, allowing custom properties
 to be read back. The shipped release ELF instead returns numeric native geom IDs
 (verified in PCSX2 while reproducing the side-scroller jump failure). There is no public
-ID lookup binding. The editor detects numeric contacts and, before subsequent steps,
+ID lookup binding. The editor detects numeric contacts and, during the first numeric
+callback of each step (before solving),
 queries event pairs with `ODE.geomCollide` to recover known geom identities. This only
 queries contacts; it does not repeat the broad phase or create extra contact joints.
-Recovery runs only if the preceding native step reported numeric contacts. With multiple
+Recovery runs once per step with numeric contacts; empty steps require no recovery. With multiple
 event pairs, conservative enclosing spheres/plane height checks omit impossible pairs;
 centres are read live once per poll, including static geoms that scripts can move.
 Unknown mesh/ray extents retain queries. A single pair uses the direct query without
 extra centre reads. Float64 scratch storage avoids the release's mixed float comparison
 defect; the native physics broad phase and solver remain unchanged.
-The editor tags geoms with `_name` and `_ctxKey`.
+The editor tags geoms with `_name`, `_ctxKey` and stable object `_id` when events are enabled.
 Its event state records `lastHit`, `lastHitNormal` and `lastHitPosition`. The contact
 position lets controllers distinguish a floor below the body's centre from a ceiling.
 
@@ -222,7 +282,12 @@ body, so `dJointAttach(c, body, NULL)` welds the dynamic body to the static envi
 a "trigger" in the space **blocks movement**.
 
 The editor therefore creates trigger geoms with a `null` space and polls them with
-`ODE.geomCollide(trigger, otherGeom)` each frame.
+`ODE.geomCollide(trigger, otherGeom)` each frame. Only pairs with at least one event-enabled
+collider are generated; each pair is queried once, with the same conservative bounds as
+contact recovery. Static colliders and other triggers can participate too.
+Both sides use the same pair lifecycle implementation, which deduplicates repeated contact points. Script callbacks
+`ctx.<key>.onCollisionEnter/Exit(event)` and `onTriggerEnter/Exit(event)` run after physics.
+See [Physics events](PHYSICS-EVENTS.md) for lifecycle, payload and compatibility details.
 
 ### `getRotation()` returns a truncated matrix
 
@@ -388,6 +453,31 @@ Confirmed at `ath_shadows.c:169`: `argv[0]` space, `argv[1]` enable (int),
 
 > The README's prose says `(space, rayLength, enable)`. It is wrong.
 
+The projector creates its ray **inside** the supplied space (`shadows.c:175`).
+Passing the solver's space makes the ray part of physics and allows it to hit
+the caster. The editor uses separate receiver spaces containing solid collider
+proxies. It excludes the caster subtree and its enclosing Rigidbody actor, plus
+triggers and other rays. Identical receiver sets share a space. Dynamic proxies
+attach to the original body; static proxies follow the original geom's position.
+Destroyed receivers are removed before the next shadow draw.
+
+Each grid ray starts half its length along +L from the transformed grid node.
+`shadowRayMatrixFor` places that origin at the caster's height, updating X/Y/Z
+together. This also reaches platforms above the old fixed Ground Y query range.
+The native receiver fixture checks the emitted centre ray against the actual
+receiver geoms at floor height, on a high platform and after moving/destruction.
+
+Receiver spaces must outlive their projector rays. Projector finalizers own
+those rays; cleanup releases projector references and runs `std.gc()` before
+freeing proxies/spaces, then disposes the simulation. Cleanup also supports
+scenes without a script context.
+
+**Known release limitation:** native scene reload with live render-target
+shadows can hang during VM cleanup. The flat live-shadow control reproduced the
+same failure, so it predates receiver isolation. `tools/verify-shadow-receivers.js`
+checks rendering/query behaviour; its optional `--reload` audits this failure.
+Do not describe that probe as a passing live-shadow scene-transition test.
+
 ### `setSlopeLimit` — `-1` disables, `0` does not
 
 `src/shadows.c` enables the filter for `maxSlopeCos > -0.5f`. The engine's default is
@@ -490,6 +580,12 @@ Two different objects with two different capability sets, and the difference dec
 the editor can offer.
 
 ### `Sound.Stream` — what the editor emits
+
+In the bundled release, `sound_rewind` in `src/sound_stream.c` seeks `cur_snd->fp`,
+even though its argument is a different stream. Calling `rewind()` before the first
+`play()` dereferences a null pointer; switching files also rewinds the wrong file.
+For a one-shot, call `pause()`, then `play()`, then `rewind()`. This selects the
+receiver as the current stream before seeking. Cinematic audio adapts the same order.
 
 ```
 play()  pause()  rewind()  playing()  free()      methods       (ath_sound.c:126-130)

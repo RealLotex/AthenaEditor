@@ -7,6 +7,7 @@ const A = await load([
   "core/project.js",
   "editor/mesh.js",
   "editor/assets.js",
+  "editor/asset-management.js",
   "editor/clipboard.js",
 ]);
 const encode = (payload) => A.EDITOR_CLIPBOARD_PREFIX + JSON.stringify(payload);

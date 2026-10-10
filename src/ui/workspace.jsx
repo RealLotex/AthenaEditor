@@ -17,15 +17,30 @@ function PanelSlot({ host, active = true }) {
   );
 }
 
-function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onCopy, onPaste, onWindowFocus, onError, resetWindowsKey }) {
+// Keep the selected tab in view and expose overflow with two explicit controls.
+function DockTabCarousel({active,children}) {
+  const strip=useRef(null),[edges,setEdges]=useState({overflow:false,left:false,right:false});
+  const measure=()=>{const el=strip.current;if(!el)return;const next={overflow:el.scrollWidth>el.parentElement.clientWidth+1,left:el.scrollLeft>1,right:el.scrollLeft+el.clientWidth<el.scrollWidth-1};setEdges(previous=>Object.keys(next).every(key=>previous[key]===next[key])?previous:next);};
+  useLayoutEffect(()=>{const el=strip.current;const observer=new ResizeObserver(measure);observer.observe(el);measure();return()=>observer.disconnect();},[]);
+  useLayoutEffect(()=>{const el=strip.current,tab=el.querySelector(`[data-dock-tab="${active}"]`);if(tab){const a=el.getBoundingClientRect(),b=tab.getBoundingClientRect();if(b.left<a.left)el.scrollLeft-=a.left-b.left;else if(b.right>a.right)el.scrollLeft+=b.right-a.right;}measure();},[active]);
+  useLayoutEffect(measure,[children]);
+  const step=direction=>{const el=strip.current;el.scrollBy({left:direction*Math.max(70,el.clientWidth*.75),behavior:'auto'});measure();};
+  return <div className="a-tab-carousel">
+    {edges.overflow&&<button className="a-tab-carousel__arrow" aria-label={tr("Previous panels")} disabled={!edges.left} onClick={()=>step(-1)}>‹</button>}
+    <div ref={strip} role="tablist" aria-label={tr("Docked panels")} onScroll={measure}>{children}</div>
+    {edges.overflow&&<button className="a-tab-carousel__arrow" aria-label={tr("Next panels")} disabled={!edges.right} onClick={()=>step(1)}>›</button>}
+  </div>;
+}
+
+function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyDown, onCopy, onPaste, onWindowFocus, onError, resetWindowsKey, uiAnimations=false }) {
   const root = useRef(null),
     hosts = useRef(null),
     gesture = useRef(null),
     current = useRef(layout);
   current.current = layout;
-  useDetailsPopovers(root, ".a-dock-options");
+  useDetailsPopovers(root, ".a-dock-options, .a-panel-picker");
   const parking = useRef(null), windows = useRef(new Map()), callbacks = useRef({});
-  callbacks.current = { onKeyDown, onCopy, onPaste, onWindowFocus, onError };
+  callbacks.current = { onKeyDown, onCopy, onPaste, onWindowFocus, onError,uiAnimations };
   const [external, setExternal] = useState([]);
   const releaseWindow = (id) => {
     const frame = windows.current.get(id);
@@ -40,7 +55,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
     const existing = windows.current.get(id);
     if (existing && !existing.window.closed) { existing.window.focus(); return; }
     try {
-      const frame = openPanelWindow(window, document, id, `${projectName} — ${DOCK_PANELS[id]} — AthEditor`, {
+      const frame = openPanelWindow(window, document, id, `${projectName} — ${tr(DOCK_PANELS[id])} — AthEditor`, {
         onClose: () => releaseWindow(id),
         onKey: (event) => callbacks.current.onKeyDown?.(event),
         onCopy: (event) => callbacks.current.onCopy?.(event),
@@ -53,6 +68,8 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
         onError: (error) => callbacks.current.onError?.(error),
       });
       windows.current.set(id, frame);
+      frame.window.document.body.classList.add('a-app');
+      for(const name of ['click','change'])frame.window.document.body.addEventListener(name,event=>{if(callbacks.current.uiAnimations)animateEditorAction(event);});
       frame.slot.appendChild(hosts.current[id]);
       notifyPanelWindow(hosts.current[id]);
       setExternal([...windows.current.keys()]);
@@ -64,8 +81,9 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
   }, [resetWindowsKey]);
   useEffect(() => {
     for (const [id, frame] of windows.current) {
-      frame.window.document.title = `${projectName} — ${DOCK_PANELS[id]} — AthEditor`;
+      frame.window.document.title = `${projectName} — ${tr(DOCK_PANELS[id])} — AthEditor`;
       frame.window.document.documentElement.setAttribute("data-theme", document.documentElement.getAttribute("data-theme"));
+      frame.window.document.body.classList.toggle('a-app--motion',uiAnimations);
     }
   });
   useEffect(() => {
@@ -252,7 +270,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
     >
       <summary
         aria-label={`Panel options for ${DOCK_PANELS[panel]}`}
-        title="Panel options"
+        title={tr("Panel options")}
       >
         ⋯
       </summary>
@@ -263,20 +281,18 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
         }}
       >
         {external.includes(panel)
-          ? <button onClick={() => releaseWindow(panel)}>Return to editor</button>
-          : <button onClick={() => detachWindow(panel)}>Open in window</button>}
+          ? <button onClick={() => releaseWindow(panel)}>{tr("Return to editor")}</button>
+          : <button onClick={() => detachWindow(panel)}>{tr("Open in window")}</button>}
         {floating
           ? (
             <button
               onClick={() => { releaseWindow(panel); change((l) => redockPanel(l, panel)); }}
             >
-              Dock
-            </button>
+              {tr("Dock")}</button>
           )
           : (
             <button onClick={() => { releaseWindow(panel); change((l) => moveDockPanel(l, panel)); }}>
-              Undock
-            </button>
+              {tr("Undock")}</button>
           )}
         {[
           ["left", "Dock left"],
@@ -291,7 +307,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
                 moveDockPanel(l, panel, l.tree?.id || "work", edge)
               ); }}
           >
-            {label}
+            {tr(label)}
           </button>
         ))}
         {!floating && (
@@ -301,12 +317,11 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
                 updateDockNode(l, group.id, { collapsed: !group.collapsed })
               )}
           >
-            {group.collapsed ? "Expand" : "Collapse"}
+            {group.collapsed ? tr("Expand") : tr("Collapse")}
           </button>
         )}
         <button onClick={() => { releaseWindow(panel); change((l) => closeDockPanel(l, panel)); }}>
-          Close panel
-        </button>
+          {tr("Close panel")}</button>
       </div>
     </details>
   );
@@ -314,8 +329,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
     if (!n) {
       return (
         <div className="a-dock-empty">
-          Open a panel from View → Panels, or choose a layout preset.
-        </div>
+          {tr("Open a panel from View → Panels, or choose a layout preset.")}</div>
       );
     }
     if (n.type === "split") {
@@ -362,18 +376,19 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
         onPointerDown={() => onActive?.(n.active)}
       >
         <div className="a-dock-tabs">
-          <div role="tablist" aria-label="Docked panels">
+          <DockTabCarousel active={n.active}>
             {n.tabs.map((id) => (
               <button
                 key={id}
                 data-dock-tab={id}
                 role="tab"
                 aria-selected={n.active === id && !n.collapsed}
+                aria-label={id==='sceneSettings'?tr("World"):undefined}
                 tabIndex={n.active === id ? 0 : -1}
                 className={`a-dock-tab${
                   n.active === id ? " a-dock-tab--active" : ""
                 }`}
-                title={`Drag to dock ${DOCK_PANELS[id]}; Alt-drag to float`}
+                title={`${tr("Drag to dock")} ${tr(DOCK_PANELS[id])}; ${tr("Alt-drag to float")}`}
                 onClick={() => activate(id)}
                 onKeyDown={(e) => {
                   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
@@ -388,17 +403,22 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
                 onPointerDown={(e) => start(e, id)}
                 {...events}
               >
-                {DOCK_PANELS[id]}
+                <EditorIcon name={PANEL_ICONS[id]} size={20}/>{tr(DOCK_PANELS[id])}
               </button>
             ))}
-          </div>
+          </DockTabCarousel>
+          {n.tabs.some(id=>['viewport','game','timeline','terrain','hud','uv','scripts'].includes(id))&&<details className="a-panel-picker">
+            <summary aria-label={tr("Open editor panel")} title={tr("Open editor panel")}><EditorIcon name="plus" size={19}/></summary>
+            <div className="a-panel-picker__pop">
+              {Object.entries(DOCK_PANELS).map(([id,label])=><button key={id} className="a-menu__item" onClick={e=>{e.currentTarget.closest('details').open=false;activate(id);}}><EditorIcon name={PANEL_ICONS[id]} size={18}/>{tr(label)}</button>)}
+            </div>
+          </details>}
           {options(n.active, n)}
         </div>
         {n.tabs.map((id) => (
           external.includes(id)
             ? (id === n.active && !n.collapsed && <div key={id} className="a-dock-empty">
-              {DOCK_PANELS[id]} is open in another window.
-              <button className="a-btn" onClick={() => releaseWindow(id)}>Return to editor</button>
+              {tr(DOCK_PANELS[id])} {tr("is open in another window.")}<button className="a-btn" onClick={() => releaseWindow(id)}>{tr("Return to editor")}</button>
             </div>)
             : <PanelSlot key={id} host={hosts.current[id]} active={id === n.active && !n.collapsed} />
         ))}
@@ -416,7 +436,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
           <section
             className="a-floating-panel"
             role="region"
-            aria-label={`Floating ${DOCK_PANELS[f.panel]}`}
+            aria-label={`Floating ${tr(DOCK_PANELS[f.panel])}`}
             key={f.panel}
             style={{
               left: f.x,
@@ -435,19 +455,19 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
               onPointerDown={(e) => start(e, f.panel, "panel", f)}
               {...events}
             >
-              <span>{DOCK_PANELS[f.panel]}</span>
+              <span>{tr(DOCK_PANELS[f.panel])}</span>
               <span className="a-grow" />
               {options(f.panel, null, true)}
               <button
-                aria-label={`Dock ${DOCK_PANELS[f.panel]}`}
-                title="Dock"
+                aria-label={`Dock ${tr(DOCK_PANELS[f.panel])}`}
+                title={tr("Dock")}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => { releaseWindow(f.panel); change((l) => redockPanel(l, f.panel)); }}
               >
                 ↙
               </button>
               <button
-                aria-label={`Close ${DOCK_PANELS[f.panel]} panel`}
+                aria-label={`Close ${tr(DOCK_PANELS[f.panel])} panel`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => { releaseWindow(f.panel); change((l) => closeDockPanel(l, f.panel)); }}
               >
@@ -455,12 +475,12 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
               </button>
             </div>
             {external.includes(f.panel)
-              ? <div className="a-dock-empty"><button className="a-btn" onClick={() => releaseWindow(f.panel)}>Return to editor</button></div>
+              ? <div className="a-dock-empty"><button className="a-btn" onClick={() => releaseWindow(f.panel)}>{tr("Return to editor")}</button></div>
               : <PanelSlot host={hosts.current[f.panel]} />}
             <div
               className="a-floating-resize"
               role="separator"
-              aria-label={`Resize ${DOCK_PANELS[f.panel]}`}
+              aria-label={`Resize ${tr(DOCK_PANELS[f.panel])}`}
               onPointerDown={(e) => start(e, f.panel, "resize", f)}
               {...events}
             />
@@ -472,16 +492,17 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
           !external.includes(id) && <PanelSlot key={id} host={hosts.current[id]} />
         ))}
       </div>
-      {Object.entries(panels).map(([id, panel]) =>
-        ReactDOM.createPortal(panel, hosts.current[id], id)
-      )}
+      {Object.entries(panels).map(([id, panel]) => {
+        const active=external.includes(id)||layout.floating.some(f=>f.panel===id)||dockGroups(layout.tree).some(g=>g.active===id&&!g.collapsed);
+        return ReactDOM.createPortal(<PanelActivityContext.Provider value={active}>{panel}</PanelActivityContext.Provider>,hosts.current[id],id);
+      })}
       {drag && (
         <>
           <div
             className="a-dock-drag-label"
             style={{ left: drag.x, top: drag.y }}
           >
-            {DOCK_PANELS[drag.panel]}
+            {tr(DOCK_PANELS[drag.panel])}
           </div>
           {drag.target && <DockDropPreview target={drag.target} />}
         </>
@@ -505,7 +526,7 @@ function DockDropPreview({ target }) {
       className="a-dock-drop-preview"
       style={{ left: x, top: y, width, height }}
     >
-      <span>{edge === "center" ? "Group as tabs" : `Dock ${edge}`}</span>
+      <span>{edge === "center" ? tr("Group as tabs") : `Dock ${edge}`}</span>
     </div>
   );
 }
@@ -517,7 +538,7 @@ function SplitHandle({ node, onChange }) {
       className={`a-dock-divider a-dock-divider--${node.axis}`}
       role="separator"
       tabIndex="0"
-      aria-label="Resize docked panels"
+      aria-label={tr("Resize docked panels")}
       aria-orientation={node.axis === "row" ? "vertical" : "horizontal"}
       aria-valuemin={12}
       aria-valuemax={88}

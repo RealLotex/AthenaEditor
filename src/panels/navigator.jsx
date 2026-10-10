@@ -10,6 +10,7 @@ const CAT_META = {
 function Navigator({
   compact,
   files,
+  project,
   prefabs,
   tab,
   onTab,
@@ -25,8 +26,14 @@ function Navigator({
   onDeletePrefab,
   onSavePrefab,
   revealAssetName,
+  assetFolders = [],
+  onCreateFolder,
+  onCreateVariant,
 }) {
   const [query, setQuery] = useState(""), [folder, setFolder] = useState("");
+  const [referencedOnly,setReferencedOnly]=useState(false);
+  const referenced=useMemo(()=>new Set(project?projectAssetReferences(project).filter(r=>r.sceneId===project.activeSceneId).map(r=>r.cat+'/'+r.name):[]),[project]);
+  const [category, setCategory] = useState(''), [newFolder, setNewFolder] = useState(null), [folderError, setFolderError] = useState('');
   const [dropTarget, setDropTarget] = useState(null);
   const dropProps = (destination) => ({
     onDragOver: (event) => {
@@ -42,12 +49,14 @@ function Navigator({
       onDropAssets?.(event.dataTransfer, destination);
     },
   });
-  const tree = useMemo(() => assetFolderTree(files), [files]);
+  const tree = useMemo(() => assetFolderTree(files, assetFolders), [files, assetFolders]);
   useEffect(() => {
     if (folder && !tree.some((f) => f.path === folder)) setFolder("");
   }, [tree, folder]);
   useEffect(() => {
     const asset = files.find((f) => f.id === selectedAssetId);
+    if(asset&&!referenced.has(asset.cat+'/'+asset.name))setReferencedOnly(false);
+    if(asset&&category&&asset.cat!==category)setCategory('');
     if (asset && folder && !assetLibraryFolder(asset).startsWith(folder + "/") && assetLibraryFolder(asset) !== folder) setFolder("");
   }, [selectedAssetId]);
   useEffect(() => {
@@ -55,11 +64,13 @@ function Navigator({
     if (asset) {
       setFolder("");
       setQuery("");
+      setCategory('');
+      setReferencedOnly(false);
     }
   }, [revealAssetName]);
   const q = query.trim().toLowerCase();
   const shown = files.filter((f) =>
-    q ? f.name.toLowerCase().includes(q) : !folder || assetLibraryFolder(f) === folder || assetLibraryFolder(f).startsWith(folder + "/")
+    (!referencedOnly||referenced.has(f.cat+'/'+f.name))&&(!category || f.cat === category) && (q ? f.name.toLowerCase().includes(q) : !folder || assetLibraryFolder(f) === folder || assetLibraryFolder(f).startsWith(folder + "/"))
   ).sort((a, b) => a.name.localeCompare(b.name));
   const assetCard = (f) => {
     const meta = CAT_META[f.cat] || CAT_META.other;
@@ -84,19 +95,10 @@ function Navigator({
         }}
         title={`${f.name}\n${fmtBytes(f.size)}${f.error ? `\n${f.error}` : ""}`}
       >
-        {f.cat === "textures" && f.dataUrl
-          ? <img className="a-asset__thumb" src={f.dataUrl} alt="" />
-          : (
-            <span
-              className="a-asset__icon"
-              style={{ color: f.error ? "var(--err)" : meta.color }}
-            >
-              {meta.icon}
-            </span>
-          )}
+        <AssetThumbnail asset={f}/>
         <span className="a-asset__name">{f.name}</span>
         <span className="a-asset__meta">
-          {f.error ? "Needs attention" : ASSET_CATEGORY_LABELS[f.cat] || "Other"}
+          {f.error ? tr("Needs attention") : ASSET_CATEGORY_LABELS[f.cat] || "Other"}
         </span>
       </button>
     );
@@ -112,57 +114,66 @@ function Navigator({
       {!compact && (
         <div className="a-tabs">
           <button className="a-tab" onClick={() => onTab("assets")}>
-            Assets
-          </button>
+            {tr("Assets")}</button>
           <button className="a-tab" onClick={() => onTab("prefabs")}>
-            Prefabs
-          </button>
+            {tr("Prefabs")}</button>
           <span className="a-grow" />
           <button
             className="a-btn a-btn--ghost"
             disabled={loading}
             onClick={tab === "assets" ? onOpenFolder : onSavePrefab}
           >
-            {tab === "assets" ? "Import assets…" : "Save Selection"}
+            {tab === "assets" ? tr("Import assets…") : tr("Save Selection")}
           </button>
         </div>
       )}
       {tab === "assets"
         ? (
           <>
-            {(files.length > 8 || query) && <div className="a-library-bar">
+            <div className="a-library-bar">
               <input
                 className="a-input a-library-search"
-                aria-label="Search assets"
-                placeholder="Search assets…"
+                aria-label={tr("Search assets")}
+                placeholder={tr("Search assets…")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </div>}
+              <select className="a-select" aria-label={tr("Filter assets by type")} value={category} onChange={e=>{setCategory(e.target.value);setFolder('');}}>
+                <option value="">{tr("All types")}</option>{Object.entries(ASSET_CATEGORY_LABELS).map(([value,label])=><option key={value} value={value}>{tr(label)}</option>)}
+              </select>
+            </div>
+            {project&&<div className="a-toolbar"><Checkbox label={tr("Referenced in this scene")} value={referencedOnly} onChange={setReferencedOnly}/><span className="a-dim">{shown.length} / {files.length}</span>{query&&<button className="a-btn a-btn--ghost a-btn--sm" onClick={()=>setQuery('')}>{tr("Clear search")}</button>}</div>}
+            {onCreateFolder && <button className="a-btn a-btn--ghost a-btn--sm" onClick={()=>{setNewFolder({cat:category||'models',name:''});setFolderError('');}}>{tr("+ Folder")}</button>}
+            {newFolder && <form className="a-folder-form" onSubmit={e=>{e.preventDefault();try{const path=normalizeLibraryFolder(`${ASSET_CATEGORY_LABELS[newFolder.cat]}/${newFolder.name}`);if(!newFolder.name.trim())throw Error('Enter a folder name.');onCreateFolder(path);setFolder(path);setCategory(newFolder.cat);setNewFolder(null);}catch(error){setFolderError(error.message);}}}>
+              <select aria-label={tr("New folder type")} className="a-select" value={newFolder.cat} onChange={e=>setNewFolder({...newFolder,cat:e.target.value})}>{Object.entries(ASSET_CATEGORY_LABELS).map(([value,label])=><option key={value} value={value}>{tr(label)}</option>)}</select>
+              <input aria-label={tr("New folder name")} className="a-input" placeholder={tr("Folder name")} autoFocus value={newFolder.name} onChange={e=>setNewFolder({...newFolder,name:e.target.value})}/>
+              <button className="a-btn a-btn--sm" type="submit">{tr("Create folder")}</button><button className="a-btn a-btn--sm" type="button" onClick={()=>setNewFolder(null)}>{tr("Cancel")}</button>
+              {folderError&&<p className="a-error" role="alert">{folderError}</p>}
+            </form>}
             {!!tree.length && <details className="a-library-filter a-disclosure">
-              <summary>{folder && !q ? folder : "Browse folders"}</summary>
-              <select className="a-select" aria-label="Filter assets by folder" value={folder}
+              <summary>{folder && !q ? folder : tr("Browse folders")}</summary>
+              <select className="a-select" aria-label={tr("Filter assets by folder")} value={folder}
                 onChange={(e) => { setFolder(e.target.value); setQuery(""); }}>
-                <option value="">All assets</option>
+                <option value="">{tr("All assets")}</option>
                 {tree.map(f => <option key={f.path} value={f.path}>{f.path}</option>)}
               </select>
-              {!!folder && <button className="a-btn a-btn--ghost" onClick={() => { setFolder(""); setQuery(""); }}>Show all assets</button>}
+              {!!folder && <button className="a-btn a-btn--ghost" onClick={() => { setFolder(""); setQuery(""); }}>{tr("Show all assets")}</button>}
             </details>}
             <div className="a-library">
               <div className="a-scroll a-library-content">
                 {!files.length
                   ? (
                     <Empty>
-                      <p>Add models, images or scripts to your game.</p>
-                      <button className="a-btn" disabled={loading} onClick={onOpenFolder}>Import assets…</button>
+                      <p>{tr("Add models, images or scripts to your game.")}</p>
+                      <button className="a-btn" disabled={loading} onClick={onOpenFolder}>{tr("Import assets…")}</button>
                     </Empty>
                   )
                   : (
                     <div className="a-assets">
                       {shown.map(assetCard)}
                       {!shown.length && (
-                        <Empty>{q ? `No assets match “${query}”.` : "This folder is empty."}
-                          <button className="a-btn a-btn--ghost" onClick={() => { setQuery(""); setFolder(""); }}>Show all assets</button>
+                        <Empty>{q ? `No assets match “${query}”.` : tr("This folder is empty.")}
+                          <button className="a-btn a-btn--ghost" onClick={() => { setQuery(""); setFolder(""); }}>{tr("Show all assets")}</button>
                         </Empty>
                       )}
                     </div>
@@ -176,8 +187,7 @@ function Navigator({
             {!prefabs.length
               ? (
                 <Empty>
-                  Select an object and choose Save Selection to reuse it.
-                </Empty>
+                  {tr("Select an object and choose Save Selection to reuse it.")}</Empty>
               )
               : (
                 <div className="a-assets">
@@ -198,6 +208,7 @@ function Navigator({
                         {objIcon(p)}
                       </span>
                       <span className="a-asset__name">{p.name}</span>
+                      {p._variantParentId&&<span className="a-asset__meta">{tr("Variant of ")}{prefabs.find(base=>base._pid===p._variantParentId)?.name||'missing prefab'}</span>}
                       <div className="a-row">
                         <button
                           className="a-btn a-btn--sm"
@@ -206,8 +217,8 @@ function Navigator({
                             onInstancePrefab(p);
                           }}
                         >
-                          Place
-                        </button>
+                          {tr("Place")}</button>
+                        {onCreateVariant&&<button className="a-btn a-btn--sm" onClick={e=>{e.stopPropagation();onCreateVariant(p);}}>{tr("Variant")}</button>}
                         <button
                           className="a-btn a-btn--icon a-btn--ghost a-btn--danger"
                           aria-label={`Delete prefab ${p.name}`}
@@ -227,7 +238,7 @@ function Navigator({
         )}
       {dropTarget !== null && (
         <div className="a-import-hint" role="status">
-          Drop to import into {dropTarget || "Assets"}
+          {tr("Drop to import into ")}{dropTarget || "Assets"}
         </div>
       )}
     </div>
@@ -247,16 +258,16 @@ function ModelPicker({ files, onChoose, onImport, onClose }) {
     catch (e) { setError(e.message || "Could not add this model. Try another file."); }
     finally { importing.current = false; setBusy(false); if (input.current) input.current.value = ""; }
   };
-  return <Modal title="Add a model" onClose={onClose} width={480} canDismiss={!busy}
+  return <Modal title={tr("Add a model")} onClose={onClose} width={480} canDismiss={!busy}
     initialFocus={models.length ? ".a-model-choice" : ".a-btn--primary"}
-    footer={<><span className="a-grow" /><button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>Cancel</button>
-      <button className={`a-btn ${models.length ? "a-btn--ghost" : "a-btn--primary"}`} disabled={busy} onClick={() => input.current?.click()}>{busy ? "Adding…" : "Import model…"}</button></>}>
+    footer={<><span className="a-grow" /><button className="a-btn a-btn--ghost" disabled={busy} onClick={onClose}>{tr("Cancel")}</button>
+      <button className={`a-btn ${models.length ? "a-btn--ghost" : "a-btn--primary"}`} disabled={busy} onClick={() => input.current?.click()}>{busy ? tr("Adding…") : tr("Import model…")}</button></>}>
     <input ref={input} type="file" accept=".obj,.glb,.gltf" hidden disabled={busy} onChange={e => importFile(e.target.files?.[0])} />
-    {models.length > 8 && <input className="a-input" aria-label="Find a model" placeholder="Find a model…" value={query} onChange={e => setQuery(e.target.value)} />}
+    {models.length > 8 && <input className="a-input" aria-label={tr("Find a model")} placeholder={tr("Find a model…")} value={query} onChange={e => setQuery(e.target.value)} />}
     {models.length ? <div className="a-model-choices">{shown.map(f => <button key={f.id} className="a-model-choice" disabled={busy || !!f.error}
       onClick={() => { onChoose(f); onClose(); }}><span aria-hidden="true">◈</span><span>{f.name}</span>{f.error && <small>{f.error}</small>}</button>)}
-      {!shown.length && <Empty>No model matches “{query}”.</Empty>}</div>
-      : <p className="a-new-project__intro">Choose a model to place in your scene.</p>}
+      {!shown.length && <Empty>{tr("No model matches “")}{query}”.</Empty>}</div>
+      : <p className="a-new-project__intro">{tr("Choose a model to place in your scene.")}</p>}
     {error && <p className="a-error a-modal__error" role="alert">{error}</p>}
   </Modal>;
 }

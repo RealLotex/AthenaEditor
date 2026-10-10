@@ -11,6 +11,14 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 const DOC_CODE = {
+  sceneEvents: `export function init(ctx) {
+    ctx.events.on("sceneStart", () => ctx.events.startTimer("dialogueReady", 3));
+    ctx.events.on("cinematicFinished", event => {
+        // event.sequenceId identifies the completed sequence.
+    });
+}
+// Bind a sequence's Custom event to "dialogueReady".
+// Or emit it from another callback: ctx.events.emit("dialogueReady").`,
   scriptSkeleton: `// scripts/Player.js
 export function init(ctx) {
     // Runs once, before the first frame.
@@ -63,24 +71,32 @@ export function update(ctx, pad) {
     if (pad.justPressed(Pads.START)) { /* pressed this frame */ }
 }`,
 
-  collision: `export function update(ctx, pad) {
-    // The generated contact callback fills these in.
-    if (ctx.player.lastHit === "Spikes") {
-        ctx.player.hp -= 1;
-        ctx.player.lastHit = null;      // consume it, or it stays set
-    }
-
+  collision: `export function init(ctx) {
+    // Enable Generate Collision / Overlap Events and use ctx Key "player".
+    ctx.player.onCollisionEnter = function(event) {
+        if (event.otherName === "Spikes") ctx.player.hp -= 1;
+    };
+    ctx.player.onCollisionExit = function(event) {
+        // event.otherId identifies the object even when names repeat.
+    };
+}
+export function update(ctx, pad) {
     // Contact normal — the usual way to test "am I standing on something".
     const n = ctx.player.lastHitNormal;
     ctx.player.grounded = !!n && n[1] > 0.7;
     ctx.player.lastHitNormal = null;
 }`,
 
-  trigger: `export function update(ctx, pad) {
-    // A Rigidbody in Trigger mode reports overlap without blocking.
-    if (ctx.goal.entered)     ctx.player.won = true;      // this frame
-    if (ctx.goal.exited)      ctx.player.inZone = false;
-    if (ctx.goal.overlapping) { /* name of whatever is inside, or null */ }
+  trigger: `export function init(ctx) {
+    // Trigger mode + Generate Collision / Overlap Events + ctx Key "goal".
+    // Each pair reports entry/exit once, including simultaneous occupants.
+    ctx.goal.onTriggerEnter = function(event) {
+        if (event.otherName === "Player") ctx.player.won = true;
+    };
+    ctx.goal.onTriggerExit = function(event) {
+        if (event.otherName === "Player") ctx.player.inZone = false;
+    };
+    // Callbacks run after physics. Triggers never block movement.
 }`,
 
   jump: `export function update(ctx, pad) {

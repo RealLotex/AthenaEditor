@@ -93,9 +93,10 @@ Deno.test("tab reordering accounts for removal of the dragged tab", () => {
     index: 2,
   });
   assertEquals(A.dockLocation(l, "viewport").group.tabs, [
-    "hud",
+    "game",
     "viewport",
-    "uv",
+    "timeline",
+    "hud",
     "scripts",
   ]);
   complete(l);
@@ -141,7 +142,7 @@ Deno.test("layout persistence repairs malformed, duplicate and obsolete preferen
         active: "bad",
       }, { type: "group", id: "other", tabs: ["assets"] }],
     },
-    floating: [{ panel: "viewport" }, { panel: "uv", x: Infinity, width: NaN }],
+    floating: [{ panel: "viewport" }, { panel: "terrain", x: Infinity, width: NaN }],
     hidden: ["uv", "scripts", "scripts"],
     nextId: 1,
   };

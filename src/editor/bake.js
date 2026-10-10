@@ -48,7 +48,7 @@ async function bakeModelLighting(
     for (const other of exportableObjects(scene.objects)) {
       if (
         other.components.rigidbody?.mode === "dynamic" ||
-        other.components.animator
+        other.components.animator || other.components.water || other.components.particles
       ) continue;
       const asset = files.find((f) => f.name === other.components.model?.file);
       if (

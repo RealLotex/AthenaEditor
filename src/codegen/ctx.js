@@ -24,12 +24,12 @@ function keyMaker() {
 }
 
 function emitCtx(e, ir) {
-  if (!ir.scripts.files.length) return;
+  if (!ir.scripts.files.length && !ir.physics.anyEvents && !ir.cinematics?.enabled && !ir.eventFlows?.enabled && !ir.models.some(m=>m.particles)) return;
 
   const inCtx = (o) => o.ctxEnabled !== false;
   const models = ir.models.filter((m) => inCtx(m.obj));
   const lights = ir.lights.filter((l) => inCtx(l.obj));
-  const sounds = ir.sounds.filter((s) => inCtx(s.obj));
+  const sounds = ir.sounds.filter((s) => inCtx(s.obj) && !s.eventOnly);
 
   e.section("ctx — shared state and scene handles for behaviour scripts");
   e.w(`const ctx = {`);
@@ -126,6 +126,11 @@ function emitCtx(e, ir) {
       if (slots.has(bind.ctxKey)) continue;
       slots.add(bind.ctxKey);
       b.w(`${bind.ctxKey}: {},`);
+    }
+    for (const body of ir.physics.bodies.filter(body => body.events)) {
+      if (slots.has(body.ctxKey)) continue;
+      slots.add(body.ctxKey);
+      b.w(`${body.ctxKey}: {},`);
     }
   });
   e.w(`};`);

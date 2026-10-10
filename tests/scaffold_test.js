@@ -6,14 +6,15 @@ import { load } from "./_load.js";
 const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/components.js",
   "core/skybox.js", "codegen/skybox.js",
+  "core/imagesize.js", "core/vram.js",
   "editor/assets.js",
-  "core/project.js", "core/validate.js", "core/storage.js",
+  "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js", "core/storage.js",
   "templates/assets.js",
   "templates/firstperson.js", "templates/thirdperson.js", "templates/sidescroller.js",
   "templates/topdown.js", "templates/registry.js",
-  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/lights.js",
-  "codegen/sounds.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
-  "codegen/ctx.js", "codegen/index.js",
+  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/environment.js", "codegen/water.js", "codegen/lights.js",
+  "codegen/sounds.js", "codegen/object-lifetime.js", "codegen/event-presets.js", "codegen/events.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
+  "codegen/ctx.js", "codegen/cinematics.js", "codegen/event-flows.js", "codegen/index.js",
   "core/scaffold.js",
 ]);
 

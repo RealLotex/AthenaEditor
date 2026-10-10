@@ -171,8 +171,8 @@ function buildCameraOverlay(cam) {
   const group = new THREE.Group();
   const fov = clamp(cam.fov ?? 60, 1, 179);
   const far = 3.2;
-  const h = Math.tan((fov * Math.PI) / 360) * far;
-  const w = h * (4 / 3);
+  const w = Math.tan((fov * Math.PI) / 360) * far;
+  const h = w * (448/640);
 
   const corners = [
     new THREE.Vector3(-w, -h, -far), new THREE.Vector3(w, -h, -far),

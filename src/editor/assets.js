@@ -29,6 +29,7 @@ function putProjectAsset(project, asset) {
     throw new Error("Use a filename without folders.");
   }
   project.assets ||= [];
+  project.hiddenAssets = (project.hiddenAssets || []).filter(name => name.toLowerCase() !== asset.name.toLowerCase());
   const old = project.assets.find((f) =>
     f.name.toLowerCase() === asset.name.toLowerCase()
   );
@@ -60,10 +61,12 @@ function putProjectAsset(project, asset) {
   const next = {
     ...asset,
     id: old?.id || asset.id || uid(),
+    libraryFolder: asset.libraryFolder ?? old?.libraryFolder,
     owned: true,
     folder: project.dirs?.[asset.cat] || asset.cat,
     mtime: Date.now(),
   };
+  for(const key of Object.keys(next))if(next[key]===undefined)delete next[key];
   project.assets = project.assets.filter((f) =>
     f.name.toLowerCase() !== next.name.toLowerCase()
   );
@@ -83,7 +86,7 @@ const ASSET_CATEGORY_LABELS = {
 // Library folders organise the editor without changing the engine's filenames.
 function assetLibraryFolder(asset) {
   const category = ASSET_CATEGORY_LABELS[asset.cat] || "Other";
-  if (asset.libraryFolder) return `${category}/${asset.libraryFolder}`;
+  if (asset.libraryFolder !== undefined) return asset.libraryFolder ? `${category}/${asset.libraryFolder}` : category;
   if (asset.editKind) {
     return `${category}/Generated/${
       {
@@ -113,8 +116,12 @@ function assetLibraryFolder(asset) {
   return path ? `${category}/Imported/${path}` : category;
 }
 
-function assetFolderTree(files) {
+function assetFolderTree(files, folders = []) {
   const counts = new Map();
+  for (const folder of folders) {
+    const parts = folder.split('/');
+    for (let i = 1; i <= parts.length; i++) counts.set(parts.slice(0, i).join('/'), 0);
+  }
   for (const asset of files) {
     const parts = assetLibraryFolder(asset).split("/");
     for (let i = 1; i <= parts.length; i++) {
@@ -240,8 +247,9 @@ function saveEditorScript(project, name, content) {
   if (!/^[a-zA-Z_$][\w$.-]*\.js$/.test(name) || name.includes("..")) {
     throw new Error("Use a script filename such as Player.js.");
   }
+  const previous = (project.scripts || []).find(s => s.name === name);
   project.scripts = (project.scripts || []).filter((s) => s.name !== name);
-  project.scripts.push({ name, content, edited: true });
+  project.scripts.push({ ...previous, name, content, edited: true });
 }
 
 function prototypeTextureAssets() {

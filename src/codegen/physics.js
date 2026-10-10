@@ -68,8 +68,19 @@ function emitPhysicsSetup(e, ir) {
     e.nl();
   }
 
+  emitPhysicsEvents(e, ir);
   emitContactCallback(e, ir);
   emitTriggerTables(e, ir);
+  e.w(`function _disposePhysics() {`);
+  e.block(b => {
+    if (ir.shadowReceivers.length) b.w(`_disposeShadows();`);
+    b.w(`ode_contacts.free();`);
+    for (const body of P.bodies) b.w(`${body.geomVN}.free();`);
+    for (const body of P.bodies.filter(b => b.isDynamic)) b.w(`${body.bodyVN}.free();`);
+    b.w(`ode_space.free();`);
+    b.w(`ode_world.destroyWorld();`);
+  });
+  e.w(`}`);
 }
 
 function emitBody(e, ir, b, spaceExpr) {
@@ -95,31 +106,10 @@ function emitBody(e, ir, b, spaceExpr) {
     }
   }
 
-  switch (b.shape) {
-    case "sphere":
-      e.w(`const ${b.geomVN} = ODE.GeomSphere(${spaceExpr}, ${fl(b.radius)});`);
-      break;
-    case "plane":
-      // a*x + b*y + c*z = d, normal pointing up.
-      e.w(`const ${b.geomVN} = ODE.GeomPlane(${spaceExpr}, 0.0, 1.0, 0.0, ${fl(b.rb.planeY ?? 0)});`);
-      break;
-    case "mesh":
-      e.w(`const ${b.geomVN} = ODE.GeomRenderObject(${spaceExpr}, ${b.model.vn});`);
-      if (Math.abs(t.scale.x - 1) + Math.abs(t.scale.y - 1) + Math.abs(t.scale.z - 1) > 1e-3) {
-        e.problem("warn",
-          `"${b.obj.name}" has a mesh collider and a non-unit scale. ODE builds the ` +
-          `trimesh from the raw mesh, so the collider stays at 1:1.`,
-          { objectId: b.obj.id, objectName: b.obj.name, component: "rigidbody" });
-      }
-      break;
-    case "ray":
-      e.w(`const ${b.geomVN} = ODE.GeomRay(${spaceExpr}, ${fl(b.rb.rayLength ?? 5)});`);
-      e.w(`${b.geomVN}.raySetParams(1, 0);`);
-      e.w(`${b.geomVN}.raySetClosestHit(1);`);
-      e.w(`${b.geomVN}.raySet(${px}, ${py}, ${pz}, 0.0, -1.0, 0.0);`);
-      break;
-    default:
-      e.w(`const ${b.geomVN} = ODE.GeomBox(${spaceExpr}, ${fl(b.size.x)}, ${fl(b.size.y)}, ${fl(b.size.z)});`);
+  emitColliderGeometry(e, b, spaceExpr);
+  if (b.shape === "mesh" && Math.abs(t.scale.x - 1) + Math.abs(t.scale.y - 1) + Math.abs(t.scale.z - 1) > 1e-3) {
+    e.problem("warn", `"${b.obj.name}" has a mesh collider and a non-unit scale. ODE builds the trimesh from the raw mesh, so the collider stays at 1:1.`,
+      { objectId: b.obj.id, objectName: b.obj.name, component: "rigidbody" });
   }
 
   // A plane is an implicit surface: it has no position to set and no body.
@@ -136,8 +126,38 @@ function emitBody(e, ir, b, spaceExpr) {
 
   // Identity tags read back from contacts.
   e.w(`${b.geomVN}._name = "${jsStr(b.obj.name)}";`);
+  if (ir.physics.anyEvents) {
+    e.w(`${b.geomVN}._id = "${jsStr(b.obj.id)}";`);
+    if (b.isDynamic) e.w(`${b.geomVN}._dynamic = true;`);
+    if (b.isTrigger) e.w(`${b.geomVN}._trigger = true;`);
+  }
   if (b.events && b.ctxKey) e.w(`${b.geomVN}._ctxKey = "${jsStr(b.ctxKey)}";`);
   e.nl();
+}
+
+/** The solver and shadow query spaces must use identical collider shapes. */
+function emitColliderGeometry(e, b, spaceExpr, geomVN = b.geomVN) {
+  const t = b.world;
+  switch (b.shape) {
+    case "sphere":
+      e.w(`const ${geomVN} = ODE.GeomSphere(${spaceExpr}, ${fl(b.radius)});`);
+      break;
+    case "plane":
+      // a*x + b*y + c*z = d, normal pointing up.
+      e.w(`const ${geomVN} = ODE.GeomPlane(${spaceExpr}, 0.0, 1.0, 0.0, ${fl(b.rb.planeY ?? 0)});`);
+      break;
+    case "mesh":
+      e.w(`const ${geomVN} = ODE.GeomRenderObject(${spaceExpr}, ${b.model.vn});`);
+      break;
+    case "ray":
+      e.w(`const ${geomVN} = ODE.GeomRay(${spaceExpr}, ${fl(b.rb.rayLength ?? 5)});`);
+      e.w(`${geomVN}.raySetParams(1, 0);`);
+      e.w(`${geomVN}.raySetClosestHit(1);`);
+      e.w(`${geomVN}.raySet(${f3(t.position.x)}, ${f3(t.position.y)}, ${f3(t.position.z)}, 0.0, -1.0, 0.0);`);
+      break;
+    default:
+      e.w(`const ${geomVN} = ODE.GeomBox(${spaceExpr}, ${fl(b.size.x)}, ${fl(b.size.y)}, ${fl(b.size.z)});`);
+  }
 }
 
 function emitContactCallback(e, ir) {
@@ -153,11 +173,17 @@ function emitContactCallback(e, ir) {
   e.block((b) => {
     b.w(`if (typeof c.geom1 === "number" || typeof c.geom2 === "number") {`);
     b.block((x) => {
-      x.w(`_odeLegacyContacts = true;`);
+      x.w(`if (!_odeLegacyContacts) {`);
+      x.block(y => {
+        y.w(`_odeLegacyContacts = true;`);
+        y.w(`_odePollContacts();`);
+      });
+      x.w(`}`);
       x.w(`return;`);
     });
     b.w(`}`);
     b.w(`const a = c.geom1, d = c.geom2;`);
+    b.w(`if (a && d) { _odeTouch(a, d, c, false, false); _odeTouch(d, a, c, false, true); }`);
     b.w(`if (a && a._ctxKey && ctx[a._ctxKey]) {`);
     b.block((x) => {
       x.w(`ctx[a._ctxKey].lastHit = d ? d._name : null;`);
@@ -185,6 +211,38 @@ function emitContactCallback(e, ir) {
     const a = solids[i], d = solids[j];
     if ((a.events || d.events) && (a.isDynamic || d.isDynamic)) pairs.push([a, d]);
   }
+  const bounds = emitPhysicsPairBounds(e, pairs, "_ode");
+  e.w(`const _odeEventPairs = [`);
+  e.block((b) => {
+    for (const [a, d] of pairs) b.w(`[${a.geomVN}, ${d.geomVN}],`);
+  });
+  e.w(`];`);
+  e.w(`function _odePollContacts() {`);
+  e.block((b) => {
+    bounds.read(b);
+    b.w(`for (let i = 0; i < _odeEventPairs.length; i++) {`);
+    b.block((x) => {
+      x.w(`const pair = _odeEventPairs[i];`);
+      if (ir.canDestroy) x.w(`if (pair[0]._destroyed || pair[1]._destroyed) continue;`);
+      bounds.check(x);
+      x.w(`const hits = ODE.geomCollide(pair[0], pair[1]);`);
+      x.w(`for (const hit of hits || []) {`);
+      x.block((y) => {
+        y.w(`hit.geom1 = pair[0];`);
+        y.w(`hit.geom2 = pair[1];`);
+        y.w(`ode_onCollide(hit);`);
+      });
+      x.w(`}`);
+    });
+    b.w(`}`);
+  });
+  e.w(`}`);
+  e.nl();
+}
+
+// Shared conservative rejection for contact recovery and trigger polling.
+// Emitters return code-writing closures; no runtime allocation per pair check.
+function emitPhysicsPairBounds(e, pairs, prefix) {
   // Enclosing spheres remain conservative even if a script rotates/moves a
   // collider. Read live geom centres, never cache static world positions.
   // Meshes/rays have unknown extents and retain the unconditional query path.
@@ -201,7 +259,7 @@ function emitContactCallback(e, ir) {
   };
   for (const [a, d] of pairs) {
     // One event pair needs no additional broad check: querying that pair is
-    // cheaper than reading its centres. The numeric callback already gates it.
+    // cheaper than reading its centres.
     if (pairs.length === 1) { bounded.push(null); continue; }
     const ar = radiusOf(a), dr = radiusOf(d);
     const plane = a.shape === "plane" ? a : d.shape === "plane" ? d : null;
@@ -213,102 +271,75 @@ function emitContactCallback(e, ir) {
       bounded.push([centreIndex(a), centreIndex(d), Math.ceil(r * r * 1000) / 1000]);
     } else bounded.push(null);
   }
-  e.w(`const _odeEventPairs = [`);
-  e.block((b) => {
-    for (const [a, d] of pairs) b.w(`[${a.geomVN}, ${d.geomVN}],`);
-  });
-  e.w(`];`);
   if (centres.length) {
     e.comment("Skip impossible contact pairs; each live centre is read once per poll.",
       "Float64 storage avoids the release QuickJS mixed float comparison defect.");
-    e.w(`const _odeBoundGeoms = [${centres.map(b => b.geomVN).join(", ")}];`);
-    e.w(`const _odeBoundPositions = new Array(${il(centres.length)});`);
-    e.w(`const _odeBoundNumber = new Float64Array(1);`);
+    e.w(`const ${prefix}BoundGeoms = [${centres.map(b => b.geomVN).join(", ")}];`);
+    e.w(`const ${prefix}BoundPositions = new Array(${il(centres.length)});`);
+    e.w(`const ${prefix}BoundNumber = new Float64Array(1);`);
     // Round radii up before formatting; rounding down could omit a contact.
-    e.w(`const _odeEventBounds = [${bounded.map(b => b ? `[${il(b[0])}, ${il(b[1])}, ${fl(b[2])}]` : "null").join(", ")}];`);
+    e.w(`const ${prefix}EventBounds = [${bounded.map(b => b ? `[${il(b[0])}, ${il(b[1])}, ${fl(b[2])}]` : "null").join(", ")}];`);
   }
-  e.w(`function _odePollContacts() {`);
-  e.block((b) => {
-    if (centres.length) b.w(`for (let i = 0; i < _odeBoundGeoms.length; i++) _odeBoundPositions[i] = _odeBoundGeoms[i].getPosition();`);
-    b.w(`for (let i = 0; i < _odeEventPairs.length; i++) {`);
-    b.block((x) => {
-      x.w(`const pair = _odeEventPairs[i];`);
+  return {
+    read(b) {
+      if (centres.length) b.w(`for (let i = 0; i < ${prefix}BoundGeoms.length; i++) ${prefix}BoundPositions[i] = ${prefix}BoundGeoms[i]._destroyed ? null : ${prefix}BoundGeoms[i].getPosition();`);
+    },
+    check(x) {
       if (centres.length) {
-        x.w(`const bounds = _odeEventBounds[i];`);
+        x.w(`const bounds = ${prefix}EventBounds[i];`);
         x.w(`if (bounds) {`);
         x.block((y) => {
-          y.w(`const a = _odeBoundPositions[bounds[0]];`);
-          y.w(`if (bounds[1] === -1) _odeBoundNumber[0] = a[1];`);
+          y.w(`const a = ${prefix}BoundPositions[bounds[0]];`);
+          y.w(`if (bounds[1] === -1) ${prefix}BoundNumber[0] = a[1];`);
           y.w(`else {`);
           y.block((z) => {
-            z.w(`const d = _odeBoundPositions[bounds[1]];`);
+            z.w(`const d = ${prefix}BoundPositions[bounds[1]];`);
             z.w(`const dx = a[0] - d[0], dy = a[1] - d[1], dz = a[2] - d[2];`);
-            z.w(`_odeBoundNumber[0] = dx * dx + dy * dy + dz * dz;`);
+            z.w(`${prefix}BoundNumber[0] = dx * dx + dy * dy + dz * dz;`);
           });
           y.w(`}`);
-          y.w(`if (_odeBoundNumber[0] > bounds[2]) continue;`);
+          y.w(`if (${prefix}BoundNumber[0] > bounds[2]) continue;`);
         });
         x.w(`}`);
       }
-      x.w(`const hits = ODE.geomCollide(pair[0], pair[1]);`);
-      x.w(`for (const hit of hits || []) {`);
-      x.block((y) => {
-        y.w(`hit.geom1 = pair[0];`);
-        y.w(`hit.geom2 = pair[1];`);
-        y.w(`ode_onCollide(hit);`);
-      });
-      x.w(`}`);
-    });
-    b.w(`}`);
-  });
-  e.w(`}`);
-  e.nl();
+    },
+  };
+}
+
+function physicsTriggerPairs(bodies) {
+  const pairs = [];
+  for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) {
+    const a = bodies[i], d = bodies[j];
+    if ((a.isTrigger || d.isTrigger) && (a.events || d.events)) {
+      pairs.push(a.isTrigger ? [a, d] : [d, a]);
+    }
+  }
+  return pairs;
 }
 
 function emitTriggerTables(e, ir) {
-  const triggers = ir.physics.bodies.filter((b) => b.isTrigger);
-  if (!triggers.length) return;
-
-  // Anything that can move is worth testing a trigger against.
-  const movers = ir.physics.bodies.filter((b) => b.isDynamic);
-
-  e.comment("Trigger volumes — overlap only, no physical response.");
+  const pairs = physicsTriggerPairs(ir.physics.bodies);
+  if (!pairs.length) return;
+  const bounds = emitPhysicsPairBounds(e, pairs, "_trigger");
+  e.comment("Trigger volumes — each observed pair once, no physical response.");
   e.w(`const _triggers = [`);
-  e.block((b) => {
-    for (const t of triggers) {
-      b.w(`{ geom: ${t.geomVN}, key: ${t.ctxKey ? `"${jsStr(t.ctxKey)}"` : "null"}, name: "${jsStr(t.obj.name)}", hit: null },`);
-    }
+  e.block(b => {
+    for (const [a, d] of pairs) b.w(`{ geom: ${a.geomVN}, other: ${d.geomVN} },`);
   });
   e.w(`];`);
-  e.w(`const _movers = [`);
-  e.block((b) => {
-    for (const m of movers) b.w(`{ geom: ${m.geomVN}, name: "${jsStr(m.obj.name)}" },`);
-  });
-  e.w(`];`);
-  e.nl();
-
-  if (!movers.length) {
-    e.problem("info", "Trigger volumes exist but no dynamic body can enter them.");
-  }
-
   e.w(`function _updateTriggers() {`);
-  e.block((b) => {
+  e.block(b => {
+    bounds.read(b);
     b.w(`for (let i = 0; i < _triggers.length; i++) {`);
-    b.block((x) => {
+    b.block(x => {
       x.w(`const t = _triggers[i];`);
-      x.w(`const was = t.hit;`);
-      x.w(`t.hit = null;`);
-      x.w(`for (let j = 0; j < _movers.length; j++) {`);
-      x.block((y) => {
-        y.w(`const hits = ODE.geomCollide(t.geom, _movers[j].geom);`);
-        y.w(`if (hits && hits.length) { t.hit = _movers[j].name; break; }`);
-      });
-      x.w(`}`);
-      x.w(`if (t.key && ctx[t.key]) {`);
-      x.block((y) => {
-        y.w(`ctx[t.key].overlapping = t.hit;`);
-        y.w(`ctx[t.key].entered = (t.hit !== null && was === null);`);
-        y.w(`ctx[t.key].exited  = (t.hit === null && was !== null);`);
+      if (ir.canDestroy) x.w(`if (t.geom._destroyed || t.other._destroyed) continue;`);
+      bounds.check(x);
+      x.w(`const hits = ODE.geomCollide(t.geom, t.other);`);
+      x.w(`if (hits && hits.length) {`);
+      x.block(y => {
+        y.w(`_odeTouch(t.geom, t.other, null, true);`);
+        y.w(`_odeTouch(t.other, t.geom, null, true);`);
       });
       x.w(`}`);
     });
@@ -327,20 +358,18 @@ function emitPhysicsStep(e, ir) {
   const cb = P.bodies.some((b) => !b.isTrigger && b.events) ? ", ode_onCollide" : "";
 
   e.comment("Physics step — broad phase, contact joints, solve, all in one call");
-  if (cb) {
-    e.w(`if (_odeLegacyContacts) _odePollContacts();`);
-    // Numeric callbacks re-arm this flag for the following frame. Airborne
-    // frames with no contacts need no fallback queries at all.
-    e.w(`_odeLegacyContacts = false;`);
-  }
+  if (P.anyEvents) e.w(`_odeEventFrame++;`);
+  if (cb) e.w(`_odeLegacyContacts = false;`);
   e.w(`ode_world.stepWithContacts(ode_space, ode_contacts, ${fl(dt)}${cb});`);
-  if (P.bodies.some((b) => b.isTrigger)) e.w(`_updateTriggers();`);
+  if (physicsTriggerPairs(P.bodies).length) e.w(`_updateTriggers();`);
+  if (P.anyEvents) e.w(`_odeFinishEvents();`);
+  if (ir.canDestroy) e.w(`_flushDestroyedObjects();`);
   e.nl();
 
   const frozen = P.bodies.filter((b) => b.freezeRotation);
   if (frozen.length) {
     e.comment("Upright bodies — kill the spin the solver just introduced");
-    for (const b of frozen) e.w(`${b.bodyVN}.setAngularVel(0.0, 0.0, 0.0);`);
+    for (const b of frozen) e.w(`${ir.canDestroy ? `if (!${b.bodyVN}._destroyed) ` : ""}${b.bodyVN}.setAngularVel(0.0, 0.0, 0.0);`);
     e.nl();
   }
 
@@ -348,7 +377,7 @@ function emitPhysicsStep(e, ir) {
   if (dyn.length) {
     e.comment("Drive the visuals from the simulation");
     for (const b of dyn) {
-      e.w(`{`);
+      e.w(`${ir.canDestroy ? `if (!${b.bodyVN}._destroyed) ` : ""}{`);
       e.block((x) => {
         x.w(`const _p = ${b.bodyVN}.getPosition();`);
         x.w(`${b.model.vn}.position = {x: _p[0], y: _p[1], z: _p[2]};`);

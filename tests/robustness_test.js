@@ -10,9 +10,9 @@ import { load } from "./_load.js";
 // ═══════════════════════════════════════════════════════════════════════
 
 const A = await load([
-  "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js",
+  "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js", "core/vram.js",
   "core/skybox.js",
-  "core/components.js", "core/project.js", "core/validate.js", "core/storage.js",
+  "core/components.js", "core/project.js", "core/validate.js", "core/recovery-codec.js", "core/storage.js",
 ]);
 
 // ── a diagnostic's one-click fix ───────────────────────────────────────
@@ -164,6 +164,8 @@ Deno.test("validateScene survives a scene full of malformed objects", () => {
   );
   const out = A.validateScene(p.scenes[0], [], p);
   assert(Array.isArray(out));
+  p.scenes[0].environment = { fog: { enabled: true, start: 20, end: 100 } };
+  assert(Array.isArray(A.validateScene(p.scenes[0], [], p)));
 });
 
 // ── autosave ───────────────────────────────────────────────────────────
@@ -268,6 +270,64 @@ Deno.test("a save that cannot be written at all says why", () => {
   assert(r.message, "the reason has to be reportable to the user");
 });
 
+Deno.test("large authored recovery payloads survive a quota without resizing or changing portable saves", () => {
+  const p = A.migrateProject(A.mkProject());
+  const pixels = "data:image/bmp;base64," + "ABCD/1234+abcdef".repeat(500000);
+  p.assets.push({ name: "authored.bmp", cat: "textures", dataUrl: pixels, owned: true });
+  const before = JSON.stringify(p), store = fakeStorage({ limit: 5 * 1024 * 1024 });
+  const restored = withStorage(store, () => {
+    assertEquals(A.saveAutosave(p).ok, true);
+    return A.loadAutosave();
+  });
+  assertEquals(restored.project.assets[0].dataUrl, pixels);
+  assertEquals(JSON.stringify(p), before, "compression must not mutate authored pixels");
+  assertEquals(A.autosaveValue("dataUrl", pixels), A.autosaveValue("dataUrl", pixels), "unchanged assets reuse cached compression");
+});
+
+Deno.test("damaged compressed assets recover the previous slot and legacy JSON remains readable", () => {
+  const p = A.migrateProject(A.mkProject()), store = fakeStorage();
+  const restored = withStorage(store, () => {
+    store.setItem("athena.editor.project.prev", JSON.stringify({ at: 1, project: p }));
+    const damaged = A.deepClone(p);
+    damaged.assets = [{ name: "broken.bmp", cat: "textures", dataUrl: { _athenaRecovery: 1, length: 90000, lz: "damaged" } }];
+    store.setItem("athena.editor.project", JSON.stringify({ at: 2, project: damaged }));
+    return A.loadAutosave();
+  });
+  assertEquals(restored.project.name, p.name);
+  assert(restored.recoveredFrom);
+  assertEquals(A.parseRecoveryJSON(JSON.stringify({ content: "Diálogo 🐬", dataUrl: "data:original" })), { content: "Diálogo 🐬", dataUrl: "data:original" });
+});
+
+Deno.test("background recovery compression uses the same lossless format and keeps authored data intact", async () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  const jobs = [];
+  class RecoveryTestWorker {
+    constructor() {
+      this.handle = new Function("postMessage", "let onmessage;" + A.RecoveryCodec.workerSource() + ";return onmessage;")(
+        data => queueMicrotask(() => this.onmessage({ data })),
+      );
+    }
+    postMessage(data) { jobs.push(data.id); this.handle({ data }); }
+    terminate() {}
+  }
+  Object.defineProperty(globalThis, "Worker", { value: RecoveryTestWorker, configurable: true });
+  try {
+    const p = A.migrateProject(A.mkProject()), content = "Nubes 🐬 áéíóú\n".repeat(7000);
+    p.assets.push({ name: "authored.obj", cat: "models", content, owned: true });
+    const before = JSON.stringify(p);
+    await A.prepareRecoveryPayloads(p);
+    assertEquals(jobs.length, 1);
+    const packed = A.autosaveValue("content", content);
+    assertEquals(A.RecoveryCodec.decompress(packed.lz), content);
+    await A.prepareRecoveryPayloads(p);
+    assertEquals(jobs.length, 1, "unchanged assets must not queue another compression job");
+    assertEquals(JSON.stringify(p), before);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "Worker", previous);
+    else delete globalThis.Worker;
+  }
+});
+
 Deno.test("the max wait is shorter than a gesture and longer than the debounce", () => {
   // A debounce alone never fires while the user keeps dragging.
   assert(A.AUTOSAVE_MAX_MS > A.AUTOSAVE_MS);
@@ -317,6 +377,9 @@ Deno.test("every field a component stores has a control somewhere", () => {
   for (const [key, def] of Object.entries(A.COMPONENTS)) {
     const stored = Object.keys(def.make()).filter((k) => !exempt.has(k));
     const reachable = new Set((def.fields || []).map((f) => f.key.split(".")[0]));
+    // Water's dedicated quality sliders replace the legacy rate/enable fields.
+    // Their effective values are covered by water_quality_test.js.
+    if(key==='water')for(const field of ['updateRate','caustics'])reachable.add(field);
     for (const k of stored) {
       assert(reachable.has(k), `${key}.${k} is stored and emitted but has no Inspector control`);
     }

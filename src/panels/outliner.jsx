@@ -29,6 +29,12 @@ function Outliner({
   const [renaming, setRenaming] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
   const dragId = useRef(null);
+  const treeRef=useRef(null);
+  useEffect(()=>{setQuery('');setRenaming(null);},[scene?.id]);
+  useEffect(()=>{
+    const row=[...treeRef.current?.querySelectorAll('[data-object-id]')||[]].find(row=>row.dataset.objectId===activeId);
+    row?.scrollIntoView({block:'nearest'});
+  },[activeId,scene]);
 
   const problemsByObject = useMemo(() => {
     const m = new Map();
@@ -49,7 +55,7 @@ function Outliner({
     const keep = new Set();
     walk(scene?.objects || [], (o, parents) => {
       const hit = (o.name || "").toLowerCase().includes(q) ||
-        Object.keys(o.components || {}).some((k) => k.includes(q));
+        Object.keys(o.components || {}).some((k) => k.includes(q)||tr(COMPONENTS[k]?.label||k).toLowerCase().includes(q));
       if (hit) {
         keep.add(o.id);
         for (const p of parents) keep.add(p.id);
@@ -57,6 +63,7 @@ function Outliner({
     });
     return keep;
   }, [scene, q]);
+  useEffect(()=>{if(activeId&&matches&&!matches.has(activeId))setQuery('');},[activeId]);
 
   const startDrag = (id) => {
     dragId.current = id;
@@ -82,6 +89,7 @@ function Outliner({
       <React.Fragment key={obj.id}>
         <div
           role="treeitem"
+          data-object-id={obj.id}
           aria-label={obj.name}
           aria-level={depth + 1}
           aria-selected={selected}
@@ -138,6 +146,11 @@ function Outliner({
               e.preventDefault(); e.stopPropagation(); setRenaming(obj.id);
             } else if (hasKids && (e.key === "ArrowRight" && !open || e.key === "ArrowLeft" && open)) {
               e.preventDefault(); e.stopPropagation(); onToggleExpand(obj.id);
+            } else if(['ArrowUp','ArrowDown','Home','End'].includes(e.key)) {
+              e.preventDefault();e.stopPropagation();
+              const rows=[...treeRef.current.querySelectorAll('[role=treeitem]')],at=rows.indexOf(e.currentTarget);
+              const next=e.key==='Home'?0:e.key==='End'?rows.length-1:clamp(at+(e.key==='ArrowDown'?1:-1),0,rows.length-1);
+              const target=rows[next];if(target){target.focus();onSelect(target.dataset.objectId,{range:e.shiftKey});}
             }
           }}
         >
@@ -151,7 +164,7 @@ function Outliner({
             {hasKids ? (open ? "▾" : "▸") : ""}
           </span>
           <span className="a-node__icon" style={{ color: objColor(obj) }}>
-            {objIcon(obj)}
+            <EditorIcon name={obj.components.camera?'camera':obj.components.light?'sun':obj.components.model?'cube':obj.children?.length?'folder':'cube'} size={23}/>
           </span>
 
           {renaming === obj.id
@@ -180,13 +193,13 @@ function Outliner({
 
           <span className="a-node__badges">
             {level === "error" && (
-              <span className="a-node__err" title="Has errors">✕</span>
+              <span className="a-node__err" title={tr("Has errors")}>✕</span>
             )}
             {level === "warn" && (
-              <span className="a-node__warn" title="Has warnings">▲</span>
+              <span className="a-node__warn" title={tr("Has warnings")}>▲</span>
             )}
             {obj.exportEnabled === false && (
-              <span className="a-node__badge" title="Excluded from export">
+              <span className="a-node__badge" title={tr("Excluded from export")}>
                 ⊘
               </span>
             )}
@@ -194,7 +207,7 @@ function Outliner({
 
           <button
             className="a-node__btn"
-            title={obj.visible === false ? "Show (H)" : "Hide (H)"}
+            title={obj.visible === false ? tr("Show (H)") : tr("Hide (H)")}
             aria-label={`${
               obj.visible === false ? "Show" : "Hide"
             } ${obj.name}`}
@@ -231,10 +244,10 @@ function Outliner({
   return (
     <>
       {!compact && (
-        <PanelHeader title="Outliner">
+        <PanelHeader title={tr("Outliner")}>
           <button
             className="a-btn a-btn--icon a-btn--ghost"
-            title="Add object"
+            title={tr("Add object")}
             onClick={onAdd}
           >
             +
@@ -242,11 +255,12 @@ function Outliner({
         </PanelHeader>
       )}
 
-      {(allObjects(scene?.objects || []).length > 8 || query) && <div className="a-object-search">
+      <div className="a-object-search">
+        <EditorIcon name="search" size={19}/>
         <input
           className="a-input"
-          placeholder="Search objects…"
-          aria-label="Search objects"
+          placeholder={tr("Search objects…")}
+          aria-label={tr("Search objects")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -256,10 +270,12 @@ function Outliner({
             }
           }}
         />
-      </div>}
+        {query&&<button className="a-btn a-btn--ghost a-btn--sm" aria-label={tr("Clear object search")} onClick={()=>setQuery('')}>×</button>}
+      </div>
 
       <div
         className="a-scroll"
+        ref={treeRef}
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) onSelect(null, {});
         }}
@@ -272,26 +288,26 @@ function Outliner({
           finishDrop(null, "root");
         }}
       >
-        <div className="a-tree" role="tree" aria-label="Scene objects" aria-multiselectable="true">
+        <div className="a-tree" role="tree" aria-label={tr("Scene objects")} aria-multiselectable="true">
           {(scene?.objects || []).map((o) => renderNode(o, 0))}
           {!scene?.objects?.length && (
             <Empty>
-              <p>Your scene is empty.</p>
-              <button className="a-btn" onClick={onAdd}>Add object</button>
+              <p>{tr("Your scene is empty.")}</p>
+              <button className="a-btn" onClick={onAdd}>{tr("Add object")}</button>
             </Empty>
           )}
           {matches && matches.size === 0 && (
-            <Empty>No object matches “{query}”.</Empty>
+            <Empty>{tr("No object matches “")}{query}”.</Empty>
           )}
         </div>
 
         {uiEls.length > 0 && (
           <>
             <div className="a-ph" style={{ position: "sticky", top: 0 }}>
-              <span className="a-ph__title">HUD</span>
+              <span className="a-ph__title">{tr("HUD")}</span>
               <button
                 className="a-btn a-btn--icon a-btn--ghost"
-                title="Add HUD element"
+                title={tr("Add HUD element")}
                 onClick={onAddUI}
               >
                 +
@@ -325,7 +341,7 @@ function Outliner({
                     aria-label={`${
                       el.visible === false ? "Show" : "Hide"
                     } ${el.name}`}
-                    title={el.visible === false ? "Show" : "Hide"}
+                    title={el.visible === false ? tr("Show") : tr("Hide")}
                   >
                     {el.visible === false ? "○" : "◉"}
                   </button>
@@ -347,6 +363,7 @@ function Outliner({
           </>
         )}
       </div>
+      <div className="a-outliner-footer"><button className="a-btn a-btn--wide" onClick={onAdd}><EditorIcon name="plus" size={21}/>{tr("Add Object")}</button></div>
     </>
   );
 }

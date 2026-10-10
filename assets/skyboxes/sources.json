@@ -1,0 +1,105 @@
+{
+  "mode": "original stylized single_image",
+  "sources": [
+    {
+      "preset": "clear",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "4376f5149a961f693239a3594336252b028fc82353ef28effd3d79468fc550e4"
+    },
+    {
+      "preset": "clouds",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "ca6382bfdd91d3c98e8463984dcdaae59e61ba0f3dcd4c75361821a667097b2a"
+    },
+    {
+      "preset": "golden",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "5123a3839a32d49b0fe2df0523851ede24d9202868123fb823f70796d50c1f1a"
+    },
+    {
+      "preset": "sunset",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "8cc6dc3a6d7642b8bb1aca25de1382affb765de0d602a8b4e90720e8c39795b7"
+    },
+    {
+      "preset": "dusk",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "c0cfa7c7af26481d79d831de988f2b9a3a53779d417e48a0b77f8a9aa14e52c3"
+    },
+    {
+      "preset": "night",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "6f6f3f6ed0cc9c556c7a3a9f3957db35903dfc578ebf36843f80b5e76e62f8d8"
+    },
+    {
+      "preset": "aurora",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "db6cc5283b3e9bb96dbc40e2f7a4ecc0dc25405465c4d5cf4bdad103df12cda2"
+    },
+    {
+      "preset": "storm",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "255c363d56d200aa6cca54df4ff45165f286a06f700787458b52457b926bb543"
+    },
+    {
+      "preset": "desert",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "301ef1253aac67411571434bea8af7147158ea3d2cae3424c5578272df614c82"
+    },
+    {
+      "preset": "space",
+      "provider": "Built-in image_gen",
+      "method": "Original single_image panorama, restored without reconstruction",
+      "outputDimensions": [
+        1774,
+        887
+      ],
+      "sha256": "bb01fae6c96d99929d1d8241bd17bb6078410e71eb88a6978eddd4521438341f"
+    }
+  ]
+}

@@ -4,10 +4,10 @@ import * as esbuild from "npm:esbuild@0.24.0";
 // Render the real panel functions into element trees. These checks exercise
 // selection changes and panel actions; browser checks cover layout and focus.
 const modules = [
-  "core/util.js", "core/math.js", "core/skybox.js", "core/theme.js",
-  "core/components.js", "core/project.js", "ui/primitives.jsx", "ui/dock.jsx",
+  "core/i18n.js", "core/ui-translations.js", "core/util.js", "core/math.js", "core/skybox.js", "core/theme.js",
+  "core/components.js", "core/project.js", "ui/primitives.jsx", "ui/icons.jsx", "ui/dock.jsx",
   "ui/modal.jsx", "ui/popover.js", "ui/palette.jsx", "panels/inspector.jsx", "panels/inspector-components.jsx",
-  "panels/skybox.jsx", "panels/inspector-scene.jsx",
+  "panels/skybox.jsx", "panels/inspector-scene.jsx", "panels/scenetools.jsx",
 ];
 const source = (await Promise.all(modules.map(async (name) => {
   const source = await Deno.readTextFile(new URL(`../src/${name}`, import.meta.url));
@@ -18,6 +18,8 @@ function panelHarness() {
   const slots = [];
   let cursor = 0, changed = false, pending = [];
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Fragment: "fragment",
     createElement(type, props, ...children) { return { type, props: { ...props, children } }; },
     useState(initial) {
@@ -36,7 +38,7 @@ function panelHarness() {
     useMemo: fn => fn(), useCallback: fn => fn, useLayoutEffect() {},
   };
   React.useRef = value => React.useState({ current: value })[0];
-  const api = new Function("React", `${source}\nreturn { Inspector, MultiInspector, ComponentFields, FieldControl, Vec3Input, SceneSettings, ProjectSettings, AddComponentMenu, mkObject, mkProject, mkScene, makeComponent };`)(React);
+  const api = new Function("React", `${source}\nreturn { NumInput, TextInput, Inspector, MultiInspector, ComponentFields, FieldControl, Vec3Input, SceneSettings, GameCameraOptions, ProjectSettings, AddComponentMenu, mkObject, mkProject, mkScene, makeComponent };`)(React);
   return {
     ...api,
     render(component, props, effects = true) {
@@ -63,6 +65,29 @@ const named = (tree, name) => elements(tree, node => node.type?.name === name);
 const section = (tree, title) => named(tree, "Section").find(node => node.props.title === title);
 const controls = tree => named(tree, "FieldControl").map(node => node.props.field.key);
 const text = tree => (tree?.props?.children || []).flat(Infinity).join("");
+
+Deno.test("collision events and presets are visible without Advanced; choices reveal only their configuration", () => {
+  const e = panelHarness(), object = e.mkObject("Zone"), comp = e.makeComponent("rigidbody");
+  object.components.rigidbody = comp;
+  const props = { compKey: "rigidbody", comp, obj: object, scene: { objects: [object] }, files: [], alwaysAdvanced: false, onChange() {} };
+  let tree = e.render(e.ComponentFields, props);
+  assert(controls(tree).includes("collisionEvents"));
+  assert(!controls(tree).includes("eventPreset"));
+  comp.collisionEvents = true;
+  tree = e.render(e.ComponentFields, props);
+  assert(controls(tree).includes("eventPreset"));
+  const preset = named(tree, "FieldControl").find(n => n.props.field.key === "eventPreset");
+  assertEquals(preset.props.field.options.map(o => o.label), ["Custom Script / No Preset", "Play Cinematic", "Play Sound Oneshot", "Change Scene", "Destroy Object", "Play Animation"]);
+  comp.eventPreset = "changeScene";
+  tree = e.render(e.ComponentFields, props);
+  assert(controls(tree).includes("eventSceneId"));
+  assert(controls(tree).includes("eventPhase"));
+  assert(!controls(tree).includes("eventAudio"));
+  comp.eventPreset = "playSound";
+  tree = e.render(e.ComponentFields, props);
+  assert(controls(tree).includes("eventAudio"));
+  assert(!controls(tree).includes("eventSceneId"));
+});
 
 Deno.test("Inspector clears property search between objects and cannot apply a hidden filter", () => {
   const e = panelHarness(), object = e.mkObject("Detailed");
@@ -111,20 +136,25 @@ Deno.test("searching for an advanced property reveals its component and controls
   assertEquals(named(result, "ComponentFields").find(node => node.props.compKey === "model").props.alwaysAdvanced, true);
 });
 
-Deno.test("Scene camera editing targets the actual camera and keeps fallback controls secondary", () => {
+Deno.test("World omits camera controls; Game edits the active camera and retains fallback settings", () => {
   const e = panelHarness(), project = e.mkProject(), scene = project.scenes[0];
   const camera = scene.objects.find(o => o.components.camera);
-  let selected;
-  const props = { scene, project, files: [], onSelectObject: id => { selected = id; }, onUpdate() {} };
-  let tree = e.render(e.SceneSettings, props);
-  section(tree, "Camera").props.onToggle();
-  tree = e.render(e.SceneSettings, props);
-  elements(tree, node => node.type === "button" && text(node) === "Edit camera")[0].props.onClick();
-  assertEquals(selected, camera.id);
-  const cameraSection = section(tree, "Camera");
-  assert(named(cameraSection, "Advanced").some(node => node.props.label === "Fallback camera"));
-  assert(!named(cameraSection, "Field").some(node => node.props.label === "Field of view" &&
-    !named(cameraSection, "Advanced").some(advanced => named(advanced, "Field").includes(node))));
+  const world = e.render(e.SceneSettings, {scene,project,files:[],onUpdate(){}});
+  assert(!section(world,'Camera'));
+  let selected, changed;
+  const game = panelHarness(), props = {scene,onEditCamera:id=>selected=id,onUpdate:(path,value)=>changed={path,value}};
+  let tree = game.render(game.GameCameraOptions, props, false);
+  assertEquals(named(tree,'Modal').length,0);
+  elements(tree,node=>node.type==='button' && node.props['aria-label']==='Game camera settings')[0].props.onClick();
+  tree = game.render(game.GameCameraOptions, props, false);
+  assertEquals(named(tree,'Modal')[0].props.title,'Game camera');
+  const orbit=named(tree,'Field').find(node=>node.props.label==='Orbit with gamepad');
+  named(orbit,'Checkbox')[0].props.onChange(false);
+  assertEquals(changed,{path:'defaultCameraRig',value:false});
+  assert(elements(tree,node=>node.type==='div' && text(node)==='Fallback camera').length);
+  elements(tree,node=>node.type==='button' && text(node).includes('in Properties'))[0].props.onClick();
+  assertEquals(selected,camera.id);
+  assertEquals(named(game.render(game.GameCameraOptions,props,false),'Modal').length,0);
 });
 
 Deno.test("multi-selection has one add action, real collapse, and marks differing field values", () => {
@@ -180,4 +210,23 @@ Deno.test("typing the first object's existing axis value still sets that axis on
   named(vector, "NumInput").find(node => node.props.axis === "x").props.onChange(1, "commit");
   assertEquals(changes[0].value, { x: 1, y: 2, z: 3 });
   assertEquals(changes[1].value, { x: 1, y: 5, z: 6 });
+});
+
+Deno.test('Enter commits a numeric draft once, Escape discards it, and invalid blur never replaces the value with zero',()=>{
+  for(const [raw,key,expected] of [['7,5','Enter',[7.5]],['9','Escape',[]],['invalid','blur',[]]]){
+    const e=panelHarness(),values=[],props={value:3,onChange:value=>values.push(value)};
+    let tree=e.render(e.NumInput,props,false),input=elements(tree,node=>node.type==='input')[0];
+    input.props.onChange({target:{value:raw}});tree=e.render(e.NumInput,props,false);input=elements(tree,node=>node.type==='input')[0];
+    const target={value:raw,blur:()=>input.props.onBlur({target})};
+    if(key==='blur')input.props.onBlur({target});else input.props.onKeyDown({key,target,currentTarget:target,preventDefault(){},stopPropagation(){}});
+    assertEquals(values,expected);
+  }
+});
+Deno.test('Escape discards a text draft without committing it through blur',()=>{
+  const e=panelHarness(),values=[],props={value:'Original',onChange:value=>values.push(value)};
+  let input=e.render(e.TextInput,props,false);input.props.onChange({target:{value:'Unwanted'}});
+  input=e.render(e.TextInput,props,false);
+  const target={value:'Unwanted',blur:()=>input.props.onBlur({target})};
+  input.props.onKeyDown({key:'Escape',currentTarget:target,preventDefault(){},stopPropagation(){}});
+  assertEquals(values,[]);assertEquals(e.render(e.TextInput,props,false).props.value,'Original');
 });

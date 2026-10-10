@@ -14,7 +14,8 @@ const A = await load([
   "core/storage.js",
   "core/scaffold.js",
 ]);
-const source = (await Promise.all([
+const localizationSource = (await Promise.all(["core/i18n.js","core/ui-translations.js"].map(path=>Deno.readTextFile(new URL(`../src/${path}`,import.meta.url))))).join("\n");
+const source = localizationSource + "\n" + (await Promise.all([
   "ui/modal.jsx",
   "ui/popover.js",
   "panels/newproject.jsx",
@@ -30,6 +31,8 @@ function dialogs(component, props, dom = {}) {
   const effects = [];
   let cursor = 0;
   const React = {
+    createContext: value => ({value,Provider: "provider"}),
+    useContext: context => context.value,
     Fragment: "fragment",
     createElement: (type, props, ...children) => ({
       type,

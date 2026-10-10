@@ -86,24 +86,21 @@ class PanelBoundary extends React.Component {
     const details = describeError(error, info);
     return (
       <div className="a-boundary" role="alert">
-        <div className="a-boundary__title">{name} could not be drawn</div>
+        <div className="a-boundary__title">{name} {tr("could not be drawn")}</div>
         <div className="a-boundary__msg">{error?.message || String(error)}</div>
         <div className="a-boundary__hint">
-          The rest of the editor still works, and your project is untouched. Undo the last
-          change (Ctrl+Z) and it should come back.
-        </div>
+          {tr("The rest of the editor still works, and your project is untouched. Undo the last change (Ctrl+Z) and it should come back.")}</div>
         <div className="a-row" style={{ gap: 6, marginTop: 8, justifyContent: "center" }}>
           <button
             className="a-btn a-btn--sm"
             onClick={() => this.setState({ error: null, info: null, copied: false })}
           >
-            Try again
-          </button>
+            {tr("Try again")}</button>
           <button
             className="a-btn a-btn--sm"
             onClick={async () => this.setState({ copied: await copyText(details) })}
           >
-            {copied ? "Copied" : "Copy details"}
+            {copied ? tr("Copied") : tr("Copy details")}
           </button>
         </div>
       </div>
@@ -148,7 +145,7 @@ class AppBoundary extends React.Component {
       if (!raw) return false;
       let text = raw;
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = parseRecoveryJSON(raw);
         if (parsed?.project) text = JSON.stringify(parsed.project, null, 2);
       } catch (_e) { /* keep the raw record */ }
       const blob = new Blob([text], { type: "application/json" });
@@ -178,30 +175,27 @@ class AppBoundary extends React.Component {
     return (
       <div className="a-crash">
         <div className="a-crash__card">
-          <div className="a-crash__title">The editor stopped</div>
+          <div className="a-crash__title">{tr("The editor stopped")}</div>
           <div className="a-crash__msg">{error?.message || String(error)}</div>
           <div className="a-crash__hint">
             {when
-              ? <>Your work was autosaved <b>{when}</b>. Download it before reloading — the
-                copy in the browser survives a reload, but a file cannot be lost.</>
-              : <>No autosave could be read, so download may produce nothing. If you have a
-                project folder linked, the last export and save are still on disk.</>}
+              ? <>{tr("Your work was autosaved ")}<b>{when}</b>{tr(". Download it before reloading — the copy in the browser survives a reload, but a file cannot be lost.")}</>
+              : <>{tr("No autosave could be read, so download may produce nothing. If you have a project folder linked, the last export and save are still on disk.")}</>}
           </div>
           <div className="a-row" style={{ gap: 8, marginTop: 14, justifyContent: "center" }}>
             <button
               className="a-btn a-btn--primary"
               onClick={() => this.setState({ saved: this.download() })}
             >
-              {saved ? "Downloaded" : "Download project JSON"}
+              {saved ? tr("Downloaded") : tr("Download project JSON")}
             </button>
             <button className="a-btn" onClick={() => location.reload()}>
-              Reload the editor
-            </button>
+              {tr("Reload the editor")}</button>
             <button
               className="a-btn"
               onClick={async () => this.setState({ copied: await copyText(details) })}
             >
-              {copied ? "Copied" : "Copy details"}
+              {copied ? tr("Copied") : tr("Copy details")}
             </button>
           </div>
           <pre className="a-crash__stack">{details}</pre>

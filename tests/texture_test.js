@@ -15,12 +15,12 @@ import { load } from "./_load.js";
 // ═══════════════════════════════════════════════════════════════════════
 
 const A = await load([
-  "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js",
+  "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js", "core/vram.js",
   "core/skybox.js", "codegen/skybox.js",
-  "core/components.js", "core/project.js", "core/validate.js",
-  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/lights.js",
-  "codegen/sounds.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
-  "codegen/ctx.js", "codegen/index.js",
+  "core/components.js", "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js",
+  "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/environment.js", "codegen/water.js", "codegen/lights.js",
+  "codegen/sounds.js", "codegen/object-lifetime.js", "codegen/event-presets.js", "codegen/events.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
+  "codegen/ctx.js", "codegen/cinematics.js", "codegen/event-flows.js", "codegen/index.js",
 ]);
 
 // ── minimal encoders, so the fixtures are real files rather than mocks ──
@@ -180,9 +180,9 @@ Deno.test("the total is measured across unique uploads, not objects", () => {
   const files = [tex("shared.png", 1024, 1024), ...["A", "B", "C"].map((n) => ({ name: `${n}.obj`, cat: "models" }))];
   const problems = A.validateScene(p.scenes[0], files, p);
   // 4 MB once is over budget; 4 MB three times would have said 12.
-  const total = problems.find((d) => /Textures come to/.test(d.message));
+  const total = problems.find((d) => d.component === "vram");
   assert(total);
-  assertStringIncludes(total.message, "4.0 MB");
+  assertStringIncludes(total.message, "textures 4.0 MB");
 });
 
 Deno.test("a texture with no dimensions known is not guessed at", () => {

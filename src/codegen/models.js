@@ -17,7 +17,10 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 function emitRenderDatas(e, ir) {
-  if (!ir.renderDatas.length) return;
+  if (!ir.renderDatas.length) {
+    for(const t of ir.textures) e.w(`const ${t.vn} = new Image("${jsStr(ir.dirs.textures)}/${jsStr(t.file)}");`);
+    return;
+  }
   e.section("Meshes — one upload per mesh, one Image per texture");
   e.w(`os.chdir("${jsStr(ir.dirs.models)}");`);
   e.nl();
@@ -43,6 +46,22 @@ function emitRenderDatas(e, ir) {
     e.w(`${rd.dataVN}.shade_model = ${m.shade_model === "SHADE_FLAT" ? 0 : 1};`);
     e.w(`${rd.dataVN}.texture_mapping = ${m.texture_mapping !== false};`);
     e.w(`${rd.dataVN}.accurate_clipping = ${!!m.accurate_clipping};`);
+    if(rd.vertexColors){
+      // loadOBJ ignores OBJ RGB extensions (mesh_loaders.c:154). Copy the
+      // baked corner colors into borrowed buffers. The unlit VU adds diffuse
+      // to vertex RGB, so neutralize diffuse without changing opaque alpha.
+      e.w(`{`);
+      e.block(b=>{
+        // The released QuickJS compiler drops entries from long array literals.
+        // JSON parsing preserves every corner and runs only during mesh setup.
+        const baked=JSON.stringify(rd.vertexColors.map(n=>clamp(num(n,0),0,1)));
+        b.w(`const colors=new Float32Array(${rd.dataVN}.vertices.colors), baked=JSON.parse(${JSON.stringify(baked)});`);
+        b.w(`if(colors.length/4 !== baked.length/3)throw Error("Vertex color count does not match the mesh.");`);
+        b.w(`for(let i=0,n=${rd.dataVN}.materials.length;i<n;i++)${rd.dataVN}.updateMaterial(i,{diffuse:{r:0,g:0,b:0}});`);
+        b.w(`for(let i=0;i<baked.length/3;i++){colors[i*4]=baked[i*3];colors[i*4+1]=baked[i*3+1];colors[i*4+2]=baked[i*3+2];colors[i*4+3]=0;}`);
+      });e.w(`}`);
+      e.w(`${rd.dataVN}.pipeline=Render.${m.pipeline || "PL_DEFAULT"};`);
+    }
     if (!rd.texVN && !rd.cloneOf) {
       // Meshes that carry their own embedded texture (GLTF) still want the
       // filter. A clone shares that texture, so setting it again is redundant.
@@ -106,6 +125,6 @@ function emitTexture(e, ir, t) {
 function emitModelDraws(e, ir) {
   if (!ir.models.length) return;
   e.comment("Opaque geometry");
-  for (const m of ir.models) e.w(`${m.vn}.render();`);
+  for (const m of ir.models.filter(m=>(!m.rd.water||!m.rd.water.quality.transparency)&&!m.particles)) e.w(`${ir.cinematics?.enabled ? `if (${m.vn}.visible !== false${ir.canDestroy ? ` && !${m.vn}._destroyed` : ""}) ` : ir.canDestroy ? `if (!${m.vn}._destroyed) ` : ""}${m.vn}.render();`);
   e.nl();
 }

@@ -11,6 +11,7 @@ function makeTerrain(width = 32, depth = 32) {
 }
 
 function checkTerrain(t) {
+  if(t?.blend && (t.blendSize!==undefined && ![256,512,1024].includes(t.blendSize) || t.blendBits!==undefined && ![4,8].includes(t.blendBits)))throw Error("Choose a supported terrain texture size and 4 or 8 bits.");
   if (!t || t.version !== 1 || !Number.isInteger(t.width) || !Number.isInteger(t.depth) ||
       t.width < 4 || t.width > 64 || t.depth < 4 || t.depth > 64 ||
       !Number.isFinite(t.cellSize) || t.cellSize < .1 || t.cellSize > 100 ||
@@ -51,7 +52,7 @@ function terrainBrush(t, point, tool) {
       for (let x = Math.max(0, Math.floor(gx - r)); x <= Math.min(t.width, Math.ceil(gx + r)); x++) {
         const distance = Math.hypot(x - gx, z - gz);
         if (distance >= r) continue;
-        const i = z * (t.width + 1) + x, weight = (1 - distance / r) ** 2;
+        const i = z * (t.width + 1) + x, weight = .5 * (1 + Math.cos(Math.PI * distance / r));
         let target;
         if (tool.hillMode === "smooth") {
           const neighbours = [[x-1,z],[x+1,z],[x,z-1],[x,z+1]]
@@ -117,7 +118,9 @@ function terrainMesh(t) {
       strips.set(key,{index:mesh.faces.length,normal});
     }
     const n=mesh.normals.push([normal.x,normal.y,normal.z])-1,pad=2/256;
-    for(const [u,v] of uvs)mesh.uvs.push([surface%2/2+pad+clamp(u,0,1)*(.5-2*pad),1-Math.floor(surface/2)/2-pad-clamp(v,0,1)*(.5-2*pad)]);
+    if(t.blend && surface<3)for(const point of points)mesh.uvs.push([pad+(point.p[0]/t.cellSize+t.width/2)/t.width*(1-2*pad),1-pad-(point.p[2]/t.cellSize+t.depth/2)/t.depth*(.75-2*pad)]);
+    else if(t.blend)for(const [u,v] of uvs)mesh.uvs.push([pad+clamp(u,0,1)*(.25-2*pad),.25-pad-clamp(v,0,1)*(.25-2*pad)]);
+    else for(const [u,v] of uvs)mesh.uvs.push([surface%2/2+pad+clamp(u,0,1)*(.5-2*pad),1-Math.floor(surface/2)/2-pad-clamp(v,0,1)*(.5-2*pad)]);
     face.forEach(c=>c.n=n);mesh.faces.push(face);
   };
   const bottom=Math.min(...t.hills)-t.cellSize,maxLevel=Math.max(1,...t.levels);
@@ -195,7 +198,7 @@ function upgradeTerrainGeometry(project) {
     const model=obj._lightingBake?.model||obj.components.model,
       asset=project.assets?.find(f=>f.name===model.file&&f.editKind==="terrain"&&f.owned);
     const texture=project.assets?.find(f=>f.name===model.textureFile&&f.editKind==="terrain"&&f.owned);
-    if(texture && typeof TERRAIN_DEFAULT_ATLAS!=="undefined" && texture.terrainTextureVersion!==TERRAIN_DEFAULT_ATLAS.terrainTextureVersion && !(obj._terrain.textures||[]).some(Boolean))Object.assign(texture,deepClone(TERRAIN_DEFAULT_ATLAS),{mtime:Date.now()});
+    if(texture && !obj._terrain.blend && typeof TERRAIN_DEFAULT_ATLAS!=="undefined" && texture.terrainTextureVersion!==TERRAIN_DEFAULT_ATLAS.terrainTextureVersion && !(obj._terrain.textures||[]).some(Boolean))Object.assign(texture,deepClone(TERRAIN_DEFAULT_ATLAS),{mtime:Date.now()});
     if(!asset || !outdated.has(asset.name))return;
     checkTerrain(obj._terrain);
     if(obj._terrain.bevel===.18)obj._terrain.bevel=.28;
@@ -211,6 +214,7 @@ function upgradeTerrainGeometry(project) {
 }
 
 async function terrainAtlasAsset(t, files, name) {
+  if(t.blend)return blendedTerrainAsset(t,files,name);
   if(!(t.textures||[]).some(Boolean) && typeof TERRAIN_DEFAULT_ATLAS!=="undefined")return {id:uid(),name,cat:"textures",...deepClone(TERRAIN_DEFAULT_ATLAS),owned:true,mtime:Date.now(),editKind:"terrain",libraryFolder:"Generated/Terrain"};
   const image=terrainAtlasPixels();
   for(let slot=0;slot<4;slot++) {
@@ -248,6 +252,7 @@ function applyEditorTerrain(project, id, terrain, external=[], atlas=null) {
   if(!obj?._terrain||!obj.components.model)throw Error("Select the terrain again before editing it.");
   if(!atlas && JSON.stringify(obj._terrain)===JSON.stringify(terrain))return;
   if(obj._lightingBake?.model)obj.components.model=deepClone(obj._lightingBake.model);
+  if(obj._environmentBake?.model)obj.components.model=deepClone(obj._environmentBake.model);
   const files=editorAssets(project,external),source=files.find(f=>f.name===obj.components.model.file);
   let uses=0;
   for(const sc of project.scenes)walk(sc.objects,o=>{if(o.components.model?.file===source?.name)uses++;});
@@ -258,6 +263,7 @@ function applyEditorTerrain(project, id, terrain, external=[], atlas=null) {
     editKind:"terrain",terrainMeshVersion:TERRAIN_MESH_VERSION,libraryFolder:"Generated/Terrain",terrainOwner:obj.id});
   obj.components.model.file=name;obj._terrain=deepClone(terrain);
   delete obj._lightingBake;
+  delete obj._environmentBake;
   if(atlas){putProjectAsset(project,{...atlas,terrainOwner:obj.id});obj.components.model.textureFile=atlas.name;}
 }
 

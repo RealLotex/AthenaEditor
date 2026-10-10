@@ -1,3 +1,9 @@
+const FLIPBOOK_FIELDS=[
+  {key:'columns',label:'Columns',type:'int',min:1,max:16,step:1},
+  {key:'rows',label:'Rows',type:'int',min:1,max:16,step:1},
+  {key:'fps',label:'Frames / second',type:'number',min:1,max:30,step:1},
+];
+
 // ═══════════════════════════════════════════════════════════════════════
 //  COMPONENT REGISTRY
 //
@@ -74,12 +80,29 @@ const BODY_MODES = [
 //  Definitions
 // ═══════════════════════════════════════════════════════════════════════
 
+const EVENT_ACTION_PRESETS = [
+  {id:"playSequence",label:"Play Cinematic",filename:"Event_PlayCinematic.js",action:"ctx.cinematics.play(action.sequenceId);"},
+  { id: "playSound", label: "Play Sound Oneshot", filename: "Event_PlaySound.js",
+    action: "action.sound.loop = false; action.sound.pause(); action.sound.play(); action.sound.rewind();" },
+  { id: "changeScene", label: "Change Scene", filename: "Event_ChangeScene.js",
+    action: "ctx.goToScene(action.sceneId);" },
+  { id: "destroyObject", label: "Destroy Object", filename: "Event_DestroyObject.js",
+    action: 'ctx.destroyObject(action.target === "other" ? event.otherId : action.objectId);' },
+  { id: "playAnimation", label: "Play Animation", filename: "Event_PlayAnimation.js",
+    action: "action.model.playAnim(action.animations[action.clip], action.loop);" },
+];
+
 const COMPONENTS = {
+  events: {
+    label:'Events',icon:'⚡',color:'#a88bff',make:()=>({rules:[],gameplayEnabled:true}),
+    fields:[{key:'gameplayEnabled',label:'Behaviours enabled at start',type:'bool',inlineLabel:true},
+      {key:'rules',label:'Conditions and actions',type:'eventRules'}],
+  },
   // ── transform ────────────────────────────────────────────────────────
   transform: {
     label: "Transform",
     icon: "✥",
-    color: "#8fa6bd",
+    color: "#47dd83",
     required: true, // cannot be removed
     order: 0,
     make: () => ({ type: "transform", position: v3(), rotation: v3(), scale: v3(1, 1, 1) }),
@@ -123,6 +146,66 @@ const COMPONENTS = {
     ],
   },
 
+  reflection:{
+    label:'Fake reflections',icon:'◉',color:'#9bd8ff',order:17,requires:['model'],
+    make:()=>({type:'reflection',texture:'',filter:'LINEAR'}),
+    fields:[{key:'texture',label:'Environment map',type:'asset',cat:'textures',required:true,help:'A small shared image supplies the reflected sky. Environment can generate presets.'},{key:'filter',label:'Filter',type:'enum',options:FILTERS}],
+    validate:(c,o)=>o.components.particles?[{level:'error',msg:'Reflections need a surface model, not a particle emitter.'}]:[],
+  },
+
+  particles:{
+    label:'Particles',icon:'✧',color:'#80dfff',order:16,requires:['model'],
+    make:()=>({type:'particles',flipbook:false,columns:4,rows:4,fps:12,animationLoop:false,preset:'bubbles',loop:true,playOnStart:true,count:24,lifetime:3,rate:8,speed:2,spread:.6,size:.18,opacity:.8,color:rgb(.7,.95,1)}),
+    fields:[
+      {key:'preset',label:'Motion',type:'enum',options:[{value:'bubbles',label:'Bubbles'},{value:'splash',label:'Splash'},{value:'fountain',label:'Fountain'}]},
+      {key:'loop',label:'Loop',type:'bool'},{key:'playOnStart',label:'Play on start',type:'bool'},
+      {key:'count',label:'Pool size',type:'int',min:1,max:64,step:1,help:'A fixed pool: more particles cost more drawing time.'},
+      {key:'rate',label:'Particles / second',type:'number',min:.1,max:64,step:1,when:c=>c.loop},
+      {key:'lifetime',label:'Lifetime',type:'number',min:.1,max:10,step:.1},
+      {key:'speed',label:'Speed',type:'number',min:0,max:30,step:.1},{key:'spread',label:'Spread',type:'number',min:0,max:10,step:.1},
+      {key:'size',label:'Size',type:'number',min:.01,max:4,step:.01},{key:'color',label:'Tint',type:'rgb01'},{key:'opacity',label:'Opacity',type:'number',min:0,max:1,step:.05},
+      {key:'flipbook',label:'Animate sprite sheet',type:'bool',help:'Use the Model texture as an atlas. Each particle starts on frame one.'},
+      ...FLIPBOOK_FIELDS.map(f=>({...f,when:c=>c.flipbook,group:'Sprite animation'})),
+      {key:'animationLoop',label:'Repeat frames',type:'bool',when:c=>c.flipbook,group:'Sprite animation'},
+    ],
+    validate:(c,o)=>{const out=c.flipbook?flipbookProblems(c):[];for(const [k,min,max] of [['count',1,64],['rate',.1,64],['lifetime',.1,10],['speed',0,30],['spread',0,10],['size',.01,4],['opacity',0,1]])if(!Number.isFinite(c[k])||c[k]<min||c[k]>max)out.push({level:'error',msg:'Particle '+k+' is outside its supported range.'});if(o.components.animator||o.components.water)out.push({level:'error',msg:'Particles need a separate sprite model.'});if(c.count>32)out.push({level:'warn',msg:'More than 32 particles per emitter can be expensive on PS2.'});if(c.loop&&c.rate*c.lifetime>c.count)out.push({level:'info',msg:'Emission rate is limited by the pool size and lifetime.'});return out;},
+  },
+
+  textureAnimation:{
+    label:'Texture animation',icon:'▦',color:'#e0adff',order:17,requires:['model'],
+    make:()=>({type:'textureAnimation',columns:4,rows:4,fps:12,loop:true}),
+    fields:[...FLIPBOOK_FIELDS,{key:'loop',label:'Repeat frames',type:'bool'}],
+    validate:(c,o)=>{
+      const out=flipbookProblems(c);
+      if(o.components.water||o.components.particles||o.components.animator)out.push({level:'error',msg:'Texture animation needs a separate static model. Particle sprites have their own animation settings.'});
+      if(!o.components.model?.textureFile||o.components.model.texture_mapping===false)out.push({level:'error',msg:'Assign a sprite sheet to the Model texture and enable texture mapping.'});
+      return out;
+    },
+  },
+
+  water: {
+    label:"Water",icon:"≈",color:"#24bfe8",order:15,requires:["model"],
+    make:()=>({type:"water",opacity:.6,color:rgb(1,1,1),tiling:4,flow:{x:0,z:0},waveHeight:0,waveSpeed:1,rippleStrength:0,updateRate:15,caustics:false,depth:4,causticStrength:.45,causticTexture:""}),
+    fields:[
+      {key:"color",label:"Tint",type:"rgb01"},
+      {key:"opacity",label:"Opacity",type:"number",min:0,max:1,step:.05},
+      {key:"tiling",label:"Pattern size",type:"number",min:.1,max:32,step:.1,help:"Texture repeats across the surface. More repeats make smaller ripples."},
+      {key:"flow",label:"Flow",type:"vec2xz",step:.01},
+      {key:"waveHeight",label:"Wave height",type:"number",min:0,max:.5,step:.005},
+      {key:"waveSpeed",label:"Wave speed",type:"number",min:0,max:8,step:.1},
+      {key:"rippleStrength",label:"Ripple distortion",type:"number",min:0,max:.25,step:.005,help:"Crossing ripples deform the pattern. Wave speed also controls the 3D pattern evolution."},
+      {key:"depth",label:"Seafloor depth",type:"number",min:.1,max:100,step:.1,when:c=>normalizedWater(c).caustics,help:"Caustics follow static terrain and platforms. This depth sets their flat fallback."},
+      {key:"causticStrength",label:"Caustic strength",type:"number",min:0,max:1,step:.05,when:c=>normalizedWater(c).caustics},
+      {key:"causticTexture",label:"Caustic pattern",type:"asset",cat:"textures",required:true,when:c=>normalizedWater(c).caustics},
+    ],
+    validate:(c,o)=>{
+      const out=[];
+      for(const [key,min,max] of [["opacity",0,1],["tiling",.1,32],["waveHeight",0,.5],["waveSpeed",0,8],["rippleStrength",0,.25],["updateRate",5,30],["depth",.1,100],["causticStrength",0,1]])if(!Number.isFinite(c[key])||c[key]<min||c[key]>max)out.push({level:"error",msg:`Water ${key} must be between ${min} and ${max}.`});
+      if(o.components.animator)out.push({level:"error",msg:"Water needs a static mesh; remove its Animator."});
+      return out;
+    },
+  },
+
   // ── animator ─────────────────────────────────────────────────────────
   animator: {
     label: "Animator",
@@ -146,7 +229,7 @@ const COMPONENTS = {
     order: 30,
     make: () => ({
       type: "light", direction: v3(0, 1, 1),
-      ambient: rgb(0.12, 0.15, 0.2), diffuse: rgb(0.5, 0.5, 0.5), specular: rgb(1, 1, 1),
+      ambient: rgb(0.15, 0.15, 0.15), diffuse: rgb(0.5, 0.5, 0.5), specular: rgb(1, 1, 1),
     }),
     fields: [
       {
@@ -175,8 +258,6 @@ const COMPONENTS = {
       { key: "near", label: "Near", type: "number", min: 0.01, step: 0.1, group: "Clipping", advanced: true },
       { key: "far", label: "Far", type: "number", min: 1, step: 10, group: "Clipping", advanced: true },
     ],
-    limit: 1,
-    limitMessage: "Only the first camera is exported.",
   },
 
   // ── sound ────────────────────────────────────────────────────────────
@@ -231,6 +312,9 @@ const COMPONENTS = {
       rayLength: 5,
       collisionEvents: false,
       onCollide: "",
+      eventPreset: "", eventScript: "", eventPhase: "enter", eventOtherId: "",
+      eventAudio: "", eventSceneId: "", eventTarget: "self",
+      eventAnimationFile: "", eventAnimation: "", eventAnimationLoop: false, eventSequenceId: "",
     }),
     fields: [
       { key: "mode", label: "Mode", type: "enum", options: BODY_MODES },
@@ -272,11 +356,37 @@ const COMPONENTS = {
         help: "Keeps the body upright and lets a script own the visual rotation. " +
           "What you want for a character; wrong for a barrel.",
       },
-      { key: "collisionEvents", label: "Report Hits", type: "bool", group: "Events", advanced: true },
+      { key: "collisionEvents", label: "Generate Collision / Overlap Events", type: "bool", group: "Events", inlineLabel: true,
+        help: "Report each pair entering or leaving contact / overlap. Triggers do not block movement." },
+      { key: "eventPreset", label: "Script Preset", type: "enum", group: "Events",
+        when: c => c.collisionEvents,
+        options: [{ value: "", label: "Custom Script / No Preset" }, ...EVENT_ACTION_PRESETS.map(p => ({ value: p.id, label: p.label }))] },
+      { key: "eventPhase", label: "When", type: "enum", group: "Events",
+        when: c => c.collisionEvents && !!c.eventPreset,
+        options: [{ value: "enter", label: "On Enter" }, { value: "exit", label: "On Exit" }] },
+      { key: "eventOtherId", label: "Only With", type: "objectIdRef", group: "Events",
+        when: c => c.collisionEvents && !!c.eventPreset, placeholder: "Any object" },
+      { key: "eventAudio", label: "Audio", type: "asset", cat: "sounds", group: "Events", required: true,
+        when: c => c.collisionEvents && c.eventPreset === "playSound" },
+      { key: "eventSceneId", label: "Scene", type: "sceneRef", group: "Events", required: true,
+        when: c => c.collisionEvents && c.eventPreset === "changeScene" },
+      { key: "eventTarget", label: "Destroy", type: "enum", group: "Events",
+        when: c => c.collisionEvents && c.eventPreset === "destroyObject",
+        options: [{ value: "self", label: "This object" }, { value: "other", label: "Other object" }] },
+      { key: "eventAnimationFile", label: "Animation File", type: "asset", cat: "models", group: "Events", required: true,
+        when: c => c.collisionEvents && c.eventPreset === "playAnimation" },
+      { key: "eventAnimation", label: "Animation", type: "text", group: "Events", required: true,
+        when: c => c.collisionEvents && c.eventPreset === "playAnimation", placeholder: "Clip name" },
+      { key: "eventAnimationLoop", label: "Loop Animation", type: "bool", group: "Events",
+        when: c => c.collisionEvents && c.eventPreset === "playAnimation" },
+      { key: "eventScript", label: "Event Script", type: "asset", cat: "scripts", group: "Events",
+        when: c => c.collisionEvents && !!c.eventPreset },
+      {key:"eventSequenceId",label:"Sequence",type:"sequenceRef",group:"Events",required:true,
+        when:c=>c.collisionEvents&&c.eventPreset==="playSequence"},
       {
         key: "onCollide", label: "ctx Key", type: "text", group: "Events", advanced: true,
         when: (c) => c.collisionEvents,
-        help: "ctx.<key>.lastHit is set to the other object's name on contact.",
+        help: "Assign onCollisionEnter, onCollisionExit, onTriggerEnter or onTriggerExit callbacks in ctx.<key>. Existing lastHit and entered/exited fields remain available.",
       },
     ],
     validate(c, obj, scene) {
@@ -367,7 +477,7 @@ const COMPONENTS = {
       slopeLimit: -1,               // -1 disables the filter (engine: > -0.5 enables)
       color: { r: 0, g: 0, b: 0, a: 0.65 },
       blend: "SHADOW_BLEND_DARKEN",
-      raycast: false,
+      raycast: true,
       rayLength: 12.0,
       follow: true,
       // A decal exactly on the ground z-fights with it. The projector is drawn
@@ -462,7 +572,7 @@ const COMPONENTS = {
       { key: "blend", label: "Blend", type: "enum", options: BLEND_MODES, advanced: true },
       { key: "follow", label: "Follow Caster", type: "bool", group: "Placement" },
       {
-        key: "groundY", label: "Ground Y", type: "number", step: 0.01, group: "Placement", when: (c) => c.follow,
+        key: "groundY", label: "Ground Y", type: "number", step: 0.01, group: "Placement", when: (c) => c.follow && !c.raycast,
         help: "Height the decal sits at. A little above the floor, or it z-fights with it.",
       },
       {
@@ -472,8 +582,7 @@ const COMPONENTS = {
       },
       {
         key: "raycast", label: "Drape On Geometry", type: "bool", group: "Raycast",
-        help: "Casts a ray per grid node so the shadow bends over real collision geometry.",
-      advanced: true,
+        help: "Follow floors and platforms using their solid colliders. Excludes the caster's own colliders and triggers. Uses Ground Y when no receivers are available.",
       },
       { key: "rayLength", label: "Ray Length", type: "number", step: 0.5, min: 0.01, group: "Raycast", when: (c) => c.raycast, advanced: true },
       {
@@ -521,8 +630,8 @@ const COMPONENTS = {
       }
       if (c.raycast && !scene?.physics?.enabled) {
         out.push({
-          level: "error",
-          msg: "Draping needs ODE physics — there is no collision space to cast into.",
+          level: "warn",
+          msg: "Enable scene physics and add solid colliders to drape shadows. Using a flat shadow at Ground Y until then.",
           fix: "enablePhysics",
         });
       }

@@ -9,9 +9,42 @@ const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/theme.js", "core/components.js",
   "core/project.js", "core/storage.js", "viewport/loaders.js", "viewport/overlays.js",
   "viewport/gizmos.js", "viewport/viewport.jsx", "editor/mesh.js", "editor/terrain.js",
-  "core/skybox.js", "viewport/skybox.js",
+  "core/imagesize.js", "core/skybox.js", "viewport/skybox.js",
+  "core/water.js", "core/water-cache.js", "viewport/water.js",
+  "core/particles.js", "viewport/particles.js",
 ]);
 const near = (a, b) => assertAlmostEquals(a, b, 1e-5);
+
+Deno.test('same-size asset edits invalidate the preview, while a bounds annotation does not',()=>{
+  const file={id:'mesh',size:3,content:'1 2'},revision=A.assetRevision(file);
+  assertEquals(A.assetRevision({...file,bounds:{min:[0,0,0]}}),revision);
+  file.content='3 4';assert(A.assetRevision(file)!==revision);
+});
+
+Deno.test('viewport buffers remain bounded and framing ignores invisible distant geometry',()=>{
+  const ratio=A.viewportPixelRatio(3840,2160,3);assert(3840*2160*ratio*ratio<=2000001);
+  const root=new THREE.Group(),visible=new THREE.Mesh(new THREE.BoxGeometry(2,2,2)),hidden=new THREE.Mesh(new THREE.BoxGeometry(2,2,2));
+  hidden.position.x=10000;hidden.visible=false;root.add(visible,hidden);
+  const bounds=A.expandVisibleViewportBounds(new THREE.Box3(),root);assertEquals(bounds.max.x,1);assertEquals(bounds.min.x,-1);
+  A.disposeObject(root);
+});
+
+Deno.test('subtree cleanup releases shared texture slots and materials exactly once',()=>{
+  const root=new THREE.Group(),texture=new THREE.Texture(),material=new THREE.MeshStandardMaterial({map:texture,normalMap:texture});
+  const geometry=new THREE.BoxGeometry();root.add(new THREE.Mesh(geometry,material),new THREE.Mesh(geometry,material));
+  const counts={texture:0,material:0,geometry:0};
+  texture.addEventListener('dispose',()=>counts.texture++);material.addEventListener('dispose',()=>counts.material++);geometry.addEventListener('dispose',()=>counts.geometry++);
+  A.disposeObject(root);assertEquals(counts,{texture:1,material:1,geometry:1});
+});
+
+Deno.test("water preview repeats ripples, keeps seafloor depth and advances the shared geometry rules",()=>{
+  const root=new THREE.Mesh(new THREE.PlaneGeometry(1,1,8,8),new THREE.MeshBasicMaterial({map:new THREE.Texture()}));root.geometry.rotateX(-Math.PI/2);
+  A.configureWaterPreview(root,{opacity:.4,tiling:4,flow:{x:.02,z:.01},waveHeight:.05},[]);
+  assertEquals(root.material.map.wrapS,THREE.RepeatWrapping);assertEquals(root.material.depthWrite,false);near(root.material.opacity,.4);
+  const uv=root.geometry.attributes.uv.array[0],state=root.userData.waterEntries[0];
+  A.advanceWaterPreview(root,.1);assert(root.geometry.attributes.uv.array[0]!==uv);assert(state.phase>0);
+  A.disposeObject(root);
+});
 
 Deno.test("model drops follow the visible surface, use the ground elsewhere and honor grid snap", () => {
   const camera = new THREE.PerspectiveCamera(55, 1, .05, 100);
@@ -91,8 +124,8 @@ Deno.test("switching skies frees GPU resources, including textures that finish l
     const files = [{ name: "one.png", cat: "textures", dataUrl: "first" }, { name: "two.png", cat: "textures", dataUrl: "second" }];
     A.syncViewportSkybox(g, { skybox: { enabled: true, texture: "one.png", rotation: 90, brightness: .6 } }, files);
     const first = g.skybox;
-    assertEquals(first.material.depthWrite, false); assertEquals(first.material.depthTest, false);
-    near(first.rotation.y, Math.PI / 2); near(first.material.color.r, .6);
+    assertEquals(first.children[0].material.depthWrite, false); assertEquals(first.children[0].material.depthTest, false);
+    near(first.rotation.y, Math.PI / 2); near(first.children[0].material.color.r, .6);
     A.syncViewportSkybox(g, { skybox: { enabled: true, texture: "two.png" } }, files);
     assertEquals(g.three.children.length, 1); assert(disposed.includes("first"));
     loads[0].done(loads[0].texture);
@@ -207,4 +240,31 @@ Deno.test("an obsolete asynchronous mesh load releases its geometry", async () =
     assert(disposed > 0);
     assertEquals(node.holder.children.length, 0);
   } finally { THREE.BufferGeometry.prototype.dispose = dispose; }
+});
+
+Deno.test("upper-only backdrops cover downward cameras, blend before objects and dispose shared textures once",()=>{
+  const original=THREE.TextureLoader.prototype.load,loads=[],disposed=[];
+  THREE.TextureLoader.prototype.load=function(key){const texture=new THREE.Texture();texture.addEventListener("dispose",()=>disposed.push(key));loads.push(key);return texture;};
+  try{
+    const camera=new THREE.PerspectiveCamera(40.074,640/448,1,4000);
+    camera.position.set(0,4.75,7.51);camera.lookAt(0,2,0);camera.updateMatrixWorld(true);
+    const g={camera,three:new THREE.Scene(),renderer:{setClearColor(){}}};
+    A.syncViewportSkybox(g,{skybox:{enabled:true,texture:"sky.png",textureSize:1024,bitDepth:16,upperOnly:true,tiles:["left.bmp","right.bmp"]}},[
+      {cat:"textures",name:"sky.png",dataUrl:"original"},{cat:"textures",name:"left.bmp",dataUrl:"left"},{cat:"textures",name:"right.bmp",dataUrl:"right"}
+    ]);
+    g.three.updateMatrixWorld(true);assertEquals(loads,["left","right"]);
+    const ray=new THREE.Raycaster();
+    for(const x of [-.95,0,.95])for(const y of [-.95,0]){
+      ray.setFromCamera(new THREE.Vector2(x,y),camera);const hits=ray.intersectObject(g.skybox,true);
+      assert(hits.length>0,"A downward game camera must see the sky background");assertEquals(hits[0].object,g.skyboxBackdrop);
+    }
+    assertEquals(g.skyboxBackdrop.material.transparent,false);assertEquals(g.skyboxBackdrop.material.blending,THREE.CustomBlending);
+    assert(g.skyboxBackdrop.renderOrder>-1000&&g.skyboxBackdrop.renderOrder<0);
+    const previous=g.skyboxBackdrop;
+    A.syncViewportSkybox(g,{skybox:{enabled:true,texture:'sky.png',textureSize:1024,bitDepth:16,upperOnly:true,tiles:['left.bmp','right.bmp'],backdropMode:'solid',backdropColor:{r:255,g:0,b:0}}},[
+      {cat:'textures',name:'sky.png',dataUrl:'original'},{cat:'textures',name:'left.bmp',dataUrl:'left'},{cat:'textures',name:'right.bmp',dataUrl:'right'}
+    ]);
+    assert(previous!==g.skyboxBackdrop);assertEquals(loads,['left','right'],"Dragging colors must not reload sky textures");
+    A.clearViewportSkybox(g);assertEquals(disposed.sort(),["left","right"]);assertEquals(g.three.children.length,0);
+  }finally{THREE.TextureLoader.prototype.load=original;}
 });

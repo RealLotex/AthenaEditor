@@ -139,6 +139,11 @@ function eulerFromOdeRotation(a) {
  * The same conversion, as source text to embed in the generated main.js.
  * Kept beside the implementation above so the two cannot drift apart.
  */
+// AthenaEnv's FOV is horizontal; Three.js expects a vertical angle.
+function verticalCameraFov(horizontalDegrees, aspect) {
+  return 2*Math.atan(Math.tan(horizontalDegrees*Math.PI/360)/aspect)*180/Math.PI;
+}
+
 const ODE_EULER_RUNTIME = `function _odeEuler(a) {
     // dMatrix3 has a padding lane every 4th float, and the binding only
     // returns 9 of the 12 values, so row 2 must be rebuilt as row0 x row1.

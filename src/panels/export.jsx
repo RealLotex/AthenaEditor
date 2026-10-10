@@ -28,30 +28,28 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
 
   return (
     <Modal
-      title="Export game"
+      title={tr("Export game")}
       onClose={onClose}
       width={Math.min(detailsOpen ? 900 : 560, window.innerWidth - 32)}
       initialFocus=".a-btn--primary"
       footer={
         <>
           <span className="a-grow a-dim" style={{ fontSize: 10.5, alignSelf: "center" }}>
-            Unzip the folder and add your console player (athena.elf).
-          </span>
+            {tr("Unzip the folder and add your console player (athena.elf).")}</span>
           <button className="a-btn a-btn--primary" disabled={errors.length > 0} onClick={downloadAll}>
-            Download game folder
-          </button>
+            {tr("Download game folder")}</button>
           {canShare && <button className="a-btn" disabled={sharing || errors.length > 0} onClick={async () => {
             setSharing(true); setShareError("");
             try { await shareEditorFile(bundleFile); } catch (error) { setShareError(error.message); }
             finally { setSharing(false); }
-          }}>Share…</button>}
+          }}>{tr("Share…")}</button>}
         </>
       }
     >
       <section className="a-export-summary" aria-labelledby="export-summary-title">
-        <h2 id="export-summary-title">{errors.length ? `Fix ${errors.length} error${errors.length > 1 ? "s" : ""} to export` : "Your game is ready"}</h2>
+        <h2 id="export-summary-title">{errors.length ? `Fix ${errors.length} error${errors.length > 1 ? "s" : ""} to export` : tr("Your game is ready")}</h2>
         <p className="a-export-summary__name">{projectName}</p>
-        <p className="a-dim">{result.sceneCount || 1} scene{result.sceneCount > 1 ? "s" : ""} · {(result.assets || []).length} assets included</p>
+        <p className="a-dim">{result.sceneCount || 1} {tr("scene")}{result.sceneCount > 1 ? "s" : ""} · {(result.assets || []).length} {tr("assets included")}</p>
       </section>
       {(errors.length > 0 || warnings.length > 0) && (
         <div style={{ marginBottom: 11 }}>
@@ -71,14 +69,14 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
               </span>
             </button>
           ))}
-          {warnings.length > 6 && <div className="a-dim" style={{ padding: "5px 9px", fontSize: 10.5 }}>+{warnings.length - 6} more in the Problems panel.</div>}
+          {warnings.length > 6 && <div className="a-dim" style={{ padding: "5px 9px", fontSize: 10.5 }}>+{warnings.length - 6} {tr("more in the Problems panel.")}</div>}
         </div>
       )}
 
-      <details className="a-disclosure" onToggle={(e) => setDetailsOpen(e.currentTarget.open)}><summary>Code and export details</summary>
+      <details className="a-disclosure" onToggle={(e) => setDetailsOpen(e.currentTarget.open)}><summary>{tr("Code and export details")}</summary>
       <div className="a-row" style={{ marginBottom: 12 }}>
-        <span className="a-grow a-dim">Generated files</span>
-        <button className="a-btn a-btn--ghost" onClick={copy}>{copied ? "Copied" : `Copy ${current.filename}`}</button>
+        <span className="a-grow a-dim">{tr("Generated files")}</span>
+        <button className="a-btn a-btn--ghost" onClick={copy}>{copied ? tr("Copied") : `Copy ${current.filename}`}</button>
       </div>
       <div className="a-row" style={{ gap: 12, marginBottom: 9, flexWrap: "wrap" }}>
         {Object.entries({
@@ -95,7 +93,7 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
         ))}
         {result.stats.vramLocked > 0 && (
           <span className="a-dim" style={{ fontSize: 10.5 }}>
-            VRAM locked{" "}
+            {tr("VRAM locked")}{" "}
             <span style={{ color: result.stats.vramLocked > 1048576 ? "var(--warn)" : "var(--fg-strong)", fontFamily: "var(--font-mono)" }}>
               {fmtBytes(result.stats.vramLocked)}
             </span>
@@ -114,7 +112,7 @@ function ExportModal({ result, projectName, onClose, onReveal }) {
         {current.content}
       </pre>
       </details>
-      {errors.length > 0 && <p role="status">Fix the errors above, then export again.</p>}
+      {errors.length > 0 && <p role="status">{tr("Fix the errors above, then export again.")}</p>}
       {shareError && <p role="status">{shareError}</p>}
     </Modal>
   );

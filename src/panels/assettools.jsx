@@ -120,7 +120,7 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
   };
   return (
     <Modal
-      title="Texture tools"
+      title={tr("Texture tools")}
       width={590}
       onClose={() => {
         generation.current++;
@@ -129,7 +129,7 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
       footer={
         <>
           <span className="a-grow" />
-          <button className="a-btn" onClick={onClose}>Cancel</button>
+          <button className="a-btn" onClick={onClose}>{tr("Cancel")}</button>
           {preview
             ? (
               <button
@@ -139,8 +139,7 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
                   onClose();
                 }}
               >
-                Use textures
-              </button>
+                {tr("Use textures")}</button>
             )
             : (
               <button
@@ -148,20 +147,20 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
                 disabled={busy || !selected.length}
                 onClick={create}
               >
-                {busy ? "Processing…" : "Preview result"}
+                {busy ? tr("Processing…") : tr("Preview result")}
               </button>
             )}
         </>
       }
     >
-      <Field label="Task" stack>
+      <Field label={tr("Task")} stack>
         <select
           className="a-select"
           value={mode}
           onChange={(e) => setMode(e.target.value)}
         >
-          <option value="optimize">Reduce texture size and colours</option>
-          <option value="atlas">Combine textures into an atlas</option>
+          <option value="optimize">{tr("Reduce texture size and colours")}</option>
+          <option value="atlas">{tr("Combine textures into an atlas")}</option>
         </select>
       </Field>
       <div className="a-tool-list">
@@ -182,29 +181,29 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
           </label>
         ))}
         {!textures.length && (
-          <p>Import a texture or add a primitive to use these tools.</p>
+          <p>{tr("Import a texture or add a primitive to use these tools.")}</p>
         )}
       </div>
-      <Field label={mode === "atlas" ? "Atlas size" : "Maximum size"}>
+      <Field label={mode === "atlas" ? tr("Atlas size") : tr("Maximum size")}>
         <select
           className="a-select"
           value={size}
           onChange={(e) => setSize(Number(e.target.value))}
         >
           {[64, 128, 256, 512, 1024].map((n) => (
-            <option key={n} value={n}>{n} px</option>
+            <option key={n} value={n}>{n} {tr("px")}</option>
           ))}
         </select>
       </Field>
       <details className="a-disclosure">
-        <summary>Advanced options</summary>
-        <Field label="Colours">
+        <summary>{tr("Advanced options")}</summary>
+        <Field label={tr("Colours")}>
           <select
             className="a-select"
             value={colors}
             onChange={(e) => setColors(Number(e.target.value))}
           >
-            <option value={256}>256 (recommended)</option>
+            <option value={256}>{tr("256 (recommended)")}</option>
             <option value={16}>16</option>
           </select>
         </Field>
@@ -215,8 +214,7 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
               checked={linear}
               onChange={(e) => setLinear(e.target.checked)}
             />{" "}
-            Smooth downscaling
-          </label>
+            {tr("Smooth downscaling")}</label>
         )}
       </details>
       {preview && (
@@ -231,16 +229,12 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
             </div>
           ))}
           <p className="a-dim">
-            Models in this scene will use the new textures. Original assets are
-            kept.
-          </p>
+            {tr("Models in this scene will use the new textures. Original assets are kept.")}</p>
         </div>
       )}
       {mode === "atlas" && (
         <p className="a-dim">
-          Atlas remapping supports OBJ models with UVs inside the texture
-          square. Tiled UVs need to be adjusted first.
-        </p>
+          {tr("Atlas remapping supports OBJ models with UVs inside the texture square. Tiled UVs need to be adjusted first.")}</p>
       )}
       {error && <p role="alert" className="a-error">{error}</p>}
     </Modal>
@@ -250,10 +244,11 @@ function TextureToolsModal({ files, scene, onApply, onClose, initialTexture }) {
 function BakeLightingModal({ scene, files, onApply, onClose }) {
   const models = exportableObjects(scene.objects).filter((o) =>
       o.components.model?.file && o.components.rigidbody?.mode !== "dynamic" &&
-      !o.components.animator
+      !o.components.animator && !o.components.water && !o.components.particles
     ),
-    [selected, setSelected] = useState(models.map((o) => o.id)),
+    [selected, setSelected] = useState(models.filter(o=>!o._terrain && o.components.rigidbody?.shape!=='plane').map((o) => o.id)),
     [size, setSize] = useState(128),
+    [mode, setMode] = useState('blobs'),
     [shadows, setShadows] = useState(true),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(""),
@@ -266,6 +261,11 @@ function BakeLightingModal({ scene, files, onApply, onClose }) {
     setBusy(true);
     setError("");
     try {
+      if(mode==='blobs'){
+        const result=await bakeSharedShadows(scene,files,selected,{size,signal:controller.signal,onProgress:p=>setProgress(Math.round(p*100)+'%')});
+        if(controller.signal.aborted)throw Error('Bake cancelled.');
+        onApply(result);onClose();return;
+      }
       const outputs = [], updates = [];
       for (const id of selected) {
         const object = findObj(scene.objects, id),
@@ -325,7 +325,7 @@ function BakeLightingModal({ scene, files, onApply, onClose }) {
   };
   return (
     <Modal
-      title="Bake scene lighting"
+      title={tr("Bake scene lighting and shadows")}
       width={470}
       onClose={() => {
         abort.current?.abort();
@@ -341,19 +341,23 @@ function BakeLightingModal({ scene, files, onApply, onClose }) {
               if (!busy) onClose();
             }}
           >
-            {busy ? "Cancel bake" : "Cancel"}
+            {busy ? tr("Cancel bake") : tr("Cancel")}
           </button>
           <button
             className="a-btn a-btn--primary"
             disabled={busy || !selected.length}
             onClick={bake}
           >
-            {busy ? "Baking…" : "Bake lighting"}
+            {busy ? tr("Baking…") : mode==='blobs' ? tr("Generate shadows") : tr("Bake lighting")}
           </button>
         </>
       }
     >
-      <p>Save static lighting and shadows into your models’ textures.</p>
+      <Field label={tr("Mode")}><Select value={mode} onChange={setMode} options={[
+        {value:'blobs',label:tr("Shared shadow blobs")}, {value:'lightmap',label:tr("Lightmap textures")},
+      ]}/></Field>
+      <p>{mode==='blobs'?tr("Generate soft directional silhouettes and share each image between matching instances. Receivers keep their textures."):tr("Save static lighting and shadows into your models’ textures.")}</p>
+      <Field label={tr("Texture size")}><Select value={size} onChange={v=>setSize(Number(v))} options={[64,128,256,512].map(n=>({value:n,label:n+' px'}))}/></Field>
       <div className="a-tool-list">
         {models.map((o) => (
           <label key={o.id}>
@@ -371,32 +375,19 @@ function BakeLightingModal({ scene, files, onApply, onClose }) {
           </label>
         ))}
       </div>
-      <details className="a-disclosure">
-        <summary>Advanced options</summary>
-        <Field label="Texture size">
-          <select
-            className="a-select"
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-          >
-            {[64, 128, 256, 512].map((n) => (
-              <option key={n} value={n}>{n} px</option>
-            ))}
-          </select>
-        </Field>
+      {mode==='lightmap' && <details className="a-disclosure">
+        <summary>{tr("Advanced options")}</summary>
+
         <label>
           <input
             type="checkbox"
             checked={shadows}
             onChange={(e) => setShadows(e.target.checked)}
           />{" "}
-          Include static shadows
-        </label>
-      </details>
+          {tr("Include static shadows")}</label>
+      </details>}
       <p className="a-dim">
-        Uses ambient and directional lights. Moving objects and indirect light
-        are not baked. Restore original lighting from the Tools menu.
-      </p>
+        {mode==='blobs'?tr("128 px shadows use about 8 KB per unique silhouette. Position and uniform scale reuse the image; different rotations and proportions need a variant. Drape follows solid colliders."):tr("Uses ambient and directional lights. Moving objects and indirect light are not baked.")} {tr("Restore the original from the Tools menu.")}</p>
       <p role="status">{progress}</p>
       {error && <p role="alert" className="a-error">{error}</p>}
     </Modal>

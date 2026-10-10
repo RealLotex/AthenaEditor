@@ -2,8 +2,8 @@
 //  STORAGE — autosave, project files, asset folders
 //
 //  Autosave is the safety net the old editor lacked: a browser refresh threw
-//  the whole scene away. Only the project structure is persisted; assets are
-//  re-read from disk on demand because they can be tens of megabytes.
+//  the whole scene away. Loaded assets are retained losslessly; large payloads
+//  are compressed in a background worker so editing stays responsive.
 // ═══════════════════════════════════════════════════════════════════════
 
 const AUTOSAVE_KEY = "athena.editor.project";
@@ -20,6 +20,82 @@ const AUTOSAVE_MS = 4000;
 // of continuous work could reach a crash with nothing written at all.
 const AUTOSAVE_MAX_MS = 15000;
 
+// Large native BMPs exceed localStorage even though they are valid console
+// assets. Compress payloads losslessly, caching unchanged strings so ordinary
+// scene edits do not recompress every texture. File saves keep the normal format.
+const recoveryPayloadCache = new Map();
+let recoveryPayloadCacheSize = 0;
+function cacheRecoveryPayload(value, packed) {
+  const result = packed.length + 80 < value.length * .9 ? { _athenaRecovery: 1, length: value.length, lz: packed } : value;
+  const cost = value.length + (result === value ? 0 : packed.length);
+  const limit = 32 * 1024 * 1024;
+  if (cost <= limit) {
+    while (recoveryPayloadCacheSize + cost > limit && recoveryPayloadCache.size) {
+      const [old, cached] = recoveryPayloadCache.entries().next().value;
+      recoveryPayloadCache.delete(old);
+      recoveryPayloadCacheSize -= old.length + (cached === old ? 0 : cached.lz.length);
+    }
+    recoveryPayloadCache.set(value, result); recoveryPayloadCacheSize += cost;
+  }
+  return result;
+}
+
+function autosaveValue(key, value) {
+  if (typeof compactWaterAsset === "function") value = compactWaterAsset(value);
+  if (!["dataUrl", "content"].includes(key) || typeof value !== "string" || value.length < 65536 || typeof RecoveryCodec === "undefined") return value;
+  if (recoveryPayloadCache.has(value)) return recoveryPayloadCache.get(value);
+  return cacheRecoveryPayload(value, RecoveryCodec.compress(value));
+}
+
+let recoveryWorker = null, recoveryWorkerUnavailable = false, recoveryWorkerId = 0;
+const recoveryWorkerTasks = new Map();
+function recoveryCompressionWorker() {
+  if (recoveryWorker || recoveryWorkerUnavailable) return recoveryWorker;
+  if (typeof Worker === "undefined" || typeof RecoveryCodec === "undefined") return null;
+  try {
+    const url = URL.createObjectURL(new Blob([RecoveryCodec.workerSource()], { type: "text/javascript" }));
+    try { recoveryWorker = new Worker(url); } finally { URL.revokeObjectURL(url); }
+    recoveryWorker.onmessage = ({ data }) => {
+      const task = recoveryWorkerTasks.get(data.id);
+      if (!task) return;
+      recoveryWorkerTasks.delete(data.id);
+      cacheRecoveryPayload(task.value, data.packed); task.resolve();
+    };
+    recoveryWorker.onerror = () => {
+      recoveryWorker.terminate(); recoveryWorker = null; recoveryWorkerUnavailable = true;
+      for (const task of recoveryWorkerTasks.values()) task.resolve();
+      recoveryWorkerTasks.clear();
+    };
+  } catch (_e) { recoveryWorkerUnavailable = true; recoveryWorker = null; }
+  return recoveryWorker;
+}
+
+async function prepareRecoveryPayloads(project) {
+  const worker = recoveryCompressionWorker();
+  if (!worker) return; // saveAutosave remains a synchronous lossless fallback.
+  const values = new Set();
+  JSON.stringify(project, (key, value) => {
+    if (typeof compactWaterAsset === "function") value = compactWaterAsset(value);
+    if (["dataUrl", "content"].includes(key) && typeof value === "string" && value.length >= 65536 && !recoveryPayloadCache.has(value)) values.add(value);
+    return value;
+  });
+  await Promise.all([...values].map(value => new Promise(resolve => {
+    const id = ++recoveryWorkerId;
+    recoveryWorkerTasks.set(id, { value, resolve });
+    worker.postMessage({ id, text: value });
+  })));
+}
+
+function parseRecoveryJSON(raw) {
+  return JSON.parse(raw, (key, value) => {
+    if (!["dataUrl", "content"].includes(key) || value?._athenaRecovery !== 1) return value;
+    if (typeof RecoveryCodec === "undefined" || typeof value.lz !== "string" || !Number.isSafeInteger(value.length) || value.length < 0) throw Error("The saved asset payload is damaged.");
+    const decoded = RecoveryCodec.decompress(value.lz);
+    if (typeof decoded !== "string" || decoded.length !== value.length) throw Error("The saved asset payload is damaged.");
+    return decoded;
+  });
+}
+
 /**
  * Write the project to the browser.
  *
@@ -30,7 +106,7 @@ const AUTOSAVE_MAX_MS = 15000;
 function saveAutosave(project) {
   let text;
   try {
-    text = JSON.stringify({ at: Date.now(), project });
+    text = JSON.stringify({ at: Date.now(), project }, autosaveValue);
   } catch (e) {
     return { ok: false, reason: "unserialisable", message: e.message };
   }
@@ -61,7 +137,7 @@ function saveAutosave(project) {
 function readAutosaveSlot(key) {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
-  const { at, project } = JSON.parse(raw);
+  const { at, project } = parseRecoveryJSON(raw);
   if (!project?.scenes?.length) throw new Error("the saved project has no scenes");
   const notes = [];
   return { at, project: migrateProject(project, notes), notes, raw };
@@ -241,10 +317,17 @@ function assetChanged(previous, next) {
  * written back by the viewport itself once a mesh has loaded, and keying on it
  * would make every load invalidate its own cache entry and rebuild forever.
  */
+const ASSET_REVISION_CACHE=new WeakMap();
 function assetRevision(file) {
   if (!file) return "missing";
   const payload = file.dataUrl ?? file.content ?? "";
-  return `${file.id}:${file.size ?? -1}:${file.mtime ?? "-"}:${payload.length}`;
+  let cached=ASSET_REVISION_CACHE.get(file);
+  if(!cached||cached.payload!==payload){
+    let hash=2166136261;
+    for(let i=0;i<payload.length;i++)hash=Math.imul(hash^payload.charCodeAt(i),16777619);
+    cached={payload,hash:hash>>>0};ASSET_REVISION_CACHE.set(file,cached);
+  }
+  return `${file.id}:${file.size ?? -1}:${file.mtime ?? "-"}:${payload.length}:${cached.hash}`;
 }
 
 /**

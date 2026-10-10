@@ -8,6 +8,29 @@
 
 const LEVEL_RANK = { error: 0, warn: 1, info: 2 };
 
+const PHYSICS_CTX_HANDLES = new Set(["particles","emitParticles","pad", "dt", "frame", "goToScene", "RenderObjects", "RenderDatas",
+  "textures", "animCollections", "lights", "sounds", "shadows", "physics", "ui", "eventActions", "destroyObject", "events", "cinematics", "eventFlows", "variables", "setGameplayEnabled", "isGameplayEnabled", "__proto__", "constructor", "prototype"]);
+
+function physicsEventKey(obj) {
+  return ident((obj.components.rigidbody.onCollide || "").trim() ||
+    (obj.components.script?.ctxKey || "").trim() || obj.name, "target");
+}
+
+/** Shared by live Problems and export; never let an event slot replace ctx handles. */
+function physicsEventKeyProblems(objects) {
+  const owners = new Map(), problems = [];
+  for (const obj of objects) {
+    if (!obj.components?.rigidbody?.collisionEvents) continue;
+    const key = physicsEventKey(obj);
+    const message = PHYSICS_CTX_HANDLES.has(key)
+      ? `"${obj.name}" uses reserved ctx Key "${key}" for physics events. Choose another key.`
+      : owners.has(key) ? `"${obj.name}" and "${owners.get(key)}" both report physics events to ctx.${key}. Set distinct ctx Keys.` : null;
+    if (message) problems.push({ level: "error", message, objectId: obj.id, objectName: obj.name, component: "rigidbody" });
+    else owners.set(key, obj.name);
+  }
+  return problems;
+}
+
 // Export must contain the bytes it references. A missing dependency is not a
 // usable game, even when an empty asset library hides it in ordinary editing.
 function exportAssetProblems(scene, files, project) {
@@ -37,18 +60,72 @@ function exportAssetProblems(scene, files, project) {
   }
   const sky = normalizedSkybox(scene.skybox);
   if (sky.enabled) requireAsset("textures", sky.texture, null, "skybox");
+  if (sky.enabled) for (const tile of sky.tiles) requireAsset("textures", tile, null, "skybox");
   return problems;
 }
 
 function validateScene(scene, files = [], project = null) {
   const out = [];
   if (!scene) return out;
+  if(scene.activeCameraId&&!resolveSceneCamera(scene).cameras.some(o=>o.id===scene.activeCameraId))out.push({level:'error',component:'camera',message:'The active camera is missing or excluded from export. Choose an active camera in Scene settings.'});
   if(project)files=editorAssets(project,files);
+  if (typeof cinematicProblems === "function") out.push(...cinematicProblems(scene, files));
+  if (typeof eventFlowProblems === "function") out.push(...eventFlowProblems(scene,files,project));
   const add = (level, message, obj, component, fix) =>
     out.push({ level, message, objectId: obj?.id, objectName: obj?.name, component, fix });
 
   const objects = allObjects(scene.objects || []);
   const exported = new Set(exportableObjects(scene.objects || []).map((o) => o.id));
+  if(scene.environment?.fog?.enabled){
+    const fog=scene.environment.fog;
+    if(!Number.isFinite(fog.start)||!Number.isFinite(fog.end)||fog.start<0||fog.end<=fog.start)add('error','Fog end distance must be greater than its start distance.',null,'environment');
+    const unsupported=objects.filter(o=>exported.has(o.id)&&o.components?.model&&!o.components.water&&!o.components.particles&&(o.components.animator||o.components.rigidbody?.mode==='dynamic'||!/\.obj$/i.test(o.components.model.file)));
+    if(unsupported.length)add('info','Native fog affects static OBJ surfaces. Animated models and water keep their own materials.',null,'environment');
+    add('info','Fog adds an untextured draw and independent geometry/color buffers for each static OBJ object; it adds no texture VRAM.',null,'environment');
+  }
+  for(const obj of objects.filter(o=>exported.has(o.id))){
+    const asset=files.find(f=>f.name===obj.components?.model?.file);
+    const water=obj.components?.water,textureAnimation=obj.components?.textureAnimation,particles=obj.components?.particles;
+    if(water&&asset?.content){
+      const corners=readMeshOBJ(asset.content).faces.length*3;
+      const settings=normalizedWater(water),layout=waterGeometryCacheLayout(corners,settings,!!obj.components.reflection);
+      if((settings.waveHeight||settings.flow.x||settings.flow.z||settings.rippleStrength)&&!layout.bytes)add('warn',`This water mesh exceeds the 8 MB animation cache limit. Mesh waves and Texture movement use the slower dynamic path; reduce their quality or simplify the mesh.`,obj,'water');
+    }
+    if(textureAnimation||particles?.flipbook){
+      const animation=textureAnimation||particles,cols=animation.columns,rows=animation.rows,texture=files.find(f=>f.name===obj.components.model.textureFile),image=texture?.image||texture?.imageSize;
+      if(image&&(image.width%cols||image.height%rows))add('error','Sprite sheet dimensions must divide evenly into its columns and rows.',obj,textureAnimation?'textureAnimation':'particles');
+      if(!obj.components.model.textureFile||obj.components.model.texture_mapping===false)add('error','Assign a sprite sheet to the Model texture and enable texture mapping.',obj,textureAnimation?'textureAnimation':'particles');
+      if(textureAnimation&&asset?.content){
+        const corners=readMeshOBJ(asset.content).faces.length*3,bytes=corners*16*cols*rows;
+        if(bytes>8*1024*1024)add('error','This mesh and atlas need more than 8 MB of cached UVs. Use a simpler sprite mesh or fewer atlas frames.',obj,'textureAnimation');
+        else if(corners>768)add('warn','Texture animation on dense geometry increases memory and CPU work. A simple sprite plane is faster.',obj,'textureAnimation');
+      }
+    }
+    if(obj.components?.particles&&asset?.content&&/\.obj$/i.test(asset.name)){
+      let capacity=0;try{capacity=readMeshOBJ(asset.content).faces.length/2;}catch{}
+      if(capacity<obj.components.particles.count)add('error','This sprite mesh has too few particle quads. Create an emitter through Add / Particle effects.',obj,'particles');
+    }
+    if(asset?.vertexColors){
+      let count=0;try{count=readMeshOBJ(asset.content).faces.length*9;}catch{}
+      if(!Array.isArray(asset.vertexColors)||asset.vertexColors.length!==count||asset.vertexColors.some(v=>!Number.isFinite(v)||v<0||v>1))add('error','Baked vertex colors no longer match this mesh. Restore original colors and apply Lighting again.',obj,'model');
+    }
+  }
+  if (scene.physics?.enabled) out.push(...physicsEventKeyProblems(objects.filter(o => exported.has(o.id))));
+  for (const obj of objects.filter(o => exported.has(o.id))) {
+    const rb = obj.components?.rigidbody;
+    if (!rb?.collisionEvents || !rb.eventPreset) continue;
+    if (!EVENT_ACTION_PRESETS.some(p => p.id === rb.eventPreset)) add("error", "Choose a valid event script preset.", obj, "rigidbody");
+    if(rb.eventPreset==="playSequence"&&!scene.sequences?.some(s=>s.id===rb.eventSequenceId))add("error","Choose a Sequence for Play Cinematic.",obj,"rigidbody");
+    if (rb.eventOtherId && !objects.some(o => exported.has(o.id) && o.id === rb.eventOtherId && o.id !== obj.id && o.components.rigidbody)) {
+      add("error", "Only With must reference another exported collider.", obj, "rigidbody");
+    }
+    if (rb.eventPreset === "changeScene" && rb.eventSceneId && project && !project.scenes.some(s => s.id === rb.eventSceneId)) {
+      add("error", "The selected Scene no longer exists.", obj, "rigidbody");
+    }
+    if (rb.eventPreset === "playAnimation" && (!obj.components.model || obj.ctxEnabled === false)) {
+      add("error", "Play Animation needs a Model available to scripts on this object.", obj, "rigidbody");
+    }
+  }
   const assetNames = new Set(files.map((f) => f.name));
   const haveFiles = files.length > 0;
   out.push(...skyboxAssetProblems(scene, files));
@@ -151,9 +228,9 @@ function validateScene(scene, files = [], project = null) {
   // then uploads the same again into 4 MB of VRAM. Nothing anywhere says the
   // picture was too big — the program simply does not boot.
   const sky = normalizedSkybox(scene.skybox);
-  const skyObject = { id: "__skybox_budget__", name: "Skybox", components: { model: { textureFile: sky.texture, textureFilter: "LINEAR" } } };
-  for (const d of validateTextures(sky.enabled ? [...objects, skyObject] : objects, sky.enabled ? new Set([...exported, skyObject.id]) : exported, files)) {
-    if (d.objectId === skyObject.id) { delete d.objectId; d.component = "skybox"; }
+  const skyObjects = sky.enabled ? (sky.tiles.length ? sky.tiles : [sky.texture]).map((texture, i) => ({ id: `__skybox_budget_${i}__`, name: "Skybox", components: { model: { textureFile: texture, textureFilter: sky.textureFilter } } })) : [];
+  for (const d of validateTextures([...objects, ...skyObjects], new Set([...exported, ...skyObjects.map(o=>o.id)]), files)) {
+    if (skyObjects.some(o=>o.id === d.objectId)) { delete d.objectId; d.component = "skybox"; }
     out.push(d);
   }
 
@@ -225,19 +302,7 @@ function validateScene(scene, files = [], project = null) {
     }
   }
 
-  // VRAM: locked render targets never return to the pool.
-  let rt = 0;
-  for (const o of objects) {
-    if (!exported.has(o.id)) continue;
-    const sh = o.components?.shadow;
-    if (sh && (sh.source || "rendertarget") === "rendertarget") {
-      const px = clamp(sh.rtSize || 128, 32, 512);
-      rt += px * px * ((sh.rtBpp || 32) / 8);
-    }
-  }
-  if (rt > 1024 * 1024) {
-    add("warn", `Shadow targets lock ${(rt / 1048576).toFixed(2)} MB of the PS2's 4 MB of VRAM.`, null, "shadow");
-  }
+  out.push(...sceneVRAMProblems(scene, files, project));
 
   out.sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level]);
   return out;
@@ -272,15 +337,13 @@ function validateTextures(objects, exported, files) {
   }
   if (!uploads.size) return out;
 
-  let total = 0;
   const seenFile = new Set();
   for (const { file, filter, obj } of uploads.values()) {
     const entry = files.find((f) => f.name === file);
     const size = imageSizeOfAsset(entry);
     if (!size || !size.width || !size.height) continue;
     const { width, height } = size;
-    const bytes = textureBytes(width, height);
-    total += bytes;
+    const bytes = textureVRAMBytes(entry) ?? textureBytes(width, height);
 
     if (width > GS_MAX_TEXTURE || height > GS_MAX_TEXTURE) {
       add(
@@ -308,7 +371,7 @@ function validateTextures(objects, exported, files) {
     if (byFilter.size < 2) continue;
     const entry = files.find((f) => f.name === file);
     const size = imageSizeOfAsset(entry);
-    const cost = size ? ` — an extra ${fmtBytes(textureBytes(size.width, size.height))}` : "";
+    const cost = size ? ` — an extra ${fmtBytes(textureVRAMBytes(entry) ?? textureBytes(size.width, size.height))}` : "";
     add(
       "warn",
       `"${file}" is used with ${[...byFilter.keys()].join(" and ")} filtering. ` +
@@ -318,17 +381,6 @@ function validateTextures(objects, exported, files) {
     );
   }
 
-  // VRAM is 4 MB and shared with the framebuffer, so well before the total
-  // reaches it the console is already out of room.
-  if (total > 2 * 1024 * 1024) {
-    out.push({
-      level: "warn",
-      message: `Textures come to ${fmtBytes(total)}. The PS2 has 4 MB of video memory in ` +
-        `total, shared with the framebuffer and the z-buffer, so anything past about 2 MB ` +
-        `of textures is unlikely to fit.`,
-      component: "model",
-    });
-  }
   return out;
 }
 

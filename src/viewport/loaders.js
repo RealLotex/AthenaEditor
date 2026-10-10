@@ -80,9 +80,9 @@ function loadGLTF(dataUrl) {
     if (!THREE.GLTFLoader) { reject(new Error("GLTFLoader is unavailable")); return; }
     let buf;
     try {
-      buf = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0)).buffer;
+      buf = dataUrl?.trim().startsWith('{') ? dataUrl : Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0)).buffer;
     } catch (e) { reject(new Error("could not decode the model")); return; }
-    new THREE.GLTFLoader().parse(buf, "", (gltf) => resolve(gltf.scene),
+    new THREE.GLTFLoader().parse(buf, "", (gltf) => {gltf.scene.userData.editorAnimations=gltf.animations;resolve(gltf.scene);},
       (err) => reject(new Error(err?.message || "could not parse the model")));
   });
 }
@@ -159,15 +159,16 @@ async function buildModel(modelComp, files) {
   if (!meshFile) return null;
 
   let root;
-  if (meshFile.isGltf) {
-    root = applyModelMaterial(await loadGLTF(meshFile.dataUrl), modelComp, files);
+  if (meshFile.isGltf || /\.(gltf|glb)$/i.test(meshFile.name)) {
+    root = applyModelMaterial(await loadGLTF(meshFile.dataUrl||meshFile.content), modelComp, files);
   } else if (meshFile.content) {
     const geo = parseOBJ(meshFile.content);
+    if(meshFile.vertexColors?.length===geo.attributes.position.count*3)geo.setAttribute('color',new THREE.Float32BufferAttribute(meshFile.vertexColors,3));
     // Untextured OBJs get a flat blue so they read as geometry rather than as
     // something whose texture failed to load; applyModelMaterial then puts the
     // assigned texture over it if there is one.
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x6688cc, roughness: 0.85, metalness: 0.0,
+      color: meshFile.vertexColors?0xffffff:0x6688cc,vertexColors:!!meshFile.vertexColors, roughness: 0.85, metalness: 0.0,
     });
     root = applyModelMaterial(new THREE.Mesh(geo, mat), modelComp, files);
   } else {
@@ -188,13 +189,28 @@ async function buildModel(modelComp, files) {
 
 /** Release GPU memory for a subtree. Three does not do this automatically. */
 function disposeObject(root) {
+  const disposed=new Set(),release=value=>{if(value&&!disposed.has(value)){disposed.add(value);value.dispose?.();}};
   root.traverse((ch) => {
-    ch.geometry?.dispose();
+    release(ch.geometry);
+    for(const texture of ch.userData?.waterTextures||[])release(texture);
     if (ch.material) {
     for (const m of [].concat(ch.material)) {
-        m.map?.dispose();
-        m.dispose();
+        // GLTF can own normal, roughness, emissive and other texture slots too.
+        for(const value of Object.values(m))if(value?.isTexture)release(value);
+        release(m);
       }
     }
+    release(ch.shadow);
   });
+}
+
+// Bound editor backing buffers on high-DPI displays; export detail is unaffected.
+function viewportPixelRatio(width,height,dpr=1) {
+  return Math.min(Math.max(1,dpr||1),1.5,Math.sqrt(2000000/Math.max(1,width*height)));
+}
+
+function expandVisibleViewportBounds(box,root) {
+  root.updateMatrixWorld(true);
+  root.traverseVisible(node=>{if(!node.geometry)return;node.geometry.computeBoundingBox();if(node.geometry.boundingBox)box.union(node.geometry.boundingBox.clone().applyMatrix4(node.matrixWorld));});
+  return box;
 }

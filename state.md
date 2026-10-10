@@ -1,6 +1,81 @@
 # Project status
 
-_Last updated: 2026-10-02._
+_Last updated: 2026-10-10._
+
+## October 10 Game crash, sky backdrops and release artifacts
+
+Game preview now requires a non-null pending request before reading requestId. Empty
+Timeline views and switching Game mode no longer crash on an absent sequence.
+
+Removing the lower hemisphere exposes Solid color, Gradient, Foggy gradient (default)
+and Mirror. Vertex colors provide the first three backgrounds; a translucent fog band
+extends 0–60 degrees above the horizon. Mirror reuses the upper textures. These options
+add no texture VRAM, preserve upper source detail and blend before scene geometry.
+Backdrop color dragging does not reload the panorama. Both Game and native export use
+the same color/geometry helper. Native alpha lanes account for the unlit pipeline's
+additive material alpha; setup checks buffer lengths before writing.
+
+Current verification: **695 tests passed, zero failed**. Each backdrop completed 60
+frames in PCSX2 with matching color buffers, two 1024×512 CT16 images and Nearest
+filtering; browser checks covered every mode and fog height without console errors.
+This is execution/state verification, not a physical-console or pixel-equivalence test.
+
+[September/October changelog](CHANGELOG.md) and [five separate demo videos](docs/media/README.md)
+are included. Save current work before reloading the editor; re-export games to pick up
+the native changes.
+
+## October 10 editor audit, color dragging and supplied-project startup
+
+Color preview samples coalesce at 50 ms, flush the final value and seal one undo step. Project edits retain unchanged immutable assets/history branches; Game appearance and HUD edits avoid geometry/playback rebuilds. Actual supplied-project edit preparation fell from 29.77 to 5.22 ms median (40 trials; CPU preparation only).
+
+Dock tab carousels, live ES/EN/PT language selection beside Export, inactive viewport disposal, bounded render buffers and graphics-context recovery are implemented. Fifteen additional authoring improvements and a same-size asset cache fix are documented in [EDITOR-AUDIT.md](docs/EDITOR-AUDIT.md). Browser-process termination remains outside the graphics-context recovery path.
+
+The supplied current project startup crash came from native compilation of a long baked RGB array literal. JSON parsing preserves its entries. The original project now reaches frame 1200 in PCSX2; a separate native color-lane regression passes at frame 120. The user's file was not overwritten. Re-export to include the fix.
+
+Final verification: **689 tests passed, zero failed**; color/undo, carousel, inactive Scene disposal, Timeline shortcuts and three languages checked in an isolated browser origin. Both generated HTML entry points contain this build.
+
+
+## October 10 water quality, source sky resolution and consolidated editing
+
+Water now has separate size/transparency/pattern/panning/wave/caustic controls,
+Linear/Nearest and a visible cost/VRAM/geometry/cache estimate. Built-in water is
+512² T4 with 32 looping procedural 3D Voronoi frames; quality mips retain full-loop
+motion. Ultra low removes every effect and uses a static 32² texture and two-triangle
+generated plane. Custom meshes retain their topology. Native geometry/UV bulk copies
+and baked static receiver caustics saved 4.33108/12.19684/3.68070 ms respectively in the
+all-maximum supplied-project experiment; all three together saved 20.20938 ms/frame.
+Its callback averages 10.27690 ms with 59.94 FPS presentation in PCSX2. These are
+emulated CPU submission measurements, not physical-hardware or GPU timings.
+Caches are bounded to 8 MB and 128/64 phase samples; moved receivers fall back to
+live projection. Dynamic characters are excluded from seafloor caustic receivers.
+Immutable water frames compact only in browser recovery; portable saves preserve
+their payloads. Generic model/particle flipbook atlases now share one image with
+independent clocks and frame-change-only UV updates. Native probes passed.
+
+The ten original stylized single_image skies are restored byte-for-byte at 1774×887.
+Higher-resolution reconstruction is deferred at the user's request. Heavy photographs
+and generated sectors are outside the shipped library. Packed source data decreased
+from 29,569,536 to 9,817,778 bytes. Preview and original data remain separate; larger
+output settings explicitly warn that they add no source detail. Conversion retires
+only generated tiles no longer referenced anywhere, preserving edited/shared/script
+assets. Browser recovery compresses large payloads losslessly in a background worker,
+with a bounded cache and prior-slot fallback; portable saves retain original data.
+
+World, Lighting, Events and Project again remain independent panels. Assets, UV and
+Prefabs are separate too, with no inner tabs. Focus keeps the default layout compact,
+and Scene/Game + opens every panel. World replaces Scene settings; camera selection,
+gamepad orbit and fallback settings live in Game. Disclosures share the same triangle
+and stable label. Controls configures hotkeys and camera mouse bindings, presets,
+sensitivity, wheel inversion, smoothing and selection drag threshold. Conflicts fail
+before changing a binding. Dragging preserves selection; clicks commit on release.
+Prefs persist independently from the project and apply in detached windows/Terrain.
+Menus use File/Edit/Create/Scene/View/Help. Timeline clips edit grouped Properties.
+Terrain omits preview fog and explains indexed atlas costs. Static contact shading
+uses BVH Draft/Balanced/High samples (about 611/681/694 ms in the supplied scene).
+Directional baking is opt-in; new Sun ambient is neutral. Native fog work is spread
+across frames. UI animations default off and can be enabled through View.
+The supplied project file was not overwritten. See [verification](docs/PRODUCTION-VERIFICATION.md)
+for measured costs, evidence and the pre-existing coastal scene-reload limitation.
 
 ## October 2 template performance
 

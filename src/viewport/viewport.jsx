@@ -14,6 +14,8 @@ function Viewport({
   scene, files, selectedIds, activeId,
   onSelect, onTransform, onMeshBounds,
   gizmoMode, gizmoSpace, snap, snapSize, showOverlays, shaded,
+  fieldOfView = 100,
+  mouseControls = DEFAULT_EDITOR_MOUSE,
   onFrameRequest,
   onCaptureRequest,
   terrainTool, onTerrainStroke,
@@ -21,10 +23,27 @@ function Viewport({
 }) {
   const mountRef = useRef(null);
   const G = useRef(null);          // long-lived Three state
+  const panelActive=useContext(PanelActivityContext),cameraState=useRef(null);
+  const viewportGeneration=useRef(0);
+  const [graphicsError,setGraphicsError]=useState('');
   const propsRef = useRef({});
-  propsRef.current = { scene, selectedIds, activeId, gizmoMode, gizmoSpace, snap, snapSize, onSelect, onTransform, terrainTool, onTerrainStroke };
+  propsRef.current = { scene, selectedIds, activeId, gizmoMode, gizmoSpace, snap, snapSize, onSelect, onTransform, terrainTool, onTerrainStroke, fieldOfView, mouseControls: normalizeEditorMouse(mouseControls) };
 
   const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const controls = G.current?.controls;
+    if (!controls) return;
+    const settings = normalizeEditorMouse(mouseControls);
+    controls.rotateSpeed = settings.orbitSpeed; controls.panSpeed = settings.panSpeed;
+    controls.zoomSpeed = settings.zoomSpeed;
+    controls.enableDamping = settings.damping;
+  }, [mouseControls, ready]);
+  useEffect(() => {
+    const camera = G.current?.camera;
+    if (!ready || !camera || camera.isOrthographicCamera) return;
+    camera.fov = verticalCameraFov(fieldOfView, camera.aspect);
+    camera.updateProjectionMatrix();
+  }, [fieldOfView, ready]);
   const [hoverAxis, setHoverAxis] = useState(null);
   const [droppingModel, setDroppingModel] = useState(false);
   const hasSelection = selectedIds.some(id => !!findObj(scene.objects, id));
@@ -46,9 +65,11 @@ function Viewport({
   // ── one-time setup ───────────────────────────────────────────────────
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount || typeof THREE === "undefined") return;
+    if (!panelActive || graphicsError || !mount || typeof THREE === "undefined") return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    let renderer;
+    try { renderer=new THREE.WebGLRenderer({antialias:true,alpha:false}); }
+    catch(error){setGraphicsError('The graphics view could not start. Close unused editor windows and retry.');return;}
     renderer.setPixelRatio(Math.min(mount.ownerDocument.defaultView.devicePixelRatio, 2));
     renderer.setClearColor(terrainTool?0x537dc0:0x070b11, 1);
     renderer.shadowMap.enabled=!!terrainTool;
@@ -63,7 +84,7 @@ function Viewport({
     mount.appendChild(renderer.domElement);
 
     const three = new THREE.Scene();
-    const camera = terrainTool?new THREE.OrthographicCamera(-20,20,20,-20,.05,8000):new THREE.PerspectiveCamera(55, 1, 0.05, 8000);
+    const camera = terrainTool?new THREE.OrthographicCamera(-20,20,20,-20,.05,8000):new THREE.PerspectiveCamera(fieldOfView, 1, 0.05, 8000);
     camera.position.set(9, terrainTool?10:7, 12);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -74,6 +95,9 @@ function Viewport({
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN,
     };
+    if(cameraState.current){camera.position.fromArray(cameraState.current.position);controls.target.fromArray(cameraState.current.target);camera.zoom=cameraState.current.zoom;controls.update();}
+    const lost=event=>{event.preventDefault();setGraphicsError('The graphics view was interrupted. Your project is safe; restore the view to continue.');};
+    renderer.domElement.addEventListener('webglcontextlost',lost);
 
     const grid = new THREE.GridHelper(60, 60, 0x2c3c52, 0x18222f);
     grid.material.transparent = true;
@@ -87,7 +111,7 @@ function Viewport({
     const key = new THREE.DirectionalLight(0xffffff, 0.85);
     key.position.set(5, 10, 7);
     if(terrainTool){key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.bias=-.002;key.shadow.normalBias=.1;}
-    const fill = new THREE.DirectionalLight(0x88aaff, 0.3);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.3);
     fill.position.set(-6, 3, -5);
     three.add(ambient, key, fill);
 
@@ -109,12 +133,12 @@ function Viewport({
 
     const resize = () => {
       const w = mount.clientWidth || 1, h = mount.clientHeight || 1;
-      renderer.setPixelRatio(Math.min(mount.ownerDocument.defaultView.devicePixelRatio, 2));
+      renderer.setPixelRatio(viewportPixelRatio(w,h,mount.ownerDocument.defaultView.devicePixelRatio));
       renderer.setSize(w, h, false);   // false: leave the CSS size to the class
       if(camera.isOrthographicCamera) {
         const half=G.current?.orthoHalf||20;
         camera.left=-half*w/h;camera.right=half*w/h;camera.top=half;camera.bottom=-half;
-      }else camera.aspect = w / h;
+      }else { camera.aspect = w / h; camera.fov = verticalCameraFov(propsRef.current.fieldOfView, camera.aspect); }
       camera.updateProjectionMatrix();
     };
     resize();
@@ -127,12 +151,15 @@ function Viewport({
     frameWindow.addEventListener("resize", resize);
 
     let raf = 0;
+    let waterTime=frameWindow.performance.now();
     const tick = () => {
       raf = frameWindow.requestAnimationFrame(tick);
       // Docked tabs stay mounted to preserve the camera; hidden tabs need no draw.
       if (!mount.clientWidth || !mount.clientHeight) return;
       controls.update();
       const g = G.current;
+      const now=frameWindow.performance.now(),dt=Math.min(.1,(now-waterTime)/1000);waterTime=now;
+      for(const node of g?.nodes?.values()||[])for(const root of node.holder.children){advanceWaterPreview(root,dt);advanceParticlePreview(root,dt,g.camera);advanceFlipbookPreview(root,dt);}
       placeViewportSkybox(g);
       if(g?.terrainDrag && performance.now()-g.terrainDrag.lastTick >= 60) {
         const d=g.terrainDrag, P=propsRef.current;
@@ -140,7 +167,7 @@ function Viewport({
         d.lastTick=performance.now();
       }
       if (g?.gizmo) scaleGizmoToView(g.gizmo, camera, 92, mount.clientHeight || 600);
-      renderer.render(three, camera);
+      try {renderer.render(three,camera);}catch(error){setGraphicsError('The graphics view was interrupted. Your project is safe; restore the view to continue.');}
     };
     tick();
     const surface = mount.closest(".a-panel-surface");
@@ -153,25 +180,30 @@ function Viewport({
       tick();
     };
     surface?.addEventListener("atheditor-window-change", changeWindow);
-    setReady(true);
+    setReady(++viewportGeneration.current);
 
     return () => {
       frameWindow.cancelAnimationFrame(raf);
       ro.disconnect();
       frameWindow.removeEventListener("resize", resize);
       surface?.removeEventListener("atheditor-window-change", changeWindow);
+      cameraState.current={position:camera.position.toArray(),target:controls.target.toArray(),zoom:camera.zoom};
+      renderer.domElement.removeEventListener('webglcontextlost',lost);
       controls.dispose();
       clearViewportSkybox(G.current);
       disposeObject(three);
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
       G.current = null;
+      setReady(false);
     };
-  }, []);
+  }, [panelActive,graphicsError]);
 
   useEffect(() => {
     if (G.current && scene) syncViewportSkybox(G.current, scene, files);
   }, [scene?.skybox, scene?.background, files, ready]);
+  useEffect(()=>{if(G.current&&scene)syncViewportEnvironment(G.current.three,scene);},[scene?.environment,ready]);
 
   // Mesh bounds are discovered asynchronously as models load; the app stores
   // them on the asset entry so Rigidbody auto-fit has real numbers to use.
@@ -216,7 +248,7 @@ function Viewport({
         node.group.visible = obj.visible !== false;
         node.group.userData.objectId = obj.id;
 
-        syncVisual(g, obj, node, files, token, () => cancelled);
+        syncVisual(g, obj, node, files, token, () => cancelled, scene);
 
 
         build(obj.children, node.group);
@@ -270,7 +302,7 @@ function Viewport({
 
     if (g.gizmo) { g.helpers.remove(g.gizmo); disposeObject(g.gizmo); g.gizmo = null; }
     const active = activeId ? g.nodes.get(activeId) : null;
-    if (active && isViewportVisible(active.group) && !terrainTool) {
+    if (active && isViewportVisible(active.group) && !terrainTool && gizmoMode!=='select') {
       const gz = buildGizmo(gizmoMode);
       active.group.getWorldPosition(gz.position);
       if (gizmoSpace === "local") active.group.getWorldQuaternion(gz.quaternion);
@@ -287,14 +319,14 @@ function Viewport({
       if (!g) return;
       const box = new THREE.Box3();
       if (which === "all") {
-        box.setFromObject(g.content);
+        expandVisibleViewportBounds(box,g.content);
       } else {
         let any = false;
         for (const id of propsRef.current.selectedIds || []) {
           const n = g.nodes.get(id);
-          if (n) { box.expandByObject(n.group); any = true; }
+          if (n && isViewportVisible(n.group)) { expandVisibleViewportBounds(box,n.group); any = true; }
         }
-        if (!any) box.setFromObject(g.content);
+        if (!any) expandVisibleViewportBounds(box,g.content);
       }
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
@@ -376,9 +408,17 @@ function Viewport({
     };
 
     const onDown = (e) => {
+      const settings = propsRef.current.mouseControls;
+      const action = editorMouseAction(settings, e) || (propsRef.current.terrainTool && e.altKey ? editorMouseAction(settings, {button:e.button,shiftKey:e.shiftKey,ctrlKey:e.ctrlKey,metaKey:e.metaKey,altKey:false}) : null);
+      // OrbitControls swaps rotate/pan when Ctrl or Shift is held. Compensate
+      // here so the user's binding always performs its named action.
+      let mapped = action === 'orbit' ? THREE.MOUSE.ROTATE : action === 'pan' ? THREE.MOUSE.PAN : action === 'dolly' ? THREE.MOUSE.DOLLY : -1;
+      if ((e.ctrlKey || e.metaKey || e.shiftKey) && action !== 'dolly') mapped = action === 'orbit' ? THREE.MOUSE.PAN : action === 'pan' ? THREE.MOUSE.ROTATE : -1;
+      g.controls.mouseButtons = { LEFT: -1, MIDDLE: -1, RIGHT: -1, [ ['LEFT','MIDDLE','RIGHT'][e.button] ]: mapped };
       if (e.button !== 0) return;
       setPointer(e);
       const P = propsRef.current;
+      if (action && editorMouseModifier(e) !== 'none') return;
       if(P.terrainTool && !e.altKey) {
         if(P.terrainTool.disabled)return;
         const point=terrainPoint();if(!point)return;
@@ -390,6 +430,7 @@ function Viewport({
       const axis = gizmoHit();
 
       if (axis && P.activeId) {
+        e.preventDefault(); e.stopImmediatePropagation();
         const node = g.nodes.get(P.activeId);
         if (!node) return;
         const origin = node.group.getWorldPosition(new THREE.Vector3());
@@ -422,12 +463,14 @@ function Viewport({
       for (let o = hit?.object; o; o = o.parent) {
         if (o.userData.objectId) { id = o.userData.objectId; break; }
       }
-      P.onSelect(id, { additive: e.ctrlKey || e.metaKey, range: e.shiftKey });
+      g.selectionGesture = { id, x:e.clientX, y:e.clientY, pointerId:e.pointerId, dragged:false, additive:e.ctrlKey||e.metaKey, range:e.shiftKey };
+      el.setPointerCapture(e.pointerId);
     };
 
     const onMove = (e) => {
       setPointer(e);
       const P = propsRef.current;
+      updateSelectionGesture(g.selectionGesture, e, P.mouseControls.dragThreshold);
 
       if(P.terrainTool) {
         const point=terrainPoint();showBrush(point);
@@ -497,7 +540,12 @@ function Viewport({
         try{el.releasePointerCapture(d.pointerId);}catch{}
         propsRef.current.onTerrainStroke?.(d.point,e.type==="pointercancel"?"cancel":"end",d.reverse);return;
       }
-      if (!g.drag) return;
+      if (!g.drag) {
+        const gesture = g.selectionGesture; g.selectionGesture = null;
+        if (selectionGestureIsClick(gesture, e, propsRef.current.mouseControls.dragThreshold)) propsRef.current.onSelect(gesture.id, {additive:gesture.additive,range:gesture.range});
+        if (gesture) { try { el.releasePointerCapture(gesture.pointerId); } catch {} }
+        return;
+      }
       const P = propsRef.current;
       const { id, moved } = g.drag;
       g.drag = null;
@@ -539,6 +587,12 @@ function Viewport({
     };
 
     el.addEventListener("pointerdown", onDown, true);
+    const cameraWheel = () => {
+      const settings=propsRef.current.mouseControls;
+      g.controls.zoomSpeed=settings.zoomSpeed*(settings.invertWheel?-1:1);
+      queueMicrotask(()=>{g.controls.zoomSpeed=propsRef.current.mouseControls.zoomSpeed;});
+    };
+    el.addEventListener('wheel',cameraWheel,true);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onUp);
@@ -548,6 +602,7 @@ function Viewport({
     el.addEventListener("pointerleave",onTerrainLeave);
     return () => {
       el.removeEventListener("pointerdown", onDown, true);
+      el.removeEventListener('wheel',cameraWheel,true);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("pointercancel", onUp);
@@ -563,7 +618,7 @@ function Viewport({
   const empty = !scene?.objects?.length;
 
   return (
-    <div className="a-viewport" ref={mountRef} aria-label={terrainTool ? "Terrain viewport" : "Scene viewport"}
+    <div className="a-viewport" ref={mountRef} aria-label={terrainTool ? tr("Terrain viewport") : tr("Scene viewport")}
       onDragOver={(e) => {
         if (!onPlaceAsset || !ready || ![...e.dataTransfer.types].includes(MODEL_DRAG_TYPE)) return;
         e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDroppingModel(true);
@@ -576,17 +631,18 @@ function Viewport({
         const asset = files.find(f => f.id === e.dataTransfer.getData(MODEL_DRAG_TYPE) && f.cat === "models" && !f.error);
         if (asset && G.current) onPlaceAsset(asset, viewportPlacement(G.current, e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), snap ? snapSize : 0));
       }}>
-      {droppingModel && <div className="a-viewport__drop" role="status">Drop to place in the scene</div>}
+      {droppingModel && <div className="a-viewport__drop" role="status">{tr("Drop to place in the scene")}</div>}
+      {graphicsError&&<div className="a-viewport-recovery" role="alert"><p>{tr(graphicsError)}</p><button className="a-btn a-btn--primary" onClick={()=>setGraphicsError('')}>{tr("Restore view")}</button></div>}
       {empty && ready && (
         <div className="a-viewport__empty">
           <div style={{ fontSize: 26, opacity: .4 }}>◇</div>
-          <div>This scene is empty.</div>
-          <div className="a-dim">Choose Add object to start building.</div>
+          <div>{tr("This scene is empty.")}</div>
+          <div className="a-dim">{tr("Choose Add object to start building.")}</div>
         </div>
       )}
       <div className="a-viewport__hud">
-        {hasSelection && gizmoSpace === "local" && <span className="a-viewport__chip">Relative to object</span>}
-        {hasSelection && snap && <span className="a-viewport__chip">Grid snap · {snapSize}</span>}
+        {hasSelection && gizmoSpace === "local" && <span className="a-viewport__chip">{tr("Relative to object")}</span>}
+        {hasSelection && snap && <span className="a-viewport__chip">{tr("Grid snap · ")}{snapSize}</span>}
         {hoverAxis && <span className="a-viewport__chip">{hoverAxis.toUpperCase()}</span>}
       </div>
     </div>
@@ -622,8 +678,9 @@ function viewportPlacement(g, x, y, rect, snapStep = 0) {
  * unmounts the viewport and rebuilds every node from scratch. assetRevision()
  * lives in core/storage.js so it can be unit-tested without a DOM.
  */
-function syncVisual(g, obj, node, files, token, cancelled) {
-  const m = obj.components.model;
+function syncVisual(g, obj, node, files, token, cancelled, scene) {
+  let m = obj.components.model;
+  if(m&&obj.components.water){const prepared=waterPreviewAssets(m,obj.components.water,files);m=prepared.model;files=prepared.files;}
   if(obj._terrainPreview && m) {
     const texture=files.find(f=>f.name===m.textureFile&&f.cat==="textures");
     const textureKey=[assetRevision(texture),m.textureFilter||"LINEAR",m.texture_mapping!==false].join("|");
@@ -660,6 +717,10 @@ function syncVisual(g, obj, node, files, token, cancelled) {
       m.file, assetKey(m.file, "models"),
       m.textureFile || "", assetKey(m.textureFile, "textures"),
       m.pipeline || "", m.textureFilter || "", m.face_culling || "", m.shade_model || "", m.texture_mapping !== false,
+      obj.components.water ? JSON.stringify(obj.components.water) : "", assetKey(obj.components.water?.causticTexture,"textures"),
+      obj.components.particles ? JSON.stringify(obj.components.particles) : "",
+      obj.components.textureAnimation?JSON.stringify(obj.components.textureAnimation):"",
+      obj.components.reflection?JSON.stringify(obj.components.reflection):'',assetKey(obj.components.reflection?.texture,'textures'),
     ].join("|")
     : `__${primaryComponent(obj)}`;
   if (node.modelKey === key) return;
@@ -697,6 +758,10 @@ function syncVisual(g, obj, node, files, token, cancelled) {
       return;
     }
     node.bounds = built.bounds;
+    if(obj.components.water)configureWaterPreview(built.object3d,{...obj.components.water,textureFilter:m.textureFilter},files,()=>scene.physics?.enabled?[...g.nodes].filter(([id])=>!findObj(scene.objects,id)?.components.water&&!findObj(scene.objects,id)?.components.particles&&id!==obj.id).flatMap(([,n])=>n.holder.children):[],m.textureFile);
+    if(obj.components.particles)configureParticlePreview(built.object3d,obj.components.particles,files,m.textureFile);
+    if(obj.components.textureAnimation)configureFlipbookPreview(built.object3d,obj.components.textureAnimation,files,m.textureFile);
+    if(obj.components.reflection)configureReflectionPreview(built.object3d,obj.components.reflection,files);
     node.holder.add(built.object3d);
     g.refreshOverlays?.();
     g.onBounds?.(m.file, built.bounds);

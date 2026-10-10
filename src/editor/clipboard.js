@@ -6,14 +6,6 @@ const HUD_CLIPBOARD_PREFIX = "AthEditor HUD\n";
 const clipboardItemCount = payload => payload?.objects?.length || payload?.elements?.length || 0;
 const isEditorClipboardText = text => text?.startsWith(EDITOR_CLIPBOARD_PREFIX) || text?.startsWith(HUD_CLIPBOARD_PREFIX);
 
-function hudAssetReferences(elements, visit) {
-  for (const element of elements) {
-    if (element.image) visit(element, "image", "textures");
-    if (element.fontFile && element.fontFile !== "default") visit(element, "fontFile", "fonts");
-    if (element.script?.file) visit(element.script, "file", "scripts");
-  }
-}
-
 function makeHUDClipboard(project, scene, selectedIds, files) {
   const elements = deepClone(scene.uiElements.filter(el => selectedIds.includes(el.id)));
   const references = new Set();
@@ -36,16 +28,6 @@ function cloneHUDElements(elements, existing, offset = 0) {
     copies.push(copy);
   }
   return copies;
-}
-
-function objectAssetReferences(objects, visit) {
-  walk(objects, (object) => {
-    for (const [key, component] of Object.entries(object.components)) {
-      for (const field of COMPONENTS[key]?.fields || []) {
-        if (field.type === "asset" && component[field.key]) visit(component, field.key, field.cat);
-      }
-    }
-  });
 }
 
 function makeObjectClipboard(project, scene, selectedIds, files) {

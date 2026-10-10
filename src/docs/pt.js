@@ -111,12 +111,25 @@ const DOCS_PT = {
     ],
   },
 
+  cinematics: {
+    title: "Timeline e cinemáticas",
+    blocks: [
+      {p:"O + ao lado de Scene / Game abre Timeline, Terrain e outros painéis. O menu de cena no cabeçalho troca a cena ou cria outra. Game oferece Scene camera e Timeline; Active camera escolhe a câmera usada na prévia e na exportação."},
+      {p:"Abra View → Timeline / Cinematics. Crie uma sequência, escolha seu Start event e adicione canais e clips. Arraste o título para mover o clip e as bordas para mudar a duração. Escreva o diálogo dentro do próprio clip. As edições permitem desfazer/refazer."},
+      {p:"Canais: diálogo, retratos, janelas de texto, SFX, voz, câmera, transformações, animações de personagens com esqueleto, visibilidade e partículas reutilizadas. A UI usa coordenadas 640 × 448. Escolha animações no glTF / GLB importado."},
+      {p:"Eventos: início da cena, fim do timer, antes de sair da cena, entrada/saída de colisão ou overlap e eventos personalizados. Play Cinematic também aparece no Script Preset visível do Rigidbody. Uma sequência diferente substitui a atual; eventos automáticos ambíguos são rejeitados."},
+      {p:"Preview in Game mostra uma cópia independente com Play/Pause, Stop, Restart e controle de tempo. O preview para quando oculto ou ao editar a cena. No console, controladores, atualizações de IA e física são pausados; as propriedades são restauradas e a sequência de saída termina antes da troca de cena."},
+      {p:"O console tem um único player de áudio em streaming: clips de voz e SFX devem ser sequenciais. A pontuação tipográfica comum é adaptada na exportação; acentos são preservados. Caracteres incompatíveis geram erro. Game mostra a cinemática; Play no cabeçalho executa scripts e física no PCSX2."},
+      {code:"sceneEvents"},
+    ],
+  },
   physics: {
     title: "Física e colisões",
     blocks: [
       { p: "Ative Physics na aba Cena e depois dê um Rigidbody aos objetos. Nada é exportado enquanto a física da cena estiver desligada." },
+      { p: "Ative Generate Collision / Overlap Events no Rigidbody e escolha um Script Preset: Play Sound Oneshot, Change Scene, Destroy Object ou Play Animation. Escolha On Enter ou On Exit, filtre com Only With se necessário e configure o preset. Edit Script abre seu script sem substituir o controlador." },
       { h: "Reagir a contatos" },
-      { p: "Marque Report Hits em um Rigidbody e dê uma ctx Key a ele. O callback de contato gerado então preenche com o que foi tocado." },
+      { p: "Ative Generate Collision / Overlap Events em um Rigidbody e escolha uma ctx Key. Atribua onCollisionEnter/Exit ou onTriggerEnter/Exit em init(ctx). Cada par avisa uma vez ao entrar e sair, após a física, inclusive com vários objetos simultâneos. otherId distingue nomes repetidos. lastHit e os indicadores anteriores de trigger continuam disponíveis." },
       { code: "collision" },
       { h: "Triggers" },
       { code: "trigger" },

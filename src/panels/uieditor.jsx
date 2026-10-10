@@ -134,8 +134,8 @@ function HUDEditor({ scene, selectedId, files, onSelect, onUpdate, onAdd, onDele
 
         {!els.length && (
           <div className="a-viewport__empty" style={{ position: "absolute", inset: 0 }}>
-            <div>No HUD elements.</div>
-            <div className="a-dim">Add one from the toolbar above.</div>
+            <div>{tr("No HUD elements.")}</div>
+            <div className="a-dim">{tr("Add one from the toolbar above.")}</div>
           </div>
         )}
       </div>
@@ -203,76 +203,76 @@ function UIElementInspector({ el, files, onUpdate, onDelete, onImportFont }) {
   return (
     <>
       <PanelHeader title={`HUD — ${el.type}`}>
-        <button className="a-btn a-btn--icon a-btn--sm a-btn--ghost a-btn--danger" title="Delete" onClick={() => onDelete(el.id)}>✕</button>
+        <button className="a-btn a-btn--icon a-btn--sm a-btn--ghost a-btn--danger" title={tr("Delete")} onClick={() => onDelete(el.id)}>✕</button>
       </PanelHeader>
       <div className="a-scroll" style={{ padding: 8 }}>
-        <Field label="Name"><TextInput value={el.name} onChange={(v) => set({ name: v })} /></Field>
-        <Field label="Visible"><Checkbox value={el.visible !== false} onChange={(v) => set({ visible: v })} /></Field>
+        <Field label={tr("Name")}><TextInput value={el.name} onChange={(v) => set({ name: v })} /></Field>
+        <Field label={tr("Visible")}><Checkbox value={el.visible !== false} onChange={(v) => set({ visible: v })} /></Field>
 
-        <div className="a-sec__group">Layout</div>
-        <Field label="Position">
+        <div className="a-sec__group">{tr("Layout")}</div>
+        <Field label={tr("Position")}>
           <div className="a-vec a-vec--2">
             <NumInput axis="x" value={el.x} step={1} integer onChange={(v, p) => set({ x: v }, p)} />
             <NumInput axis="y" value={el.y} step={1} integer onChange={(v, p) => set({ y: v }, p)} />
           </div>
         </Field>
-        <Field label="Size">
+        <Field label={tr("Size")}>
           <div className="a-vec a-vec--2">
             <NumInput value={el.width} step={1} min={1} integer onChange={(v, p) => set({ width: v }, p)} />
             <NumInput value={el.height} step={1} min={1} integer onChange={(v, p) => set({ height: v }, p)} />
           </div>
         </Field>
-        <Field label="Z Order" help="Higher draws on top.">
+        <Field label={tr("Z Order")} help={tr("Higher draws on top.")}>
           <NumInput value={el.zindex || 0} step={1} integer onChange={(v, p) => set({ zindex: v }, p)} />
         </Field>
 
         {isText && (
           <>
-            <div className="a-sec__group">Text</div>
-            <Field label="Content"><TextInput value={el.text} onChange={(v) => set({ text: v })} /></Field>
-            <Field label="Font Size"><NumInput value={el.fontSize} step={1} min={4} max={64} integer onChange={(v, p) => set({ fontSize: v }, p)} /></Field>
-            <Field label="Font" help="Blank uses the built-in font.">
+            <div className="a-sec__group">{tr("Text")}</div>
+            <Field label={tr("Content")}><TextInput value={el.text} onChange={(v) => set({ text: v })} /></Field>
+            <Field label={tr("Font Size")}><NumInput value={el.fontSize} step={1} min={4} max={64} integer onChange={(v, p) => set({ fontSize: v }, p)} /></Field>
+            <Field label={tr("Font")} help={tr("Blank uses the built-in font.")}>
               <AssetSelect value={el.fontFile === "default" ? "" : el.fontFile} cat="fonts" files={files} showImportHint={!onImportFont}
-                onChange={(v) => set({ fontFile: v || "default" })} placeholder="default" />
+                onChange={(v) => set({ fontFile: v || "default" })} placeholder={tr("default")} />
               {onImportFont && <HUDfontImport elementId={el.id} onImport={onImportFont} />}
             </Field>
-            <Field label="Colour"><Color255Input value={el.textColor} onChange={(v, p) => set({ textColor: v }, p)} /></Field>
+            <Field label={tr("Colour")}><Color255Input value={el.textColor} onChange={(v, p) => set({ textColor: v }, p)} /></Field>
           </>
         )}
 
         {(el.type === "Panel" || el.type === "Button") && (
           <>
-            <div className="a-sec__group">Background</div>
-            <Field label="Colour"><Color255Input value={el.bgColor} onChange={(v, p) => set({ bgColor: v }, p)} /></Field>
+            <div className="a-sec__group">{tr("Background")}</div>
+            <Field label={tr("Colour")}><Color255Input value={el.bgColor} onChange={(v, p) => set({ bgColor: v }, p)} /></Field>
           </>
         )}
 
         {el.type === "ProgressBar" && (
           <>
-            <div className="a-sec__group">Bar</div>
-            <Field label="Progress"><NumInput value={el.progress} step={0.05} min={0} max={1} onChange={(v, p) => set({ progress: v }, p)} /></Field>
-            <Field label="Fill"><Color255Input value={el.barColor} onChange={(v, p) => set({ barColor: v }, p)} /></Field>
-            <Field label="Track"><Color255Input value={el.barBgColor} onChange={(v, p) => set({ barBgColor: v }, p)} /></Field>
+            <div className="a-sec__group">{tr("Bar")}</div>
+            <Field label={tr("Progress")}><NumInput value={el.progress} step={0.05} min={0} max={1} onChange={(v, p) => set({ progress: v }, p)} /></Field>
+            <Field label={tr("Fill")}><Color255Input value={el.barColor} onChange={(v, p) => set({ barColor: v }, p)} /></Field>
+            <Field label={tr("Track")}><Color255Input value={el.barBgColor} onChange={(v, p) => set({ barBgColor: v }, p)} /></Field>
           </>
         )}
 
         {el.type === "Image" && (
           <>
-            <div className="a-sec__group">Image</div>
-            <Field label="Texture" required><AssetSelect value={el.image} cat="textures" files={files} onChange={(v) => set({ image: v })} /></Field>
-            <Field label="Filter">
+            <div className="a-sec__group">{tr("Image")}</div>
+            <Field label={tr("Texture")} required><AssetSelect value={el.image} cat="textures" files={files} onChange={(v) => set({ image: v })} /></Field>
+            <Field label={tr("Filter")}>
               <Select value={el.imageFilter} onChange={(v) => set({ imageFilter: v })}
-                options={[{ value: "LINEAR", label: "Linear" }, { value: "NEAREST", label: "Nearest" }]} />
+                options={[{ value: "LINEAR", label: tr("Linear") }, { value: "NEAREST", label: tr("Nearest") }]} />
             </Field>
           </>
         )}
 
-        <div className="a-sec__group">Script</div>
-        <Field label="Module" help="Exports init(ctx) and update(ctx, pad).">
+        <div className="a-sec__group">{tr("Script")}</div>
+        <Field label={tr("Module")} help={tr("Exports init(ctx) and update(ctx, pad).")}>
           <AssetSelect value={el.script?.file} cat="scripts" files={files}
             onChange={(v) => set({ script: { ...el.script, file: v } })} />
         </Field>
-        <Field label="ctx Key">
+        <Field label={tr("ctx Key")}>
           <TextInput value={el.script?.ctxKey} onChange={(v) => set({ script: { ...el.script, ctxKey: v } })} />
         </Field>
       </div>
