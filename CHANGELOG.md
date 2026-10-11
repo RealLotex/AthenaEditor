@@ -1,6 +1,6 @@
 # Changelog — septiembre y octubre de 2026
 
-Estado al 10 de octubre. Este registro describe lo implementado; las propuestas del roadmap quedan fuera.
+Estado al 10 de octubre, con el ajuste de publicación del 11 al final. Este registro describe lo implementado; las propuestas del roadmap quedan fuera.
 
 El historial no contiene commits fechados en septiembre. Ese trabajo está documentado en [la verificación de septiembre](docs/VERIFICATION.md) y se consolidó en el commit `6a0b59e`, del 1 de octubre. Las fechas siguientes distinguen ese registro del trabajo de octubre.
 
@@ -62,3 +62,9 @@ La revisión de ese período registró **344 pruebas aprobadas** y ejecución de
 La build final pasa **695 pruebas, sin fallos**. Los cuatro fondos de cielo completaron 60 frames cada uno en PCSX2, verificando geometría, colores, formatos y filtrado. Las demos muestran el navegador; Game no ejecuta los scripts de gameplay ni ODE. Las pruebas nativas se realizan por separado.
 
 Sigue pendiente el problema de recarga de la escena costera en el runtime incluido. Tampoco se verificó hardware PS2 físico ni equivalencia exacta de píxeles entre navegador y consola. Ver [alcance completo](docs/PRODUCTION-VERIFICATION.md).
+
+### Ajuste previo a publicar — 11 de octubre
+
+El fondo con niebla desactiva PABE durante su dibujo para que la opacidad parcial se mezcle correctamente en PS2; después restaura la configuración del proyecto. Los cuatro probes nativos volvieron a completar 60 frames cada uno y se agregó una regresión para proteger la mezcla y la restauración de estado.
+
+La build que se publica pasa **696 pruebas, sin fallos**.

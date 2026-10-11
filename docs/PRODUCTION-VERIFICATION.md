@@ -1,4 +1,19 @@
-# Production verification — updated 2026-10-10
+# Production verification — updated 2026-10-11
+
+## October 11 publication check: native backdrop blending
+
+Backdrop drawing now disables PABE, which otherwise restricts blending to pixels
+whose source alpha MSB is set. Ordinary alpha blending is already enabled by the
+engine. Fractional fog alpha therefore blends normally; the authored PABE and alpha
+test reference are restored immediately after the backdrop pass. A regression checks
+both authored PABE values and a non-default alpha reference. The four native backdrop
+fixtures again completed 60 frames each with matching buffers and texture settings
+(`.verification/publish-sky-native.log`). Historical October 10 results below precede
+this correction.
+
+The publication build passed `deno task check`: **696 passed, 0 failed**
+(`.verification/publish-check.log`). The targeted sky controls suite passed all
+18 tests (`.verification/publish-sky-tests.log`).
 
 ## Game preview request and lower sky backdrops — final October 10 build
 

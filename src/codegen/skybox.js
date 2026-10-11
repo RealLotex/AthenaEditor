@@ -56,7 +56,9 @@ function emitSkyboxDraw(e, ir) {
   e.w(`${sky.objectVN}.position = Camera.save().position;`);
   e.w(`${sky.objectVN}.render();`);
   if(sky.backdropVN){
-    e.w(`Screen.setParam(Screen.ALPHA_TEST_REF,0);Screen.setParam(Screen.PIXEL_ALPHA_BLEND_ENABLE,true);`);
+    // PABE restricts blending to pixels with the alpha MSB set; fractional fog
+    // needs it disabled. Ordinary alpha blending is already enabled by the engine.
+    e.w(`Screen.setParam(Screen.ALPHA_TEST_REF,0);Screen.setParam(Screen.PIXEL_ALPHA_BLEND_ENABLE,false);`);
     e.w(`${sky.backdropVN}.position=${sky.objectVN}.position;${sky.backdropVN}.render();`);
     e.w(`Screen.setParam(Screen.ALPHA_TEST_REF,${il(ir.project.display?.alphaTest?.ref??50)});Screen.setParam(Screen.PIXEL_ALPHA_BLEND_ENABLE,${ir.project.display?.alphaTest?.pixelBlend!==false});`);
   }

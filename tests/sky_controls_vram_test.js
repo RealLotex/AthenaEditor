@@ -209,6 +209,18 @@ Deno.test("invalid backdrop values normalize before creating geometry",()=>{
   const sky=A.normalizedSkybox({backdropMode:'noise',fogHeight:Infinity,backdropColor:{r:-9,g:900,b:NaN}});
   assertEquals(sky.backdropMode,'foggy');assertEquals(sky.backdropColor,{r:0,g:255,b:100});assertEquals(sky.fogHeight,20);
 });
+Deno.test("native backdrop fog disables PABE while drawing and restores authored alpha state",async()=>{
+  const p=A.mkProject(),s=p.scenes[0],sky={enabled:true,textureSize:128,bitDepth:4,upperOnly:true,backdropMode:'foggy'};
+  A.applySkybox(p,s,sky,await prepared(sky));
+  for(const pixelBlend of [false,true]){
+    p.display.alphaTest.pixelBlend=pixelBlend;p.display.alphaTest.ref=73;
+    const main=A.generateProject(p).main,draw=main.lastIndexOf('sky_backdrop_object.render();');
+    assert(draw>0);
+    assertStringIncludes(main.slice(draw-180,draw),'Screen.setParam(Screen.PIXEL_ALPHA_BLEND_ENABLE,false)');
+    assertStringIncludes(main.slice(draw,draw+230),'Screen.setParam(Screen.ALPHA_TEST_REF,73)');
+    assertStringIncludes(main.slice(draw,draw+230),`Screen.setParam(Screen.PIXEL_ALPHA_BLEND_ENABLE,${pixelBlend})`);
+  }
+});
 Deno.test("refreshing identical generated tiles updates their revision without duplicating bytes",async()=>{
   const p=A.mkProject(),s=p.scenes[0],sky={enabled:true,preset:"clear",textureSize:128,bitDepth:4,upperOnly:false},asset=await prepared(sky);
   A.applySkybox(p,s,sky,asset);const ids=p.assets.map(f=>f.id);

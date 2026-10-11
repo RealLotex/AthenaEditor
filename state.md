@@ -1,6 +1,16 @@
 # Project status
 
-_Last updated: 2026-10-10._
+_Last updated: 2026-10-11._
+
+## October 11 publication check
+
+The sky backdrop pass now disables PABE while blending its fractional fog alpha,
+then restores the authored PABE and alpha-test state. PABE is not the ordinary
+alpha-blending enable. All four native backdrop fixtures passed again; a dedicated
+regression protects this override and restoration. October 10 counts below are
+historical. Current publication results are in [production verification](docs/PRODUCTION-VERIFICATION.md).
+
+The publication build passed all **696 tests**, with no failures.
 
 ## October 10 Game crash, sky backdrops and release artifacts
 
