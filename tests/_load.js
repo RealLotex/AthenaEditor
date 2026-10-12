@@ -20,7 +20,7 @@ export const PURE_MODULES = [
   "core/water.js", "core/water-cache.js", "core/water-data.js",
   "core/environment.js",
   "core/flipbook.js",
-  "core/particles.js",
+  "core/particle-modules.js", "core/particles.js",
   "core/skybox.js",
   "core/skybox-data.js",
   "core/skybox-high-data.js",
@@ -28,7 +28,7 @@ export const PURE_MODULES = [
   "core/project.js",
   "core/recovery-codec.js",
   "core/cinematics.js", "core/cinematic-playback.js",
-  "core/timeline-authoring.js",
+  "core/timeline-authoring.js", "core/hud-motion.js",
   "core/animation-mixing.js",
   "core/event-flows.js",
   "core/layout.js",
@@ -41,9 +41,11 @@ export const PURE_MODULES = [
   "editor/water.js", "editor/water-cache.js",
   "editor/particles.js",
   "editor/asset-management.js",
-  "editor/terrain.js",
+  "editor/terrain.js", "editor/terrain-preview.js",
   "editor/terrain-blend.js",
   "editor/shadow-bake.js",
+  "templates/assets.js", "templates/thirdperson.js", "templates/tour-assets.js",
+  "core/tours.js", "core/tour-catalog.js",
   "editor/prefabs.js",
   "codegen/emit.js",
   "codegen/skybox.js",
@@ -77,7 +79,7 @@ export async function load(modules = PURE_MODULES, { readSource } = {}) {
 
   const parts = [];
   const names = new Set();
-  for (const rel of modules) {
+  for (const rel of new Set(modules)) {
     const src = readSource ? await readSource(rel) : await Deno.readTextFile(`${ROOT}/src/${rel}`);
     for (const m of src.matchAll(TOP_LEVEL)) names.add(m[1] || m[2] || m[3]);
     const { code } = await esbuild.transform(src, {

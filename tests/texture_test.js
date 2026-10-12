@@ -17,7 +17,7 @@ import { load } from "./_load.js";
 const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js", "core/vram.js",
   "core/skybox.js", "codegen/skybox.js",
-  "core/components.js", "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js",
+  "core/particle-modules.js", "core/components.js", "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js",
   "codegen/emit.js", "codegen/resolve.js", "codegen/models.js", "codegen/environment.js", "codegen/water.js", "codegen/lights.js",
   "codegen/sounds.js", "codegen/object-lifetime.js", "codegen/event-presets.js", "codegen/events.js", "codegen/physics.js", "codegen/shadows.js", "codegen/uigen.js",
   "codegen/ctx.js", "codegen/cinematics.js", "codegen/event-flows.js", "codegen/index.js",

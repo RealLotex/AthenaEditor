@@ -1,0 +1,71 @@
+{
+  "scope": "CPU preview update only, Deno + vendored Three.js, 32x32 terrain, Ultra settings. Excludes browser GPU/presentation.",
+  "trials": [
+    {
+      "old": {
+        "firstFrame": 180.96119999999974,
+        "steadyMean": 20.584615000000007,
+        "max": 180.96119999999974,
+        "projectionComplete": true
+      },
+      "next": {
+        "firstFrame": 30.8132999999998,
+        "steadyMean": 0.017642500000026,
+        "max": 30.8132999999998,
+        "projectionComplete": true
+      },
+      "withoutCaustics": {
+        "firstFrame": 0.03960000000006403,
+        "steadyMean": 0.01594416666670592,
+        "max": 0.040500000000065484,
+        "projectionComplete": true
+      }
+    },
+    {
+      "old": {
+        "firstFrame": 120.84370000000035,
+        "steadyMean": 19.84795500000011,
+        "max": 123.2541999999994,
+        "projectionComplete": true
+      },
+      "next": {
+        "firstFrame": 41.88839999999982,
+        "steadyMean": 0.013672500000090319,
+        "max": 41.88839999999982,
+        "projectionComplete": true
+      },
+      "withoutCaustics": {
+        "firstFrame": 0.01540000000022701,
+        "steadyMean": 0.012593333333309904,
+        "max": 0.05340000000069267,
+        "projectionComplete": true
+      }
+    },
+    {
+      "old": {
+        "firstFrame": 118.92500000000109,
+        "steadyMean": 21.480470833333477,
+        "max": 152.2422000000006,
+        "projectionComplete": true
+      },
+      "next": {
+        "firstFrame": 31.36739999999918,
+        "steadyMean": 0.014112499999904079,
+        "max": 31.36739999999918,
+        "projectionComplete": true
+      },
+      "withoutCaustics": {
+        "firstFrame": 0.02599999999983993,
+        "steadyMean": 0.014151666666687863,
+        "max": 0.05199999999967986,
+        "projectionComplete": true
+      }
+    }
+  ],
+  "terrain": {
+    "directMS": 121.81240000000071,
+    "workerWallMS": 170.78620000000046,
+    "maxHeartbeatGapMS": 19.13000000000102,
+    "heartbeatSamples": 11
+  }
+}

@@ -7,7 +7,7 @@ import {
 
 const source = (await Promise.all([
   "core/util.js",
-  "core/components.js",
+  "core/particle-modules.js", "core/components.js",
   "core/project.js",
   "editor/assets.js",
   "editor/fonts.js",

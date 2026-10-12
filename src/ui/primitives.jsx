@@ -16,7 +16,7 @@ const { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect, useC
 const PanelActivityContext=React.createContext(true);
 
 /** Field row: label on the left, control on the right, help underneath. */
-function Field({ label, help, error, required, stack, children, htmlFor }) {
+function Field({ label, help, error, required, stack, children, htmlFor, fieldKey }) {
   const controls = useRef(null);
   useLayoutEffect(() => {
     if (typeof label !== "string") return;
@@ -32,7 +32,7 @@ function Field({ label, help, error, required, stack, children, htmlFor }) {
   });
   return (
     <>
-      <div className={`a-field${stack ? " a-field--stack" : ""}`}>
+      <div data-field-key={fieldKey} className={`a-field${stack ? " a-field--stack" : ""}`}>
         {label !== undefined && (
           <label
             className="a-field__label"

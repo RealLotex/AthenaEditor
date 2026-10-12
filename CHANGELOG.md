@@ -1,6 +1,6 @@
 # Changelog — septiembre y octubre de 2026
 
-Estado al 10 de octubre, con el ajuste de publicación del 11 al final. Este registro describe lo implementado; las propuestas del roadmap quedan fuera.
+Estado al 12 de octubre. Este registro describe lo implementado; las propuestas del roadmap quedan fuera.
 
 El historial no contiene commits fechados en septiembre. Ese trabajo está documentado en [la verificación de septiembre](docs/VERIFICATION.md) y se consolidó en el commit `6a0b59e`, del 1 de octubre. Las fechas siguientes distinguen ese registro del trabajo de octubre.
 
@@ -68,3 +68,15 @@ Sigue pendiente el problema de recarga de la escena costera en el runtime inclui
 El fondo con niebla desactiva PABE durante su dibujo para que la opacidad parcial se mezcle correctamente en PS2; después restaura la configuración del proyecto. Los cuatro probes nativos volvieron a completar 60 frames cada uno y se agregó una regresión para proteger la mezcla y la restauración de estado.
 
 La build que se publica pasa **696 pruebas, sin fallos**.
+
+### Fluidez del editor, partículas y tours — 12 de octubre
+
+- Terreno: preparación de geometría/OBJ en un worker y agrupación de muestras de pincel. El trabajo deja de bloquear el hilo de interacción durante la primera escultura.
+- Caustics del editor: receptores estáticos cacheados con BVH, invalidación al editar y proyección distribuida entre frames. En tres pruebas, el costo CPU estable bajó de 19,85–21,48 ms a 0,0137–0,0176 ms por actualización; no incluye GPU/presentación.
+- Agua: frecuencia visible de 5 a 60 Hz, límites independientes por calidad y nuevas ondas suaves. Se conserva la velocidad del loop al recortar cuadros y se respetan texturas editadas.
+- Skybox: resolución del panorama, tamaño de tiles nativos y resolución original diferenciados. Lighting tiene un acceso directo al Sun de la escena.
+- Timeline: todos los parámetros del clip visibles en Properties. Los diálogos mantienen un borrador local, confirman una sola edición y muestran varias líneas con altura, scroll y contador.
+- Partículas: las 20 familias solicitadas, siete formas de emisión, Local/World, valores iniciales aleatorios, bursts, curvas, rotación, colisiones, subemisores, flipbook, Billboard/Mesh, material y orden de transparencia.
+- HUD: animación de posición/tamaño y vínculos con variables de gameplay para texto, vida y visibilidad.
+- Ocho tours guiados con **191 pasos** y plantillas .atheditor portables. Inicio automático la primera vez, biblioteca en Ayuda, controles resaltados y avance al completar acciones. **Anterior** reemplaza Saltar; Siguiente prepara las acciones necesarias. Al terminar, cerrar la guía permite seguir editando la práctica.
+- Verificación: **707 pruebas aprobadas** y probes en PCSX2 para el juego de Eventos, los 11 canales de cinemáticas, HUD y partículas. [Resultados y límites](docs/PRODUCTION-VERIFICATION.md).

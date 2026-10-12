@@ -29,25 +29,16 @@ function legacyWaterPatternPixels(caustics=false,size=128) {
 // through the volume. Nearby cells only, rather than every site per pixel.
 function waterPatternPixels(caustics=false,size=128,slice=0) {
   if(caustics)return legacyWaterPatternPixels(true,size);
-  const data=new Uint8ClampedArray(size*size*4),sites=new Float64Array(8*8*4*3),tau=Math.PI*2;
-  const hash=n=>{const f=Math.sin(n*127.1+311.7)*43758.5453;return f-Math.floor(f);};
-  for(let z=0;z<4;z++)for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-    const i=(z*64+y*8+x)*3,n=i/3;sites[i]=(x+.15+hash(n)*.7)/8;sites[i+1]=(y+.15+hash(n+257)*.7)/8;sites[i+2]=(z+hash(n+513))/4;
-  }
-  slice=((slice%1)+1)%1;
+  const data=new Uint8ClampedArray(size*size*4),tau=Math.PI*2,t=((slice%1)+1)%1*tau;
+  // Smooth periodic height derivatives create broad reflected ripples. Avoid
+  // the discontinuous nearest-site edges that made Voronoi resemble lightning.
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-    const px=x/(size-1),py=y/(size-1),u=(px+.025*Math.sin(py*tau*3)+1)%1,v=(py+.015*Math.sin(px*tau*4)+1)%1;
-    const cx=Math.floor(u*8),cy=Math.floor(v*8);let a=Infinity,b=Infinity;
-    for(let z=0;z<4;z++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      const i=(z*64+(cy+dy+8)%8*8+(cx+dx+8)%8)*3;
-      let ax=Math.abs(u-sites[i]),ay=Math.abs(v-sites[i+1]),az=Math.abs(slice-sites[i+2]);
-      ax=Math.min(ax,1-ax);ay=Math.min(ay,1-ay);az=Math.min(az,1-az)*.5;
-      const d=ax*ax+ay*ay+az*az;if(d<a){b=a;a=d;}else if(d<b)b=d;
-    }
-    const edge=Math.max(0,1-(Math.sqrt(b)-Math.sqrt(a))*100)**2;
-    const glint=edge*(.25+.75*Math.max(0,Math.sin(tau*(u*3-v*2+slice))));
-    const blue=.5+.5*Math.sin(tau*(u+v*2)+Math.sin(v*tau*3)),at=(y*size+x)*4;
-    data[at]=Math.round(5+glint*210);data[at+1]=Math.round(90+blue*42+glint*118);data[at+2]=Math.round(192+blue*24+glint*39);data[at+3]=255;
+    const u=x/(size-1)*tau,v=y/(size-1)*tau;
+    const a=u*3+v*2+t,b=u*2-v*3-t,c=u*5+v+t*2;
+    const nx=.28*Math.cos(a)+.17*Math.cos(b)+.06*Math.cos(c),nz=.19*Math.cos(a)-.22*Math.cos(b)+.03*Math.cos(c);
+    const reflected=Math.max(0,1-Math.abs(nx*.8+nz*.5-.08)*5),glint=Math.pow(reflected,3)*.36;
+    const depth=.5+.5*Math.sin(u+v+Math.sin(a)*.15),at=(y*size+x)*4;
+    data[at]=Math.round(12+depth*10+glint*115);data[at+1]=Math.round(122+depth*22+glint*90);data[at+2]=Math.round(180+depth*20+glint*65);data[at+3]=255;
   }
   return {width:size,height:size,data};
 }
@@ -74,7 +65,7 @@ async function bakeWaterMotion(size=512) {
   }
   const caustics=await indexedTexturePNG(quantizeTexture(waterPatternPixels(true,size),16));
   const legacy=await indexedTexturePNG(quantizeTexture(legacyWaterPatternPixels(),16));
-  return {fps:16,size,frames,levels,caustics:{dataUrl:bytesDataURL(caustics),size:caustics.length},legacy:bytesDataURL(legacy)};
+  return {fps:60,size,frames,levels,caustics:{dataUrl:bytesDataURL(caustics),size:caustics.length},legacy:bytesDataURL(legacy)};
 }
 
 async function prepareWaterAssets() {
@@ -82,7 +73,7 @@ async function prepareWaterAssets() {
   const motion=WATER_MOTION_DATA;
   for(const caustics of [false,true]){
     const image=caustics?motion.caustics:motion.frames[0];
-    assets.push({name:caustics?"water_caustics.png":"water_tropical.png",cat:"textures",...image,...(!caustics?{waterMotion:{fps:motion.fps,frames:motion.frames,levels:motion.levels},waterRevision:3}:{}),
+    assets.push({name:caustics?"water_caustics.png":"water_tropical.png",cat:"textures",...image,...(!caustics?{waterMotion:{fps:motion.fps,frames:motion.frames,levels:motion.levels},waterRevision:4}:{}),
       image:{width:motion.size,height:motion.size,bpp:4,format:"png"},editKind:"water",owned:true,libraryFolder:"Water"});
   }
   return assets;

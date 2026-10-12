@@ -1,4 +1,70 @@
-# Production verification — updated 2026-10-11
+# Production verification — updated 2026-10-12
+
+## October 12 editor fixes, particle modules and guided practice
+
+Terrain topology, corner arrays and OBJ serialization now run in a worker, with transferable
+buffers and the latest pending brush sample per object. A brush-9, 32×32 terrain experiment
+measured 121.81 ms synchronous preparation versus 170.79 ms total worker completion, while
+the main-thread 5 ms heartbeat's largest gap was 19.13 ms. This improves responsiveness,
+not total computation time. The first brush no longer synchronously constructs/parses an OBJ
+on the render thread. Caustic projection now caches static receivers in an occlusion BVH,
+invalidates it on geometry/transforms and budgets projection across frames. Three trials
+measured steady CPU means of 19.85–21.48 ms before and 0.0137–0.0176 ms after. Initial BVH
+construction still costs 30.81–41.89 ms in these trials. These are Deno + vendored Three.js
+CPU measurements; they exclude browser GPU/presentation and do not promise a universal FPS.
+[Measurement data](verification/oct12-editor-performance.json), reproduced with
+`deno run -A tools/benchmark-oct12-editor.js`.
+
+Water has a visible 5–60 Hz update setting, independent quality caps for pattern/panning/
+mesh waves, and a smoother periodic ripple texture. Sampled qualities preserve the loop's
+speed. Only untouched built-in water assets migrate; authored frames/mips remain intact.
+The sky control explicitly labels total panorama resolution and separately reports native
+tile sizes and source resolution. Lighting selects the scene Sun in Properties.
+
+Timeline clip Properties exposes all settings in open sections, including endpoints,
+keyframes/curves and linked particle modules. Dialogue keystrokes stay in a local draft;
+blur, Ctrl+Enter or leaving the clip commits the final text once. Multiline clips have taller
+lanes, correct overlapping-row spacing, scrolling and an explicit line count. This avoids
+project/asset traversal on every keystroke; no browser input-latency number is claimed.
+
+Particles expose all 20 requested parameter families from particles.txt, with seven shapes
+(Point, Sphere, Hemisphere, Circle, Cone, Box, Edge), Local/World simulation, randomized
+start values, bursts, lifetime curves, rotation, world/plane collisions, subemitters,
+flipbooks, mesh/billboard mode, material and sorting. Native emitters retain bounded pools
+and a single draw per emitter. The native effect probe completes 150 frames, confirming
+four world collision histories, eight subparticles, three Mesh instances with 36 template
+corners and homogeneous W=1, plus HUD movement and a health binding.
+[Native readbacks](verification/oct12-effects-native.json); reproduction:
+`deno run -A tools/verify-oct12-effects.js`.
+
+Eight guided tours contain 191 steps and independent portable .atheditor templates:
+Basic; Terrain/Water/Skybox; Lighting; a complete Events game; Particles/Flipbooks;
+Advanced Physics; Cinematics; Animated gameplay HUD. First use starts Basic; Help can
+start any practice. Next completes missing prerequisites, Previous revisits the prior step
+without undoing authored work, and completed manual actions advance the guide. Highlighting
+and the explanatory card follow the relevant panel/control. The completion dialog can be
+closed to keep editing the practice; returning to the prior project is a separate explicit
+choice. Starting a practice detaches the prior project's disk destination, retains its
+state/undo history and saves browser recovery before replacing it. No practice writes to
+the original linked project. [Starting projects](../examples/tours/README.md).
+
+Native practice verification completes the Events game after 220 frames: entering the goal
+without a key leaves won=0; collecting the key opens the door from Y=1 to Y=4; reentering
+the goal sets won=1, reveals the victory HUD and disables the player. The Cinematics practice
+runs all eleven channel types and stops at eight seconds (540 frames), with SFX/voice clips
+serialized for Athena's one streaming sound player. The HUD practice completes 360 frames
+and updates score=10 and health=65 from Events timers.
+[Readbacks](verification/oct12-tours-native.json); reproduction:
+`deno run -A tools/verify-oct12-tours.js`.
+
+Browser checks traversed all eight practices, exercised automatic terrain progression,
+Sun selection, multiline dialogue editing and Properties, and verified Previous plus closing
+the completed guide leaves the practice editable. No console warnings/errors were recorded.
+Game previews visuals/cinematics; it does not run the native gameplay controller or ODE.
+These probes do not verify a physical PS2 or exact pixel equality. The previously documented
+coastal scene-reload issue remains outside this release's fixes.
+
+Final regression result: **707 passed, 0 failed**.
 
 ## October 11 publication check: native backdrop blending
 

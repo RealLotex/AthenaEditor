@@ -71,12 +71,14 @@ function emitPhysicsSetup(e, ir) {
   emitPhysicsEvents(e, ir);
   emitContactCallback(e, ir);
   emitTriggerTables(e, ir);
+  e.w(`let _physicsDisposed=false;`);
   e.w(`function _disposePhysics() {`);
   e.block(b => {
+    b.w(`if(_physicsDisposed)return;_physicsDisposed=true;`);
     if (ir.shadowReceivers.length) b.w(`_disposeShadows();`);
     b.w(`ode_contacts.free();`);
-    for (const body of P.bodies) b.w(`${body.geomVN}.free();`);
-    for (const body of P.bodies.filter(b => b.isDynamic)) b.w(`${body.bodyVN}.free();`);
+    for (const body of P.bodies) b.w(`${ir.canDestroy?`if(!${body.geomVN}._freed)`:""}{${body.geomVN}.free();${body.geomVN}._freed=true;}`);
+    for (const body of P.bodies.filter(b => b.isDynamic)) b.w(`${ir.canDestroy?`if(!${body.bodyVN}._freed)`:""}{${body.bodyVN}.free();${body.bodyVN}._freed=true;}`);
     b.w(`ode_space.free();`);
     b.w(`ode_world.destroyWorld();`);
   });

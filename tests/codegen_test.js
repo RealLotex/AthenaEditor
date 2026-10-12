@@ -757,16 +757,9 @@ Deno.test("identical objects still share one RenderData outright", () => {
   assertEquals(countOf(main, /new RenderObject\(/g), 3);
 });
 
-Deno.test("a clone never re-runs the embedded-texture filter", () => {
-  // getTexture(0) on a clone reaches the source's texture, which has already
-  // been filtered. Setting it again is a no-op that reads like a second one.
-  const p = project((s) => {
-    s.objects.push(obj("A", { model: { file: "m.glb" } }));
-    s.objects.push(obj("B", { model: { file: "m.glb", face_culling: "CULL_FACE_NONE" } }));
-  });
-  const { main } = gen(p);
-  assertEquals(countOf(main, /getTexture\(_i\)/g), 1);
-  assertEquals(countOf(main, /\.clone\(\)/g), 1);
+Deno.test("indexed GLTF variants load independent native ownership and apply embedded-texture filters", () => {
+  const p=project(s=>{s.objects.push(obj('Smooth',{model:{file:'hero.gltf'}}));s.objects.push(obj('Flat',{model:{file:'hero.gltf',shade_model:'SHADE_FLAT'}}));});
+  const main=gen(p).main;assertEquals(countOf(main,/new RenderData\(/g),2);assertEquals(countOf(main,/\.clone\(\);$/gm),0);assertEquals(countOf(main,/getTexture\(_i\)/g),2);
 });
 
 Deno.test("a clone is declared after the data it clones", () => {

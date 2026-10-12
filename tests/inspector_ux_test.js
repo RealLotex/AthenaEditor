@@ -5,7 +5,7 @@ import * as esbuild from "npm:esbuild@0.24.0";
 // selection changes and panel actions; browser checks cover layout and focus.
 const modules = [
   "core/i18n.js", "core/ui-translations.js", "core/util.js", "core/math.js", "core/skybox.js", "core/theme.js",
-  "core/components.js", "core/project.js", "ui/primitives.jsx", "ui/icons.jsx", "ui/dock.jsx",
+  "core/particle-modules.js", "core/components.js", "core/project.js", "ui/primitives.jsx", "ui/icons.jsx", "ui/dock.jsx",
   "ui/modal.jsx", "ui/popover.js", "ui/palette.jsx", "panels/inspector.jsx", "panels/inspector-components.jsx",
   "panels/skybox.jsx", "panels/inspector-scene.jsx", "panels/scenetools.jsx",
 ];

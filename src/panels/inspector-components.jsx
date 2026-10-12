@@ -76,9 +76,11 @@ function ComponentFields({ compKey, comp, obj, scene, project, files, onChange, 
 }
 
 function FieldControl({ field: f, value, comp, obj, scene, project, files, error, onChange, onOpenScript, showHelp, mixed }) {
-  const common = { label: `${tr(f.label)}${mixed ? ' · '+tr('mixed') : ''}`, help: showHelp ? tr(f.help) : undefined, error, required: f.required };
+  const common = { fieldKey:f.key, label: `${tr(f.label)}${mixed ? ' · '+tr('mixed') : ''}`, help: showHelp ? tr(f.help) : undefined, error, required: f.required };
 
   switch (f.type) {
+    case 'particleList':
+      return <ParticleListControl field={f} value={value||[]} scene={scene} obj={obj} onChange={onChange}/>;
     case 'eventRules':
       return <EventRulesEditor rules={value||[]} ownerId={obj.id} scene={scene} project={project} files={files} onChange={onChange}/>;
     case "vec3":
@@ -129,7 +131,7 @@ function FieldControl({ field: f, value, comp, obj, scene, project, files, error
     case "asset":
       return (
         <Field {...common}>
-          <AssetSelect value={value} onChange={onChange} files={files} cat={f.cat} />
+          <AssetSelect value={f.key==='material'&&comp.type==='particles'?obj.components.model?.textureFile||value:value} onChange={onChange} files={files} cat={f.cat} />
           {f.key === "eventScript" && value && onOpenScript && <button className="a-btn a-btn--sm" onClick={() => onOpenScript(value)}>{tr("Edit Script")}</button>}
         </Field>
       );

@@ -1,24 +1,25 @@
 const WATER_TEXTURE_SIZES=[32,64,128,256,512];
 const WATER_QUALITY_LABELS=['Ultra low','Low','Medium','High','Ultra'];
-const WATER_QUALITY_RATES=[0,5,10,15,30];
+const WATER_QUALITY_RATES=[0,10,20,30,60];
 const WATER_QUALITY_GRIDS=[1,4,8,12,16];
 function normalizedWaterQuality(value={}) {
   const out={textureSize:WATER_TEXTURE_SIZES.includes(value.textureSize)?value.textureSize:512};
-  for(const key of ['transparency','panning','waves','caustics','pattern'])out[key]=Math.round(clamp(num(value[key],key==='transparency'?1:['pattern','waves'].includes(key)?4:3),0,key==='transparency'?1:4));
+  for(const key of ['transparency','panning','waves','caustics','pattern'])out[key]=Math.round(clamp(num(value[key],key==='transparency'?1:['pattern','waves','panning'].includes(key)?4:3),0,key==='transparency'?1:4));
   return out;
 }
 
 function normalizedWater(value) {
   const water = { ...COMPONENTS.water.make(), ...value };
-  for (const [key, lo, hi] of [["opacity",0,1],["tiling",.1,32],["waveHeight",0,.5],["waveSpeed",0,8],["rippleStrength",0,.25],["updateRate",5,30],["depth",.1,100],["causticStrength",0,1]]) water[key] = clamp(num(water[key], COMPONENTS.water.make()[key]),lo,hi);
+  for (const [key, lo, hi] of [["opacity",0,1],["tiling",.1,32],["waveHeight",0,.5],["waveSpeed",0,8],["rippleStrength",0,.25],["updateRate",5,60],["depth",.1,100],["causticStrength",0,1]]) water[key] = clamp(num(water[key], COMPONENTS.water.make()[key]),lo,hi);
   water.flow = { x:clamp(num(water.flow?.x,0),-1,1),z:clamp(num(water.flow?.z,0),-1,1) };
   water.color = Object.fromEntries(["r","g","b"].map(k=>[k,clamp(num(water.color?.[k],1),0,1)]));
   water.caustics = water.caustics === true;
   water.quality=normalizedWaterQuality(value?.quality||{caustics:water.caustics?3:0});
+  water.textureUpdateRate=water.updateRate;
   if(value?.quality){
     water.caustics=water.quality.caustics>0;
-    water.updateRate=Math.max(1,WATER_QUALITY_RATES[water.quality.waves],WATER_QUALITY_RATES[water.quality.panning]);
-    water.waveUpdateRate=WATER_QUALITY_RATES[water.quality.waves];water.uvUpdateRate=WATER_QUALITY_RATES[water.quality.panning];
+    water.updateRate=Math.min(water.updateRate,Math.max(1,WATER_QUALITY_RATES[water.quality.waves],WATER_QUALITY_RATES[water.quality.panning]));
+    water.waveUpdateRate=Math.min(water.updateRate,WATER_QUALITY_RATES[water.quality.waves]);water.uvUpdateRate=Math.min(water.updateRate,WATER_QUALITY_RATES[water.quality.panning]);
   }else water.waveUpdateRate=water.uvUpdateRate=water.updateRate;
   if(!water.quality.transparency)water.opacity=1;
   if(!water.quality.panning){water.flow={x:0,z:0};water.rippleStrength=0;}
@@ -52,7 +53,8 @@ function advanceWaterArrays(state, dt) {
   if(state.frameCount>1){
     if(!state.motionClock)state.motionClock=new Float64Array([0,state.frameCount/state.frameRate]);
     state.motionClock[0]=(state.motionClock[0]+step*w.waveSpeed)%state.motionClock[1];
-    state.textureFrame=Math.floor(state.motionClock[0]*state.frameRate)%state.frameCount;
+    if(!state.patternTick)state.patternTick=new Float64Array([0,1/w.textureUpdateRate]);state.patternTick[0]+=step;
+    if(step===0||state.patternTick[0]>=state.patternTick[1]){state.patternTick[0]%=state.patternTick[1];state.textureFrame=Math.floor(state.motionClock[0]*state.frameRate)%state.frameCount;}
   }
   // The coastal preset carries its evolving ripples in the small T4 frames.
   // A flat surface needs no per-corner CPU work on PS2. Only authored flow,
@@ -61,7 +63,7 @@ function advanceWaterArrays(state, dt) {
     if(!state.staticUVReady){for(let i=0;i<state.uvs.length;i+=state.uvStride){state.uvs[i]=state.baseUVs[i]*w.tiling;state.uvs[i+1]=state.baseUVs[i+1]*w.tiling;}state.staticUVReady=true;}
     return;
   }
-  if(!state.waveTick)state.waveTick=new Float64Array([state.waveClock||0,1/30]);
+  if(!state.waveTick)state.waveTick=new Float64Array([state.waveClock||0,1/Math.max(1,w.waveUpdateRate)]);
   state.waveTick[0]+=step;
   if(!state.geometryClock)state.geometryClock=new Float64Array([0,1/w.updateRate]);
   state.geometryClock[0]+=step;if(step>0 && state.geometryClock[0]<state.geometryClock[1])return;
@@ -109,17 +111,25 @@ function waterFrameAssets(asset, files=[],value) {
   if(value)asset=waterTextureForQuality(asset,value,files);
   const motion=asset?.waterMotion;
   if(!motion || !Array.isArray(motion.frames) || motion.frames.length<2)return [];
-  if(motion.frames.length>64 || !Number.isFinite(motion.fps) || motion.fps<=0 || motion.fps>30 || motion.frames.some(f=>!f?.dataUrl?.startsWith('data:image/png;base64,')))throw Error('Water animation is damaged. Add a new Water object to restore its pattern.');
+  if(motion.frames.length>64 || !Number.isFinite(motion.fps) || motion.fps<=0 || motion.fps>60 || motion.frames.some(f=>!f?.dataUrl?.startsWith('data:image/png;base64,')))throw Error('Water animation is damaged. Add a new Water object to restore its pattern.');
   return motion.frames.slice(1).map((frame,i)=>({cat:'textures',name:freeAssetName(files,asset.name.replace(/\.[^.]+$/,'')+'_motion_'+String(i+1).padStart(2,'0'),'png'),...frame,image:asset.image}));
 }
 
+function waterFrameFingerprint(text) {
+  let a=2166136261,b=2246822519;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b^text.charCodeAt(i),3266489917);}
+  return text.length+':'+(a>>>0).toString(16)+':'+(b>>>0).toString(16);
+}
 function upgradeWaterAssets(project) {
   if(typeof WATER_MOTION_DATA==='undefined' || !WATER_MOTION_DATA.frames.length)return;
   for(const asset of project.assets||[]) {
     if(asset.owned!==true || asset.editKind!=='water')continue;
-    if(asset.waterMotion?.builtin===3&&asset.dataUrl===WATER_MOTION_DATA.frames[0].dataUrl)asset.waterMotion={fps:asset.waterMotion.fps,frames:WATER_MOTION_DATA.frames,levels:WATER_MOTION_DATA.levels};
-    if(asset.cat==='textures' && (asset.dataUrl===WATER_MOTION_DATA.legacy || asset.waterRevision===2&&asset.waterMotion?.frames.length===32&&asset.dataUrl===asset.waterMotion.frames[0]?.dataUrl)){
-      Object.assign(asset,WATER_MOTION_DATA.frames[0],{image:{width:WATER_MOTION_DATA.size,height:WATER_MOTION_DATA.size,bpp:4,format:'png'},waterRevision:3,waterMotion:{fps:WATER_MOTION_DATA.fps,frames:WATER_MOTION_DATA.frames,levels:WATER_MOTION_DATA.levels}});
+    const previous=WATER_MOTION_DATA.previousFrames,frames=asset.waterMotion?.frames;
+    const uneditedLevels=!asset.waterMotion?.levels||Object.entries(asset.waterMotion.levels).every(([size,list])=>list.length===WATER_MOTION_DATA.previousLevels?.[size]?.length&&list.every((f,i)=>waterFrameFingerprint(f.dataUrl||'')===WATER_MOTION_DATA.previousLevels[size][i]));
+    const oldBuiltin=uneditedLevels&&asset.waterRevision===3&&previous?.length===32&&waterFrameFingerprint(asset.dataUrl||'')===previous[0]&&
+      (asset.waterMotion?.builtin===3||frames?.length===32&&frames.every((f,i)=>waterFrameFingerprint(f.dataUrl||'')===previous[i]));
+    if([3,4].includes(asset.waterMotion?.builtin)&&asset.dataUrl===WATER_MOTION_DATA.frames[0].dataUrl)asset.waterMotion={fps:asset.waterMotion.fps,frames:WATER_MOTION_DATA.frames,levels:WATER_MOTION_DATA.levels};
+    if(asset.cat==='textures' && (oldBuiltin||asset.dataUrl===WATER_MOTION_DATA.legacy || asset.waterRevision===2&&asset.waterMotion?.frames.length===32&&asset.dataUrl===asset.waterMotion.frames[0]?.dataUrl)){
+      Object.assign(asset,WATER_MOTION_DATA.frames[0],{image:{width:WATER_MOTION_DATA.size,height:WATER_MOTION_DATA.size,bpp:4,format:'png'},waterRevision:4,waterMotion:{fps:WATER_MOTION_DATA.fps,frames:WATER_MOTION_DATA.frames,levels:WATER_MOTION_DATA.levels}});
     }
     if(asset.cat==='models' && asset.content===waterMeshOBJ(8))asset.content=waterMeshOBJ();
   }
@@ -132,11 +142,11 @@ function upgradeWaterAssets(project) {
 // Recovery storage references the editor's immutable preset; portable project
 // files still embed every frame. Edited frames/levels are never compacted.
 function compactWaterAsset(asset) {
-  if(!asset||asset.cat!=='textures'||!asset.owned||asset.waterRevision!==3||typeof WATER_MOTION_DATA==='undefined'||asset.dataUrl!==WATER_MOTION_DATA.frames[0].dataUrl)return asset;
+  if(!asset||asset.cat!=='textures'||!asset.owned||![3,4].includes(asset.waterRevision)||typeof WATER_MOTION_DATA==='undefined'||asset.dataUrl!==WATER_MOTION_DATA.frames[0].dataUrl)return asset;
   const motion=asset.waterMotion;
   if(motion?.frames?.length!==WATER_MOTION_DATA.frames.length||motion.frames.some((f,i)=>f.dataUrl!==WATER_MOTION_DATA.frames[i].dataUrl))return asset;
   if(motion.levels&&Object.entries(motion.levels).some(([size,frames])=>frames.length!==WATER_MOTION_DATA.levels[size]?.length||frames.some((f,i)=>f.dataUrl!==WATER_MOTION_DATA.levels[size][i].dataUrl)))return asset;
-  return {...asset,waterMotion:{fps:motion.fps,builtin:3}};
+  return {...asset,waterMotion:{fps:motion.fps,builtin:4}};
 }
 
 function waterCausticObject(object, world) {

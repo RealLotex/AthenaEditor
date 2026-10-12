@@ -41,6 +41,8 @@ function emitUI(e, ir) {
   }
 
   e.section("HUD elements — mutate these at runtime to animate the interface");
+  const defaultFont=ir.ui.some(u=>['Text','Button'].includes(u.el.type)&&(!u.el.fontFile||u.el.fontFile==='default'));
+  if(defaultFont)e.w(`const _hudDefaultFont = ${(ir.project.display?.frameCounter!==false||ir.project.display?.debugHUD)&&!ir.overlayFont?'font':'new Font("default")'};`);
   for (const u of ir.ui) {
     const el = u.el;
     const needsFont = el.type === "Text" || el.type === "Button";
@@ -51,7 +53,7 @@ function emitUI(e, ir) {
       b.w(`visible: ${el.visible !== false},`);
       if (needsFont) {
         b.w(`text: "${jsStr(el.text || "")}",`);
-        b.w(`font: new Font(${el.fontFile && el.fontFile !== "default" ? `"${jsStr(ir.dirs.fonts)}/${jsStr(el.fontFile)}"` : `"default"`}),`);
+        b.w(`font: ${el.fontFile&&el.fontFile!=="default"?`new Font("${jsStr(ir.dirs.fonts)}/${jsStr(el.fontFile)}")`:"_hudDefaultFont"},`);
         b.w(`fontSize: ${il(el.fontSize || 14)},`);
         b.w(`color: ${colorNew(el.textColor, { r: 200, g: 200, b: 200, a: 128 })},`);
       }
@@ -66,15 +68,19 @@ function emitUI(e, ir) {
       if (u.imageVN) b.w(`image: ${u.imageVN},`);
     });
     e.w(`};`);
-    if (needsFont) e.w(`${u.vn}.font.scale = ${fl(((el.fontSize || 14) / 14) * 0.6)};`);
+
     e.nl();
   }
 
+  const motion=ir.ui.some(u=>u.el.binding?.variable||u.el.animation?.enabled);
+  if(motion){e.w(hudMotionValues.toString());e.w('let _hudTime=0;');}
   e.comment("Called once per frame, after the depth test is turned off.");
   e.w(`function drawUI() {`);
+  if(motion)e.w(`_hudTime+=${ir.project.display?.mode==='PAL'?'1/50':'1/60'};`);
   e.block((b) => {
     for (const u of ir.ui) {
       const el = u.el;
+      if(motion&&(el.binding?.variable||el.animation?.enabled)){b.w(`{const values=hudMotionValues(${JSON.stringify({binding:el.binding,animation:el.animation})},_hudTime,ctx.variables||{});for(const key of Object.keys(values))${u.vn}[key==='width'?'w':key==='height'?'h':key]=values[key];}`);}
       b.w(`if (${u.vn}.visible) {`);
       b.block((x) => {
         switch (el.type) {
@@ -82,11 +88,15 @@ function emitUI(e, ir) {
             x.w(`Draw.rect(${u.vn}.x, ${u.vn}.y, ${u.vn}.w, ${u.vn}.h, ${u.vn}.bgColor);`);
             break;
           case "Text":
+            x.w(`${u.vn}.font.scale = ${u.vn}.fontSize / 14 * .6;`);
+            x.w(`${u.vn}.font.outline = 0;`);
             x.w(`${u.vn}.font.color = ${u.vn}.color;`);
             x.w(`${u.vn}.font.print(${u.vn}.x, ${u.vn}.y, ${u.vn}.text);`);
             break;
           case "Button":
             x.w(`Draw.rect(${u.vn}.x, ${u.vn}.y, ${u.vn}.w, ${u.vn}.h, ${u.vn}.bgColor);`);
+            x.w(`${u.vn}.font.scale = ${u.vn}.fontSize / 14 * .6;`);
+            x.w(`${u.vn}.font.outline = 0;`);
             x.w(`${u.vn}.font.color = ${u.vn}.color;`);
             x.w(`${u.vn}.font.print(${u.vn}.x + 6, ${u.vn}.y + Math.floor(${u.vn}.h / 2) - 6, ${u.vn}.text);`);
             break;
@@ -95,6 +105,7 @@ function emitUI(e, ir) {
             x.w(`Draw.rect(${u.vn}.x, ${u.vn}.y, Math.floor(${u.vn}.w * ${u.vn}.progress), ${u.vn}.h, ${u.vn}.barColor);`);
             break;
           case "Image":
+            x.w(`if (${u.vn}.image) { if(${u.vn}.image.width!==${u.vn}.w)${u.vn}.image.width=${u.vn}.w;if(${u.vn}.image.height!==${u.vn}.h)${u.vn}.image.height=${u.vn}.h; }`);
             x.w(`if (${u.vn}.image) ${u.vn}.image.draw(${u.vn}.x, ${u.vn}.y);`);
             break;
         }

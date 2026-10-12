@@ -155,20 +155,27 @@ const COMPONENTS = {
 
   particles:{
     label:'Particles',icon:'✧',color:'#80dfff',order:16,requires:['model'],
-    make:()=>({type:'particles',flipbook:false,columns:4,rows:4,fps:12,animationLoop:false,preset:'bubbles',loop:true,playOnStart:true,count:24,lifetime:3,rate:8,speed:2,spread:.6,size:.18,opacity:.8,color:rgb(.7,.95,1)}),
+    make:()=>({...particleModuleDefaults(),type:'particles',flipbook:false,columns:4,rows:4,fps:12,animationLoop:false,loop:true,playOnStart:true,count:24,rate:8,opacity:.8,color:rgb(.7,.95,1),material:''}),
     fields:[
-      {key:'preset',label:'Motion',type:'enum',options:[{value:'bubbles',label:'Bubbles'},{value:'splash',label:'Splash'},{value:'fountain',label:'Fountain'}]},
-      {key:'loop',label:'Loop',type:'bool'},{key:'playOnStart',label:'Play on start',type:'bool'},
-      {key:'count',label:'Pool size',type:'int',min:1,max:64,step:1,help:'A fixed pool: more particles cost more drawing time.'},
-      {key:'rate',label:'Particles / second',type:'number',min:.1,max:64,step:1,when:c=>c.loop},
-      {key:'lifetime',label:'Lifetime',type:'number',min:.1,max:10,step:.1},
-      {key:'speed',label:'Speed',type:'number',min:0,max:30,step:.1},{key:'spread',label:'Spread',type:'number',min:0,max:10,step:.1},
-      {key:'size',label:'Size',type:'number',min:.01,max:4,step:.01},{key:'color',label:'Tint',type:'rgb01'},{key:'opacity',label:'Opacity',type:'number',min:0,max:1,step:.05},
-      {key:'flipbook',label:'Animate sprite sheet',type:'bool',help:'Use the Model texture as an atlas. Each particle starts on frame one.'},
-      ...FLIPBOOK_FIELDS.map(f=>({...f,when:c=>c.flipbook,group:'Sprite animation'})),
-      {key:'animationLoop',label:'Repeat frames',type:'bool',when:c=>c.flipbook,group:'Sprite animation'},
+      {key:'loop',label:'Looping',type:'bool',group:'Main'}, {key:'duration',label:'Duration',type:'number',min:.01,max:3600,group:'Main'},
+      {key:'playOnStart',label:'Play on start',type:'bool',group:'Main'}, {key:'count',label:'Max particles',type:'int',min:1,max:64,group:'Main'},
+      ...['lifetime','speed','size'].flatMap(key=>[{key:key+'Min',label:'Start '+key+' minimum',type:'number',min:0,step:.01,group:'Main'},{key:key+'Max',label:'Start '+key+' maximum',type:'number',min:0,step:.01,group:'Main'}]),
+      {key:'simulationSpace',label:'Simulation space',type:'enum',options:[{value:'world',label:'World'},{value:'local',label:'Local'}],group:'Main'},
+      {key:'rate',label:'Rate over time',type:'number',min:0,max:64,group:'Emission'}, {key:'bursts',label:'Bursts',type:'particleList',group:'Emission'},
+      {key:'shape',label:'Shape',type:'enum',options:PARTICLE_SHAPES.map(value=>({value,label:value})),group:'Shape'},
+      {key:'radius',label:'Radius',type:'number',min:0,max:100,group:'Shape'}, {key:'coneAngle',label:'Cone angle',type:'number',min:0,max:90,group:'Shape'}, {key:'box',label:'Box size',type:'vec3',min:0,group:'Shape'},
+      {key:'velocity',label:'Velocity over lifetime',type:'vec3',group:'Forces'}, {key:'gravityModifier',label:'Gravity modifier',type:'number',min:-10,max:10,group:'Forces'},
+      {key:'color',label:'Start color',type:'rgb01',group:'Over lifetime'}, {key:'opacity',label:'Start opacity',type:'number',min:0,max:1,step:.05,group:'Over lifetime'},
+      {key:'colorKeys',label:'Color over lifetime',type:'particleList',group:'Over lifetime'}, {key:'sizeKeys',label:'Size over lifetime',type:'particleList',group:'Over lifetime'},
+      {key:'rotation',label:'Start rotation (degrees)',type:'number',min:-360,max:360,group:'Over lifetime'}, {key:'rotationSpeed',label:'Rotation over lifetime (degrees / sec)',type:'number',min:-1080,max:1080,group:'Over lifetime'},
+      {key:'collisionType',label:'Collision type',type:'enum',options:['none','world','planes'].map(value=>({value,label:value})),group:'Collision'},
+      {key:'collisionPlanes',label:'Collision planes',type:'particleList',group:'Collision'}, {key:'bounce',label:'Bounce',type:'number',min:0,max:1,step:.05,group:'Collision'}, {key:'collisionLifetimeLoss',label:'Lifetime loss per collision',type:'number',min:0,max:1,step:.05,group:'Collision'},
+      {key:'subEmitters',label:'Sub emitters',type:'particleList',group:'Sub emitters'},
+      {key:'flipbook',label:'Texture sheet animation',type:'bool',group:'Texture sheet animation'}, ...FLIPBOOK_FIELDS.map(f=>({...f,group:'Texture sheet animation'})), {key:'animationLoop',label:'Repeat frames',type:'bool',group:'Texture sheet animation'},
+      {key:'renderMode',label:'Render mode',type:'enum',options:[{value:'billboard',label:'Billboard'},{value:'mesh',label:'Mesh'}],group:'Renderer'}, {key:'meshFile',label:'Particle mesh',type:'asset',cat:'models',group:'Renderer'}, {key:'sortingFudge',label:'Sorting fudge',type:'number',min:-100,max:100,group:'Renderer'},
+      {key:'material',label:'Material texture',type:'asset',cat:'textures',group:'Renderer'},
     ],
-    validate:(c,o)=>{const out=c.flipbook?flipbookProblems(c):[];for(const [k,min,max] of [['count',1,64],['rate',.1,64],['lifetime',.1,10],['speed',0,30],['spread',0,10],['size',.01,4],['opacity',0,1]])if(!Number.isFinite(c[k])||c[k]<min||c[k]>max)out.push({level:'error',msg:'Particle '+k+' is outside its supported range.'});if(o.components.animator||o.components.water)out.push({level:'error',msg:'Particles need a separate sprite model.'});if(c.count>32)out.push({level:'warn',msg:'More than 32 particles per emitter can be expensive on PS2.'});if(c.loop&&c.rate*c.lifetime>c.count)out.push({level:'info',msg:'Emission rate is limited by the pool size and lifetime.'});return out;},
+    validate:(c,o,scene)=>{const out=[...(c.flipbook?flipbookProblems(c):[]),...particleModulesProblems(c,o,scene)];for(const [k,min,max] of [['count',1,64],['rate',0,64],['lifetime',.1,10],['speed',0,30],['spread',0,10],['size',.01,4],['opacity',0,1]])if((!['lifetime','speed','spread','size'].includes(k)||c[k]!==undefined)&&(!Number.isFinite(c[k])||c[k]<min||c[k]>max))out.push({level:'error',msg:'Particle '+k+' is outside its supported range.'});if(o.components.animator||o.components.water)out.push({level:'error',msg:'Particles need a separate sprite model.'});if(c.count>32)out.push({level:'warn',msg:'More than 32 particles per emitter can be expensive on PS2.'});if(c.loop&&c.rate*(c.lifetimeMax||c.lifetime)>c.count)out.push({level:'info',msg:'Emission rate is limited by the pool size and lifetime.'});return out;},
   },
 
   textureAnimation:{
@@ -185,7 +192,7 @@ const COMPONENTS = {
 
   water: {
     label:"Water",icon:"≈",color:"#24bfe8",order:15,requires:["model"],
-    make:()=>({type:"water",opacity:.6,color:rgb(1,1,1),tiling:4,flow:{x:0,z:0},waveHeight:0,waveSpeed:1,rippleStrength:0,updateRate:15,caustics:false,depth:4,causticStrength:.45,causticTexture:""}),
+    make:()=>({type:"water",opacity:.6,color:rgb(1,1,1),tiling:4,flow:{x:0,z:0},waveHeight:0,waveSpeed:1,rippleStrength:0,updateRate:60,caustics:false,depth:4,causticStrength:.45,causticTexture:""}),
     fields:[
       {key:"color",label:"Tint",type:"rgb01"},
       {key:"opacity",label:"Opacity",type:"number",min:0,max:1,step:.05},
@@ -200,7 +207,7 @@ const COMPONENTS = {
     ],
     validate:(c,o)=>{
       const out=[];
-      for(const [key,min,max] of [["opacity",0,1],["tiling",.1,32],["waveHeight",0,.5],["waveSpeed",0,8],["rippleStrength",0,.25],["updateRate",5,30],["depth",.1,100],["causticStrength",0,1]])if(!Number.isFinite(c[key])||c[key]<min||c[key]>max)out.push({level:"error",msg:`Water ${key} must be between ${min} and ${max}.`});
+      for(const [key,min,max] of [["opacity",0,1],["tiling",.1,32],["waveHeight",0,.5],["waveSpeed",0,8],["rippleStrength",0,.25],["updateRate",5,60],["depth",.1,100],["causticStrength",0,1]])if(!Number.isFinite(c[key])||c[key]<min||c[key]>max)out.push({level:"error",msg:`Water ${key} must be between ${min} and ${max}.`});
       if(o.components.animator)out.push({level:"error",msg:"Water needs a static mesh; remove its Animator."});
       return out;
     },

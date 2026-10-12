@@ -196,7 +196,7 @@ function hudElementContent(el, scale) {
 
 // ── inspector for a HUD element ────────────────────────────────────────
 
-function UIElementInspector({ el, files, onUpdate, onDelete, onImportFont }) {
+function UIElementInspector({ el, files, scene, onUpdate, onDelete, onImportFont }) {
   const set = (patch, phase) => onUpdate(el.id, patch, phase);
   const isText = el.type === "Text" || el.type === "Button";
 
@@ -267,6 +267,7 @@ function UIElementInspector({ el, files, onUpdate, onDelete, onImportFont }) {
           </>
         )}
 
+        <HUDMotionControls element={el} variables={scene?.eventVariables||{}} onChange={set}/>
         <div className="a-sec__group">{tr("Script")}</div>
         <Field label={tr("Module")} help={tr("Exports init(ctx) and update(ctx, pad).")}>
           <AssetSelect value={el.script?.file} cat="scripts" files={files}

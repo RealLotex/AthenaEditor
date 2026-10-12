@@ -121,13 +121,13 @@ function GameViewport({scene,files,request,onTime,onCameraChange,onSceneUpdate,o
       try{
         for(const o of objects){
           if(!o.components.model)continue;
-          const prepared=o.components.water?waterPreviewAssets(o.components.model,o.components.water,files):{model:o.components.model,files};const built=await buildModel(prepared.model,prepared.files);
+          const prepared=o.components.water?waterPreviewAssets(o.components.model,o.components.water,files):o.components.particles?particlePreviewAssets(o.components.model,o.components.particles,files,o.id):{model:o.components.model,files};const built=await buildModel(prepared.model,prepared.files);
           if(!built)throw new Error('Import model: '+o.components.model.file);
           if(disposed){disposeObject(built.object3d);return;}
           const root=built.object3d,t=worlds.get(o.id);roots.push(root);world.add(root);
           const h=cinematicThreeHandle(root);h.position=t.position;h.rotation=t.rotation;h.scale=t.scale;handles.set(o.id,h);
           if(o.components.water)configureWaterPreview(root,{...o.components.water,textureFilter:prepared.model.textureFilter},prepared.files,()=>scene.physics?.enabled?objects.filter(other=>other.id!==o.id&&!other.components.water&&!other.components.particles).map(other=>handles.get(other.id)?.root).filter(Boolean):[],prepared.model.textureFile);
-          if(o.components.particles)configureParticlePreview(root,o.components.particles,files,o.components.model.textureFile);
+          if(o.components.particles)configureParticlePreview(root,o.components.particles,files,o.components.model.textureFile,()=>objects.filter(other=>other.id!==o.id&&other.components.rigidbody&&other.components.rigidbody.mode!=='trigger').map(other=>handles.get(other.id)?.root).filter(Boolean),id=>handles.get(id)?.root.userData.particlePreview?.state);
           if(o.components.textureAnimation)configureFlipbookPreview(root,o.components.textureAnimation,files,o.components.model.textureFile);
           if(o.components.reflection)configureReflectionPreview(root,o.components.reflection,files);
           root.traverse(node=>{if(node.isSkinnedMesh&&!h.bones)h.bones=node.skeleton.bones;});
@@ -195,7 +195,7 @@ function GameViewport({scene,files,request,onTime,onCameraChange,onSceneUpdate,o
     {graphicsError&&<div className="cin-error" role="alert">{tr(graphicsError)} <button className="a-btn" onClick={()=>setGraphicsError('')}>{tr("Restore view")}</button></div>}
     <div className="cin-game-area"><div className="cin-game-stage" ref={stage}>
       <div className="cin-game-ui">
-        {(scene.uiElements||[]).filter(e=>e.visible!==false).sort((a,b)=>(a.zindex||0)-(b.zindex||0)).map(e=><GameHUD key={e.id} element={e} files={files}/>)}
+        {(scene.uiElements||[]).filter(e=>e.visible!==false).sort((a,b)=>(a.zindex||0)-(b.zindex||0)).map(e=><GameHUD key={e.id} element={e} files={files} variables={scene.eventVariables||{}}/>)}
         {['panel','portrait','dialogue','fade'].flatMap(type=>ui.filter(e=>e.type===type)).map(({type,clip:c,opacity})=><GameCinematicUI key={c.id} type={type} clip={c} opacity={opacity} files={files}/>)}
       </div>
     </div></div>
@@ -212,7 +212,10 @@ function GameCinematicUI({type,clip:c,opacity=1,files}) {
   if(type==='portrait')return <img alt={c.name} src={files.find(f=>f.cat==='textures'&&f.name===c.file)?.dataUrl} style={style}/>;
   return <div style={{...style,color:'#fff',fontSize:`${c.fontSize/640*100}cqw`,lineHeight:1.2,whiteSpace:'pre-wrap'}}>{c.speaker&&<>{c.speaker}:{'\n'}</>}{c.text}</div>;
 }
-function GameHUD({element:e,files}) {
+function GameHUD({element,files,variables={}}) {
+  const [time,setTime]=useState(0);
+  useEffect(()=>{if(!element.animation?.enabled)return;const started=performance.now();let raf;const tick=()=>{setTime((performance.now()-started)/1000);raf=requestAnimationFrame(tick);};raf=requestAnimationFrame(tick);return ()=>cancelAnimationFrame(raf);},[element.animation]);
+  const e={...element,...hudMotionValues(element,time,variables)};if(e.visible===false)return null;
   const style=gameUIStyle(e),color=c=>`rgba(${c?.r||0},${c?.g||0},${c?.b||0},${(c?.a??128)/128})`;
   if(e.type==='Image')return <img alt={e.name} style={style} src={files.find(f=>f.name===e.image&&f.cat==='textures')?.dataUrl}/>;
   return <div style={{...style,background:['Panel','Button','ProgressBar'].includes(e.type)?color(e.bgColor||e.barBgColor):undefined,color:color(e.textColor),fontSize:`${(e.fontSize||14)/640*100}cqw`,whiteSpace:'pre-wrap'}}>

@@ -4,7 +4,7 @@ import { load } from "./_load.js";
 // Scaffolding sits on top of templates, storage and codegen: it decides what a
 // new project folder holds, then hands main.js to the normal export path.
 const A = await load([
-  "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/components.js",
+  "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/particle-modules.js", "core/components.js",
   "core/skybox.js", "codegen/skybox.js",
   "core/imagesize.js", "core/vram.js",
   "editor/assets.js",

@@ -320,6 +320,7 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
     emitModelDraws(b, ir);
     if (ir.cinematics?.enabled) b.w(`_cinematicDrawParticles();`);
     emitShadowDraws(b, ir);
+    if(ir.models.some(m=>m.particles?.sortingFudge<0))emitParticleDraws(b,ir,true);
     emitWaterDraws(b, ir);
     if(ir.models.some(m=>m.particles))emitParticleDraws(b,ir);
     if(ir.fogModels.length)emitFogDraws(b,ir);
@@ -331,7 +332,7 @@ function generateSceneProgram(project, scene, uploadedFiles, scenePaths) {
     if (ir.cinematics?.enabled) b.w(`_cinematicDrawUI();`);
 
     if (showOverlay) {
-      if(ir.cinematics?.enabled) b.w(`font.scale = 0.6;`);
+      if(ir.cinematics?.enabled||ir.ui.length)b.w(`font.scale = 0.6;font.outline=1;font.color=Color.new(200,200,200);`);
       b.w(`if (++_hudFrame >= 15) {`);
       b.block(h => {
         h.w(`_hudFrame = 0;`);

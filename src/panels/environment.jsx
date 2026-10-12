@@ -1,4 +1,4 @@
-function EnvironmentPanel({scene,files,selectedIds=[],onEdit,onApply,onReflect}) {
+function EnvironmentPanel({scene,files,selectedIds=[],onEdit,onApply,onReflect,onSelect}) {
   const value=normalizedEnvironment(scene.environment),models=exportableObjects(scene.objects).filter(o=>/\.obj$/i.test(o.components.model?.file||'')&&!o.components.water&&!o.components.particles&&!o.components.animator&&o.components.rigidbody?.mode!=='dynamic'),lights=exportableObjects(scene.objects).filter(o=>o.components.light);
   const [busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState('');
   const [open,setOpen]=useState({recess:true,mid:true,highlight:true});
@@ -12,11 +12,7 @@ function EnvironmentPanel({scene,files,selectedIds=[],onEdit,onApply,onReflect})
     catch(e){setError(e.message);}finally{setBusy(false);}
   };
   return <><PanelHeader title={tr("Lighting")}/><div className="a-scroll" style={{padding:12}}>
-    {lights.map(light=><Section key={light.id} title={light.name} open={open[light.id]!==false} onToggle={()=>setOpen(s=>({...s,[light.id]:s[light.id]===false}))}>
-      <Field label={tr("Sun direction")}><Vec3Input value={light.components.light.direction} step={.1} onChange={(v,p)=>onEdit(sc=>mutObj(sc.objects,light.id,o=>o.components.light.direction=v),p==='commit'?null:'light.direction')}/></Field>
-      {['ambient','diffuse'].map(key=><Field key={key} label={key==='ambient'?tr("Ambient color"):tr("Sun color")}><Color01Input value={light.components.light[key]} onChange={(v,p)=>onEdit(sc=>mutObj(sc.objects,light.id,o=>o.components.light[key]=v),p==='commit'?null:'light.'+key)}/></Field>)}
-      <button className="a-btn a-btn--sm" onClick={()=>onEdit(sc=>mutObj(sc.objects,light.id,o=>{const a=o.components.light.ambient,v=(a.r+a.g+a.b)/3;o.components.light.ambient={r:v,g:v,b:v};}))}>{tr("Neutral ambient color")}</button>
-    </Section>)}
+    <div className="a-light-shortcuts">{lights.map(light=><button key={light.id} className="a-btn a-btn--wide" onClick={()=>onSelect?.(light.id)}>☀ {tr('Select')} {light.name} → {tr('Properties')}</button>)}</div>
     <h3>{tr("Fog")}</h3><Checkbox value={value.fog.enabled} label={tr("Enable distance fog")} onChange={v=>set('fog.enabled',v,'commit')}/>
     {value.fog.enabled&&<>
       <Field label={tr("Fog color")}><Color01Input value={value.fog.color} onChange={(v,p)=>set('fog.color',v,p)}/></Field>

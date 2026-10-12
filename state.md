@@ -1,6 +1,29 @@
 # Project status
 
-_Last updated: 2026-10-11._
+_Last updated: 2026-10-12._
+
+## October 12 editor responsiveness, particles and tours
+
+Terrain preparation runs in a worker and coalesces brush samples. Static caustics use
+cached BVH projection with invalidation and a per-frame budget. Water has a visible
+5–60 Hz setting and smoother ripple frames; panorama and tile resolution labels are
+separate. Lighting selects Sun in Properties. All Timeline clip parameters stay exposed,
+and multiline dialogue uses a local draft with one final commit rather than project edits
+on every keystroke.
+
+All 20 particle parameter families are exposed, with seven emission shapes, Local/World,
+bursts, lifetime curves, world/plane collisions, subemitters, mesh mode and sorting. HUD
+animation and variable bindings work in preview and native export. Eight guided tours,
+191 steps and portable templates are included. First use starts Basic, Help opens the
+library, Next supplies missing prerequisites and Previous revisits a step. Closing the
+completed guide keeps the practice open for editing; returning to the prior project is
+an explicit separate action.
+
+Current verification: **707 tests passed, zero failed**. PCSX2 probes passed the complete
+Events game (220 frames), all 11 cinematic channels (540), gameplay HUD (360), and particle
+collisions/subemitters/Mesh (150). Detailed CPU measurements, scope and limitations are
+in [production verification](docs/PRODUCTION-VERIFICATION.md). The prior coastal reload
+limitation remains unresolved; no physical PS2 verification is claimed.
 
 ## October 11 publication check
 

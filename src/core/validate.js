@@ -67,6 +67,7 @@ function exportAssetProblems(scene, files, project) {
 function validateScene(scene, files = [], project = null) {
   const out = [];
   if (!scene) return out;
+  if(typeof hudMotionProblems==='function')for(const element of scene.uiElements||[])out.push(...hudMotionProblems(element,scene.eventVariables||{}));
   if(scene.activeCameraId&&!resolveSceneCamera(scene).cameras.some(o=>o.id===scene.activeCameraId))out.push({level:'error',component:'camera',message:'The active camera is missing or excluded from export. Choose an active camera in Scene settings.'});
   if(project)files=editorAssets(project,files);
   if (typeof cinematicProblems === "function") out.push(...cinematicProblems(scene, files));
@@ -103,7 +104,7 @@ function validateScene(scene, files = [], project = null) {
     }
     if(obj.components?.particles&&asset?.content&&/\.obj$/i.test(asset.name)){
       let capacity=0;try{capacity=readMeshOBJ(asset.content).faces.length/2;}catch{}
-      if(capacity<obj.components.particles.count)add('error','This sprite mesh has too few particle quads. Create an emitter through Add / Particle effects.',obj,'particles');
+      if(obj.components.particles.renderMode!=='mesh'&&capacity<obj.components.particles.count)add('error','This sprite mesh has too few particle quads. Create an emitter through Add / Particle effects.',obj,'particles');
     }
     if(asset?.vertexColors){
       let count=0;try{count=readMeshOBJ(asset.content).faces.length*9;}catch{}

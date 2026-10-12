@@ -1,0 +1,95 @@
+[
+  {
+    "id": "events",
+    "passed": true,
+    "records": [
+      {
+        "tag": "SAMPLE",
+        "tour": "events",
+        "frame": 40,
+        "keys": 0,
+        "won": 0,
+        "victoryVisible": false,
+        "playerEnabled": true,
+        "doorY": 1
+      },
+      {
+        "tag": "SAMPLE",
+        "tour": "events",
+        "frame": 140,
+        "keys": 1,
+        "won": 0,
+        "victoryVisible": false,
+        "playerEnabled": true,
+        "doorY": 4
+      },
+      {
+        "tag": "DONE",
+        "tour": "events",
+        "frame": 220,
+        "keys": 1,
+        "won": 1,
+        "victoryVisible": true,
+        "playerEnabled": false,
+        "doorY": 4
+      }
+    ]
+  },
+  {
+    "id": "cinematics",
+    "passed": true,
+    "records": [
+      {
+        "tag": "SAMPLE",
+        "tour": "cinematics",
+        "frame": 40,
+        "playing": true,
+        "time": 0.6666666666666671,
+        "active": 9
+      },
+      {
+        "tag": "SAMPLE",
+        "tour": "cinematics",
+        "frame": 140,
+        "playing": true,
+        "time": 2.33333333333333,
+        "active": 10
+      },
+      {
+        "tag": "DONE",
+        "tour": "cinematics",
+        "frame": 540,
+        "playing": false,
+        "time": 8,
+        "active": 0
+      }
+    ]
+  },
+  {
+    "id": "hud",
+    "passed": true,
+    "records": [
+      {
+        "tag": "SAMPLE",
+        "tour": "hud",
+        "frame": 40,
+        "score": 0,
+        "health": 100
+      },
+      {
+        "tag": "SAMPLE",
+        "tour": "hud",
+        "frame": 140,
+        "score": 0,
+        "health": 100
+      },
+      {
+        "tag": "DONE",
+        "tour": "hud",
+        "frame": 360,
+        "score": 10,
+        "health": 65
+      }
+    ]
+  }
+]

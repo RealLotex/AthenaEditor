@@ -22,7 +22,7 @@ const RESERVED_VARS = [
   "_cinematicPlayerState", "_sceneEventsState", "_cinematicDialogueLines",
   "_cinematicModels", "_cinematicSounds", "_cinematicImages", "_cinematicAnims", "_cinematicDefaults", "_cinematicPools", "_cinematicFont", "_cinematicAdapter", "_cinematicExitPending", "_cinematicDrawUI", "_cinematicDrawParticles", "createCinematicPlayer", "createSceneEvents", "createCinematicAdapter", "cinematicLerp",
   "drawUI", "_mainCam", "_mainDraw", "_mainDepth", "_shadowPass", "_odeEuler",
-  "ode_world", "ode_space", "ode_contacts", "ode_onCollide", "_disposePhysics", "_disposeShadows", "_releaseShadowProjectors", "_syncShadowReceivers", "_dt", "_hit",
+  "ode_world", "ode_space", "ode_contacts", "ode_onCollide", "_disposePhysics", "_physicsDisposed", "_disposeShadows", "_releaseShadowProjectors", "_syncShadowReceivers", "_dt", "_hit",
   "_odeLegacyContacts", "_odeEventPairs", "_odePollContacts",
   "_odeBoundGeoms", "_odeBoundPositions", "_odeBoundNumber", "_odeEventBounds",
   "_odeEventStates", "_odeEventFrame", "_odeTouch", "_odeFinishPairs", "_odeFinishEvents",
@@ -32,7 +32,7 @@ const RESERVED_VARS = [
   "_isObjectEnabled", "setObjectGameplayEnabled", "_flowModels", "_flowSounds", "_flowAnimations", "_flowPlatform", "_eventFlowState", "_flowRulesByType", "_flowComplete", "flowEventType",
   "cinematicCurve", "cinematicValueLerp", "cinematicKeyframeValue", "cinematicClipOpacity",
   "cinematicAnimationWeight", "cinematicQuaternionLerp", "sampleCinematicPose", "CinematicPoseMixer", "_cinematicMixData", "_cinematicPoseMixer",
-  "_hudFrame", "_hudText", "_hudMemory",
+  "_hudFrame", "_hudText", "_hudMemory", "_hudDefaultFont", "_hudTime", "hudMotionValues",
 ];
 
 function resolveScene(project, scene, files = []) {
@@ -121,6 +121,7 @@ function resolveScene(project, scene, files = []) {
       m={...m,file:mesh?.name||m.file,textureFile:texture?.name||m.textureFile,textureFilter:water.textureFilter||m.textureFilter};
     }
     const particles=obj.components.particles?normalizedParticles(obj.components.particles):null;
+    if(particles?.renderMode==='mesh'){const pool=particleMeshAssetForSettings(particles,files,obj.id);files.push(pool);waterGeneratedAssets.push(pool);m={...m,file:pool.name};}
     const flipbook=obj.components.textureAnimation?normalizedFlipbook(obj.components.textureAnimation):null;
     const reflection=obj.components.reflection;
     const mutableProfile=water ? `|water:${waterGeometryProfile(water)}` : particles?'|particles:'+obj.id+':'+JSON.stringify(particles):flipbook?'|flipbook:'+JSON.stringify(flipbook):'';
@@ -160,7 +161,9 @@ function resolveScene(project, scene, files = []) {
       // Animated water owns its vertex arrays. Material-only clones share those
       // arrays, so distinct water RenderDatas must load independent geometry.
       const upload = uploadKeyOf(m) + (water||particles||flipbook ? profile+rdKeyOf(m) : "");
-      const source = sourceByUpload.get(upload) || null;
+      // Native clones share indexed skin/skeleton pointers; their destructor owns
+      // those pointers. Keep GLTF variants independently owned to prevent double frees.
+      const source = /\.obj$/i.test(m.file)?sourceByUpload.get(upload)||null:null;
 
       let refTex=null;
       if(reflection?.texture){

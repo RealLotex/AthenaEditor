@@ -59,8 +59,8 @@ function destroyObject(id) {
 function _flushDestroyedObjects() {
     for (const object of _pendingDestroy) {
         for (const sound of object.sounds) sound.pause();
-        if (object.geom) object.geom.free();
-        if (object.body) object.body.free();
+        if (object.geom && !object.geom._freed) { object.geom.free(); object.geom._freed = true; }
+        if (object.body && !object.body._freed) { object.body.free(); object.body._freed = true; }
     }
     _pendingDestroy.clear();
 }`;

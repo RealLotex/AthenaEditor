@@ -29,6 +29,8 @@ jobs:
           mkdir _site
           cp AthenaEditor.html _site/index.html
           cp AthenaEditor.html _site/AthenaEditor.html
+          mkdir -p _site/examples
+          cp -r examples/tours _site/examples/tours
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

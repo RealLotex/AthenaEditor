@@ -133,6 +133,9 @@ function App() {
   const [cinematicPreview, setCinematicPreview] = useState(null);
   const [cinematicTime, setCinematicTime] = useState(0);
   const [timelineSelection,setTimelineSelection]=useState(null);
+  const [tourRun,setTourRun]=useState(null),[tourBusy,setTourBusy]=useState(false),[tourError,setTourError]=useState('');
+  const tourBackupRef=useRef(null),tourRunRef=useRef(null),tourAdvanceRef=useRef(false),tourGeneration=useRef(0),tourObserved=useRef(null);
+  tourRunRef.current=tourRun;
   useEffect(()=>setTimelineSelection(null),[selectedIds,selectedUIId,selectedAssetId,project.activeSceneId]);
   const [playBusy, setPlayBusy] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -331,12 +334,13 @@ function App() {
   const autosavePendingRef = useRef(false);
 
   const runAutosave = useCallback(async () => {
+    if(tourBackupRef.current)return;
     if (autosavePendingRef.current) return;
     const snapshot = projectRef.current, session = projectSessionRef.current;
     autosavePendingRef.current = true;
     try {
       await prepareRecoveryPayloads(snapshot).catch(() => {}); // Synchronous saving remains available if a worker fails.
-      if (session !== projectSessionRef.current) return;
+      if (session !== projectSessionRef.current||tourBackupRef.current) return;
       const r = saveAutosave(snapshot);
       if (r.ok) {
         lastSaveRef.current = Date.now();
@@ -661,6 +665,7 @@ function App() {
       if(prepared){const current=p.assets?.find(a=>a.name===prepared.name&&a.cat==='textures');if(current&&current.dataUrl!==prepared.dataUrl)return;putProjectAsset(p,prepared);}
       // `field` may be a dotted path — see readPath/writePath in core/util.js.
       writePath(o.components[compKey], field, value);
+      if(compKey==='particles'){o.components.particles.modules=true;if(field==='material')o.components.model.textureFile=value;}
       if (compKey === "rigidbody" && field === "eventPreset") attachEventPreset(p, sc, o, value);
       if (compKey === "rigidbody" && field === "collisionEvents" && value) sc.physics.enabled = true;
     }, phase === "edit" ? `comp:${objId}:${compKey}:${field}` : null);
@@ -1183,6 +1188,67 @@ function App() {
     setDirty(false);
     return loaded;
   }, [resetProjectDestination]);
+
+  const startGuidedTour=async id=>{
+    if(tourBackupRef.current||tourAdvanceRef.current)return;
+    tourAdvanceRef.current=true;setTourBusy(true);setTourError('');
+    try{
+      const practice=await makeTourProject(id),previous=projectRef.current;
+      if(!welcome){await prepareRecoveryPayloads(previous);const result=saveAutosave(previous);if(!result.ok)throw Error('Guardá tu proyecto antes de iniciar el tour: '+result.message);}
+      tourBackupRef.current={project:previous,history:historyRef.current,files:diskFiles,dirty:dirtyRef.current,welcome,file:projectFileRef.current,folder:folderRef.current,projectFileName,downloadedFileName,folderName,layout:prefs.layout,showAdvanced:prefs.showAdvanced,selectedIds,activeId,selectedUIId};
+      tourGeneration.current++;resetProjectDestination();setFiles([]);projectRef.current=practice;setProject(practice);historyRef.current=createHistory();
+      setWelcome(false);setDirty(false);setSelectedIds([]);setActiveId(null);setSelectedUIId(null);setSelectedAssetId(null);setTimelineSelection(null);setCinematicPreview(null);
+      setPrefs(p=>({...p,toursSeen:true,showAdvanced:['physics','lighting'].includes(id),layout:layoutPreset('Focus')}));setModal(null);setTourRun({id,index:0});
+    }catch(error){setTourError(error.message);toast.error('No se pudo iniciar el tour',{sub:error.message});}
+    finally{tourAdvanceRef.current=false;setTourBusy(false);}
+  };
+  const finishGuidedTour=()=>{
+    const backup=tourBackupRef.current;if(!backup)return;
+    tourGeneration.current++;tourBackupRef.current=null;setTourRun(null);setTourError('');setTourBusy(false);setCinematicPreview(null);setTimelineSelection(null);
+    projectSessionRef.current++;projectRef.current=backup.project;setProject(backup.project);historyRef.current=backup.history;setFiles(backup.files);setDirty(backup.dirty);setWelcome(backup.welcome);
+    projectFileRef.current=backup.file;folderRef.current=backup.folder;setProjectFileName(backup.projectFileName);setDownloadedFileName(backup.downloadedFileName);setFolderName(backup.folderName);
+    setSelectedIds(backup.selectedIds);setActiveId(backup.activeId);setSelectedUIId(backup.selectedUIId);setPrefs(p=>({...p,layout:backup.layout,showAdvanced:backup.showAdvanced,toursSeen:true}));
+    if(backup.file)fsSaveProjectFile(backup.file,backup.project.id).catch(()=>{});if(backup.folder)fsSaveHandle(backup.folder,backup.project.id).catch(()=>{});
+  };
+  const continueTourProject=()=>{
+    tourGeneration.current++;tourBackupRef.current=null;setTourRun(null);setTourError('');setTourBusy(false);setCinematicPreview(null);
+    projectSessionRef.current++;setDirty(true);
+  };
+  const previousGuidedTour=()=>{
+    if(tourAdvanceRef.current)return;
+    setTourError('');setCinematicPreview(null);setTourRun(run=>run&&({...run,index:Math.max(0,run.index-1)}));
+  };
+  const advanceGuidedTour=async()=>{
+    const run=tourRunRef.current,tour=EDITOR_TOURS.find(t=>t.id===run?.id),step=tour?.steps[run?.index];if(!step||tourAdvanceRef.current)return;
+    const generation=tourGeneration.current;tourAdvanceRef.current=true;setTourBusy(true);setTourError('');
+    try{
+      if(step.operation&&!tourOperationComplete(projectRef.current,step.operation)){
+        const prepared=await prepareTourOperation(projectRef.current,step.operation);
+        if(generation!==tourGeneration.current)return;
+        edit(p=>applyTourOperation(p,step.operation,prepared));
+      }
+      if(step.operation?.type==='previewSequence'){setCinematicPreview({sequenceId:tourSequence(projectRef.current).id,requestId:uid()});focusPanel('game');}
+      setTourRun({...run,index:run.index+1});
+    }catch(error){if(generation===tourGeneration.current)setTourError(error.message);}
+    finally{tourAdvanceRef.current=false;if(generation===tourGeneration.current)setTourBusy(false);}
+  };
+  useEffect(()=>{
+    if(!prefs.toursSeen&&!tourRun&&!tourAdvanceRef.current)startGuidedTour('basic');
+  },[prefs.toursSeen]);
+  useEffect(()=>{
+    const tour=EDITOR_TOURS.find(t=>t.id===tourRun?.id),step=tour?.steps[tourRun?.index];if(!step)return;
+    tourObserved.current={id:step.id,complete:tourOperationComplete(projectRef.current,step.operation)};
+    if(step.role){const object=tourObject(projectRef.current,step.role),hud=tourHUD(projectRef.current,step.role);if(object){setSelectedUIId(null);setSelectedIds([object.id]);setActiveId(object.id);}else if(hud){setSelectedIds([]);setActiveId(null);setSelectedUIId(hud.id);}}
+    focusPanel(step.panel);
+    if(step.panel==='inspector'&&tourRun.id==='cinematics'){
+      const trackType=step.operation?.track||(['Curvas','Keyframes'].includes(step.title)?'transform':'dialogue'),sequence=tourSequence(projectRef.current),track=sequence?.tracks.find(t=>t.type===trackType),clip=track?.clips[0];
+      if(clip)setTimelineSelection({sequenceId:sequence.id,trackId:track.id,clipId:clip.id});
+    }
+  },[tourRun?.id,tourRun?.index]);
+  useEffect(()=>{
+    const run=tourRunRef.current,step=EDITOR_TOURS.find(t=>t.id===run?.id)?.steps[run?.index],observed=tourObserved.current;
+    if(step?.operation&&observed?.id===step.id&&!observed.complete&&tourOperationComplete(project,step.operation)&&!tourAdvanceRef.current){const timer=setTimeout(()=>advanceGuidedTour(),600);return ()=>clearTimeout(timer);}
+  },[project,tourRun]);
 
   const loadProjectFile = useCallback(async (file, handle = null, recent = null) => {
       try {
@@ -2208,6 +2274,9 @@ function App() {
           }),
       },
       {
+        id:'help.tours',group:'Help',title:tr('Guided tours…'),icon:'?',run:()=>setModal('tours'),
+      },
+      {
         id: "help.docs",
         group: "Help",
         title: tr("Help & Shortcuts"),
@@ -2375,21 +2444,23 @@ function App() {
   // ── render ───────────────────────────────────────────────────────────
   const panelContents = {
     controls: <EditorControlsPanel mouse={prefs.mouseControls} hotkeys={prefs.hotkeys} commands={commands} onMouse={value=>setPref({mouseControls:normalizeEditorMouse(value)})} onHotkeys={value=>setPref({hotkeys:value})}/>,
-    environment:<EnvironmentPanel key={scene.id} scene={scene} files={files} selectedIds={selectedIds} onReflect={applyReflections} onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)} onApply={result=>edit(p=>{
+    environment:<EnvironmentPanel onSelect={id=>{select(id);focusPanel('inspector');}} key={scene.id} scene={scene} files={files} selectedIds={selectedIds} onReflect={applyReflections} onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)} onApply={result=>edit(p=>{
       const sc=p.scenes.find(s=>s.id===result.sceneId);if(!sc)return;
       for(const output of result.outputs)putProjectAsset(p,output);
       for(const update of result.updates){const o=findObj(sc.objects,update.id);if(o){o._environmentBake={model:deepClone(update.environmentSource)};o.components.model=update.model;}}
     })}/>,
     events: <EventsPanel scene={scene} files={files} project={project} selectedId={activeId} onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)}/>,
     timeline: <TimelinePanel key={scene.id} scene={scene} files={files} project={project} selectedObjectId={activeId} onProjectEdit={edit} playhead={cinematicTime}
+      guidedTrackType={EDITOR_TOURS.find(t=>t.id===tourRun?.id)?.steps[tourRun?.index]?.operation?.track}
       onSelectClip={value=>{setTimelineSelection(value);if(value)focusPanel('inspector');}}
       onEdit={(fn,tag)=>edit((p,sc)=>fn(sc),tag)}
       onPreview={id=>{setCinematicPreview({sequenceId:id,requestId:uid()});focusPanel("game");}}/>,
     game: <GameViewport key={scene.id} scene={scene} project={project} files={files} request={cinematicPreview} onTime={setCinematicTime} onCameraChange={id=>updateScene('activeCameraId',id)} onSceneUpdate={updateScene} onEditCamera={id=>{select(id,{});focusPanel('inspector');}}/>,
     terrain: <TerrainWorkspace key={project.id} scene={scene} object={activeObject} files={files} mouseControls={prefs.mouseControls}
+      guidedTool={EDITOR_TOURS.find(t=>t.id===tourRun?.id)?.steps[tourRun?.index]?.operation?.type==='terrainBrush'?EDITOR_TOURS.find(t=>t.id===tourRun?.id).steps[tourRun.index].operation.mode:undefined}
       atlasName={terrainAtlasName(project,activeId,diskFiles)} onCreate={createTerrain}
       onSelect={id => select(id)}
-      onApply={(id,data,atlas)=>edit(p=>applyEditorTerrain(p,id,data,diskFiles,atlas))}/>,
+      onApply={(id,data,atlas,prepared)=>edit(p=>applyEditorTerrain(p,id,data,diskFiles,atlas,prepared))}/>,
     viewport: (
       <>
         <SceneTools
@@ -3066,6 +3137,12 @@ function App() {
       <PanelBoundary name="Notifications" resetKey={toasts}>
         <Toasts toasts={toasts} onDismiss={dismissToast} />
       </PanelBoundary>
+      {modal==='tours'&&<PanelBoundary name="Tours" resetKey={modal}><GuidedTourPicker onStart={startGuidedTour} onClose={()=>setModal(null)}/></PanelBoundary>}
+      {tourRun&&<PanelBoundary name="Guided tour" resetKey={tourRun.id}><GuidedTour
+        tour={EDITOR_TOURS.find(t=>t.id===tourRun.id)} index={tourRun.index} busy={tourBusy} error={tourError}
+        completed={tourOperationComplete(project,EDITOR_TOURS.find(t=>t.id===tourRun.id)?.steps[tourRun.index]?.operation)}
+        onNext={advanceGuidedTour} onPrevious={previousGuidedTour} onClose={finishGuidedTour} onFinish={finishGuidedTour} onContinue={continueTourProject}
+        onSave={()=>downloadText(tourRun.id+'.atheditor',JSON.stringify(projectRef.current,null,2))}/></PanelBoundary>}
     </div>
   );
 }

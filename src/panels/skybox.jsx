@@ -57,7 +57,7 @@ function SkyboxEditor({ scene, project, files, onUpdate, onApply, onWideCamera }
       <label className="a-skybox__slider"><span>{tr("Color depth")}<output>{sky.bitDepth} {tr("bits · ")}{sky.bitDepth === 4 ? "16" : sky.bitDepth === 8 ? "256" : "32,768"} {tr("colors")}</output></span>
         <input type="range" aria-label={tr("Sky color depth")} min="0" max="2" step="1" value={SKYBOX_BIT_DEPTHS.indexOf(sky.bitDepth)} disabled={busy} onChange={e=>choose({bitDepth:SKYBOX_BIT_DEPTHS[Number(e.target.value)]},asset)} />
       </label>
-      <label className="a-skybox__slider"><span>{tr("Texture size")}<output>{sky.textureSize} × {sky.textureSize / (sky.upperOnly ? 2 : 1)}</output></span>
+      <label className="a-skybox__slider"><span>{tr("Panorama resolution")}<output>{sky.textureSize*2} × {sky.textureSize / (sky.upperOnly ? 2 : 1)}</output></span>
         <input type="range" aria-label={tr("Sky texture size")} min="0" max={SKYBOX_TEXTURE_SIZES.length - 1} step="1" value={SKYBOX_TEXTURE_SIZES.indexOf(sky.textureSize)} disabled={busy} onChange={e=>choose({textureSize:SKYBOX_TEXTURE_SIZES[Number(e.target.value)]},asset)} />
       </label>
       <label><input type="checkbox" aria-label={tr("Remove lower sky hemisphere")} checked={sky.upperOnly} disabled={busy} onChange={e=>choose({upperOnly:e.target.checked},asset)} /> {tr("Remove lower hemisphere")}</label>
@@ -73,7 +73,7 @@ function SkyboxEditor({ scene, project, files, onUpdate, onApply, onWideCamera }
         </>}
         <p className="a-skybox__hint">{tr("Backdrops use vertex colors; Mirror reuses the sky. No extra texture VRAM.")}</p>
       </>}
-      <p className="a-skybox__hint">{busy ? tr("Preparing sky textures…") : <>{sky.textureSize * 2} × {sky.textureSize / (sky.upperOnly ? 2 : 1)} {tr("panorama · ")}{sky.tiles.length ? `${sky.tiles.length} textures` : tr("one texture")} · {fmtBytes(sky.tiles.length ? sky.tiles.reduce((sum, name)=>sum + (textureVRAMBytes(files.find(f=>f.cat === "textures" && f.name === name)) || 0), 0) : textureVRAMBytes(asset) || 0)} {tr("VRAM")}</>}</p>
+      <p className="a-skybox__hint">{busy ? tr("Preparing sky textures…") : <>{sky.textureSize * 2} × {sky.textureSize / (sky.upperOnly ? 2 : 1)} {tr("panorama · ")}{sky.tiles.length ? `${sky.tiles.length} tiles (up to ${sky.textureSize} px each)` : tr("one texture")} · {fmtBytes(sky.tiles.length ? sky.tiles.reduce((sum, name)=>sum + (textureVRAMBytes(files.find(f=>f.cat === "textures" && f.name === name)) || 0), 0) : textureVRAMBytes(asset) || 0)} {tr("VRAM")}</>}</p>
       {(() => { const original = skyboxSourceSize(asset), enlarged = original && (original.width < sky.textureSize * 2 || original.height < sky.textureSize); return original && <p className={`a-skybox__hint${enlarged ? " a-skybox__error" : ""}`} role="status">{tr("Original: ")}{original.width} × {original.height}{enlarged ? tr(" · Enlarged; no additional detail. Import a larger original.") : tr(" · Converted directly from original")}</p>; })()}
       {skyboxNeedsSourceRefresh(scene, files) && <button className="a-btn" disabled={busy} onClick={() => choose({}, asset)}>{tr("Refresh from original")}</button>}
       {project && (()=>{const b=sceneVRAMBudget(scene,files,project);return <p className={`a-skybox__hint${b.total > b.capacity ? " a-skybox__error" : ""}`} role="status">{tr("Scene estimate: ")}{fmtBytes(b.total)} {tr("/ 4.0 MB · ")}{b.formats.join(" + ")}{b.total > b.capacity ? tr(" · See Problems") : ""}</p>;})()}

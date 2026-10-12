@@ -494,7 +494,7 @@ function DockWorkspace({ layout, onChange, panels, onActive, projectName, onKeyD
       </div>
       {Object.entries(panels).map(([id, panel]) => {
         const active=external.includes(id)||layout.floating.some(f=>f.panel===id)||dockGroups(layout.tree).some(g=>g.active===id&&!g.collapsed);
-        return ReactDOM.createPortal(<PanelActivityContext.Provider value={active}>{panel}</PanelActivityContext.Provider>,hosts.current[id],id);
+        return ReactDOM.createPortal(<PanelActivityContext.Provider value={active}><div data-tour-panel={id} style={{height:'100%',display:'flex',flexDirection:'column',minHeight:0}}>{panel}</div></PanelActivityContext.Provider>,hosts.current[id],id);
       })}
       {drag && (
         <>

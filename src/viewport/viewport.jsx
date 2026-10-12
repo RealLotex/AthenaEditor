@@ -681,17 +681,18 @@ function viewportPlacement(g, x, y, rect, snapStep = 0) {
 function syncVisual(g, obj, node, files, token, cancelled, scene) {
   let m = obj.components.model;
   if(m&&obj.components.water){const prepared=waterPreviewAssets(m,obj.components.water,files);m=prepared.model;files=prepared.files;}
+  if(m&&obj.components.particles){const prepared=particlePreviewAssets(m,obj.components.particles,files,obj.id);m=prepared.model;files=prepared.files;}
   if(obj._terrainPreview && m) {
     const texture=files.find(f=>f.name===m.textureFile&&f.cat==="textures");
     const textureKey=[assetRevision(texture),m.textureFilter||"LINEAR",m.texture_mapping!==false].join("|");
     const materialKey=[m.pipeline,m.shade_model,m.face_culling].join("|");
     if(node.terrainData===obj._terrainPreview&&node.terrainTextureKey===textureKey&&node.terrainMaterialKey===materialKey)return;
-    const mesh=terrainMesh(obj._terrainPreview),positions=[],uvs=[],normals=[];
-    for(const face of mesh.faces)for(const c of face){positions.push(...mesh.positions[c.v]);uvs.push(...mesh.uvs[c.uv]);normals.push(...mesh.normals[c.n]);}
+    return prepareTerrainPreview(obj._terrainPreview,'',obj.id).then(({positions,uvs,normals})=>{
+    if(cancelled()||g.loadToken!==token)return;
     const geometry=new THREE.BufferGeometry();
-    geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-    geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
-    geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
+    geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
+    geometry.setAttribute("uv",new THREE.BufferAttribute(uvs,2));
+    geometry.setAttribute("normal",new THREE.BufferAttribute(normals,3));
     let visual=node.holder.children[0];
     if(!visual?.userData.terrainPreview) {
       while(node.holder.children.length){const ch=node.holder.children[0];node.holder.remove(ch);disposeObject(ch);}
@@ -706,7 +707,8 @@ function syncVisual(g, obj, node, files, token, cancelled, scene) {
       visual.material.side=m.face_culling==="CULL_FACE_NONE"?THREE.DoubleSide:m.face_culling==="CULL_FACE_FRONT"?THREE.BackSide:THREE.FrontSide;
     }
     if(node.terrainTextureKey!==textureKey||node.terrainMaterialKey!==materialKey){visual.material.map?.dispose();visual.material.map=m.texture_mapping!==false&&texture?.dataUrl?makeTexture(texture.dataUrl,m.textureFilter):null;if(visual.material.map)visual.material.map.encoding=THREE.sRGBEncoding;visual.material.needsUpdate=true;}
-    node.terrainData=obj._terrainPreview;node.terrainTextureKey=textureKey;node.terrainMaterialKey=materialKey;node.modelKey="__terrainPreview";return;
+    node.terrainData=obj._terrainPreview;node.terrainTextureKey=textureKey;node.terrainMaterialKey=materialKey;node.modelKey="__terrainPreview";
+    }).catch(error=>console.error('Terrain preview:',error));
   }
   const assetKey = (name, cat) => {
     if (!name) return "";
@@ -758,8 +760,8 @@ function syncVisual(g, obj, node, files, token, cancelled, scene) {
       return;
     }
     node.bounds = built.bounds;
-    if(obj.components.water)configureWaterPreview(built.object3d,{...obj.components.water,textureFilter:m.textureFilter},files,()=>scene.physics?.enabled?[...g.nodes].filter(([id])=>!findObj(scene.objects,id)?.components.water&&!findObj(scene.objects,id)?.components.particles&&id!==obj.id).flatMap(([,n])=>n.holder.children):[],m.textureFile);
-    if(obj.components.particles)configureParticlePreview(built.object3d,obj.components.particles,files,m.textureFile);
+    if(obj.components.water)configureWaterPreview(built.object3d,{...obj.components.water,textureFilter:m.textureFilter},files,()=>scene.physics?.enabled?[...g.nodes].filter(([id])=>!findObj(scene.objects,id)?.components.water&&!findObj(scene.objects,id)?.components.particles&&findObj(scene.objects,id)?.components.rigidbody?.mode!=='dynamic'&&id!==obj.id).flatMap(([,n])=>n.holder.children):[],m.textureFile);
+    if(obj.components.particles)configureParticlePreview(built.object3d,obj.components.particles,files,m.textureFile,()=>[...g.nodes].filter(([id])=>id!==obj.id&&findObj(scene.objects,id)?.components.rigidbody&&findObj(scene.objects,id)?.components.rigidbody?.mode!=='trigger').flatMap(([,n])=>n.holder.children),id=>g.nodes.get(id)?.holder.children[0]?.userData.particlePreview?.state);
     if(obj.components.textureAnimation)configureFlipbookPreview(built.object3d,obj.components.textureAnimation,files,m.textureFile);
     if(obj.components.reflection)configureReflectionPreview(built.object3d,obj.components.reflection,files);
     node.holder.add(built.object3d);

@@ -4,7 +4,7 @@ import { load, PURE_MODULES } from "./_load.js";
 // Templates sit between core and the panels, so the pure set plus the
 // template modules is exactly what they need.
 const A = await load([
-  "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/components.js",
+  "core/util.js", "core/math.js", "core/shadowmath.js", "core/i18n.js", "core/particle-modules.js", "core/components.js",
   "core/skybox.js", "codegen/skybox.js",
   "core/imagesize.js", "core/vram.js",
   "core/project.js", "core/cinematics.js", "core/cinematic-playback.js", "core/timeline-authoring.js", "core/animation-mixing.js", "core/event-flows.js", "core/validate.js",

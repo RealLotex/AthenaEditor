@@ -1,6 +1,7 @@
-function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdit,onPreview,onSelectClip,playhead=0}) {
+function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdit,onPreview,onSelectClip,playhead=0,guidedTrackType}) {
   const [sequenceId,setSequenceId]=useState(null),[selection,setLocalSelection]=useState(null),[trackType,setTrackType]=useState("dialogue"),[zoom,setZoom]=useState(90);
   const drag=useRef(null);
+  useEffect(()=>{if(guidedTrackType)setTrackType(guidedTrackType);},[guidedTrackType]);
   const scroll=useRef(null),[snapStep,setSnapStep]=useState(.1);
   const [libraryOpen,setLibraryOpen]=useState(false),[libraryId,setLibraryId]=useState(''),[bindings,setBindings]=useState({}),[libraryError,setLibraryError]=useState('');
   const library=project?.sequenceLibrary||[],preset=library.find(s=>s.id===libraryId)||library[0];
@@ -18,7 +19,7 @@ function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdi
   useEffect(()=>{if(selection?.clipId){const el=[...scroll.current?.querySelectorAll('[data-clip-id]')||[]].find(el=>el.dataset.clipId===selection.clipId);el?.scrollIntoView({block:'nearest',inline:'nearest'});if(scroll.current?.ownerDocument.activeElement?.classList.contains('cin-clip'))el?.focus({preventScroll:true});}},[selection?.clipId]);
   const newClip=(type,time)=>targetNewCinematicClip(type,mkCinematicClip(type,time),scene,selectedObjectId,files);
   const update=(fn,tag=null)=>onEdit(sc=>{const s=sc.sequences.find(s=>s.id===sequence.id);if(s)fn(s);},tag);
-  const changeClip=(key,value)=>update(s=>{const c=s.tracks.find(t=>t.id===track.id).clips.find(c=>c.id===clip.id);if(key==='duration')stretchCinematicClip(c,value);else c[key]=value;},`timeline:${clip.id}:${key}`);
+  const changeClip=(key,value)=>update(s=>{const c=s.tracks.find(t=>t.id===track.id).clips.find(c=>c.id===clip.id);updateCinematicClipProperty(c,key,value);},`timeline:${clip.id}:${key}`);
   const objects=exportableObjects(scene.objects||[]);
   const problems=cinematicProblems(scene,files);
   const rulerDuration=Math.max(10,sequence?sequenceDuration(sequence)+2:10),rulerStep=Math.max(1,Math.ceil(rulerDuration/200));
@@ -52,7 +53,7 @@ function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdi
     <div className="cin-toolbar">
       <strong>{tr("Timeline")}</strong>
       <Select value={sequence?.id||""} options={(scene.sequences||[]).map(s=>({value:s.id,label:s.name}))} onChange={id=>{setSequenceId(id);setSelection(null);}}/>
-      <button className="a-btn a-btn--sm" onClick={()=>{const s=mkSequence();onEdit(sc=>{sc.sequences||=[];sc.sequences.push(s);});setSequenceId(s.id);}}>{tr("+ Sequence")}</button>
+      <button data-tour="add-sequence" className="a-btn a-btn--sm" onClick={()=>{const s=mkSequence();onEdit(sc=>{sc.sequences||=[];sc.sequences.push(s);});setSequenceId(s.id);}}>{tr("+ Sequence")}</button>
       {onProjectEdit&&<button className="a-btn a-btn--sm" onClick={()=>{setLibraryError('');setLibraryId(library[0]?.id||'');setBindings(library[0]?defaultSequenceBindings(library[0],scene):{});setLibraryOpen(true);}}>{tr("Sequence library…")}</button>}
       {sequence&&onProjectEdit&&<button className="a-btn a-btn--sm" onClick={()=>onProjectEdit((p,sc)=>saveSequencePreset(p,sc,sc.sequences.find(s=>s.id===sequence.id)))}>{tr("Save reusable sequence")}</button>}
       {sequence&&<><button className="a-btn a-btn--sm" disabled={previewProblems.length>0} onClick={()=>onPreview(sequence.id)}>{tr("▶ Preview in Game")}</button><button className="a-btn a-btn--sm" onClick={()=>{onEdit(sc=>sc.sequences=sc.sequences.filter(s=>s.id!==sequence.id));setSelection(null);}}>{tr("Delete sequence")}</button></>}
@@ -68,7 +69,7 @@ function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdi
           {field("Only with",<Select value={sequence.event.otherId||""} options={[{value:"",label:tr("Any collider")},...colliderOptions.slice(1).filter(o=>o.value!==sequence.event.objectId)]} onChange={id=>update(s=>s.event.otherId=id)}/>)}
         </>}
       </div>
-      <div className="cin-toolbar"><Select value={trackType} options={CINEMATIC_TRACKS.map(t=>({value:t.id,label:tr(t.label)}))} onChange={setTrackType}/>
+      <div className="cin-toolbar"><div data-tour="channel-type"><Select value={trackType} options={CINEMATIC_TRACKS.map(t=>({value:t.id,label:tr(t.label)}))} onChange={setTrackType}/></div>
         <button className="a-btn a-btn--sm" onClick={()=>update(s=>s.tracks.push(mkCinematicTrack(trackType)))}>{tr("+ Channel")}</button>
         <span>{tr("Drag clips to move · Drag edges to resize · Seconds")}</span>
         <label>{tr("Zoom ")}<input aria-label={tr("Timeline zoom")} type="range" min="5" max="180" value={zoom} onChange={e=>setZoom(+e.target.value)}/></label>
@@ -79,16 +80,16 @@ function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdi
         <div className="cin-ruler" style={{marginLeft:180}}>{Array.from({length:Math.ceil(rulerDuration/rulerStep)},(_,i)=><span key={i} style={{left:i*rulerStep*zoom}}>{i*rulerStep}s</span>)}</div>
         {sequence.tracks.map(t=><div className="cin-track" key={t.id}>
           <div className="cin-track-label"><input aria-label={tr("Channel name")} value={t.name} onChange={e=>update(s=>s.tracks.find(x=>x.id===t.id).name=e.target.value,`track-name:${t.id}`)}/>
-            <button title={tr("Add clip")} onClick={()=>{const c=newClip(t.type,Math.max(0,...t.clips.map(c=>c.start+c.duration)));update(s=>s.tracks.find(x=>x.id===t.id).clips.push(c));setSelection({trackId:t.id,clipId:c.id});}}>+</button>
+            <button data-tour-add-clip={t.type} title={tr("Add clip")} onClick={()=>{const c=newClip(t.type,Math.max(0,...t.clips.map(c=>c.start+c.duration)));update(s=>s.tracks.find(x=>x.id===t.id).clips.push(c));setSelection({trackId:t.id,clipId:c.id});}}>+</button>
             <button title={tr("Delete channel")} onClick={()=>{update(s=>s.tracks=s.tracks.filter(x=>x.id!==t.id));setSelection(null);}}>×</button>
           </div>
-          <div className="cin-lane" style={{minHeight:channelRows.get(t.id).count*65}} onDoubleClick={e=>{if(e.target!==e.currentTarget)return;const r=e.currentTarget.getBoundingClientRect();const c=newClip(t.type,snapCinematicTime((e.clientX-r.left)/zoom,snapStep));update(s=>s.tracks.find(x=>x.id===t.id).clips.push(c));setSelection({trackId:t.id,clipId:c.id});}}>
+          <div className="cin-lane" style={{minHeight:channelRows.get(t.id).count*(t.type==='dialogue'?150:65)}} onDoubleClick={e=>{if(e.target!==e.currentTarget)return;const r=e.currentTarget.getBoundingClientRect();const c=newClip(t.type,snapCinematicTime((e.clientX-r.left)/zoom,snapStep));update(s=>s.tracks.find(x=>x.id===t.id).clips.push(c));setSelection({trackId:t.id,clipId:c.id});}}>
             <div className="cin-playhead" style={{left:playhead*zoom}}/>
-            {t.clips.map(c=><div className={`cin-clip cin-clip--${t.type} ${selection?.clipId===c.id?'is-selected':''}`} key={c.id} data-clip-id={c.id} role="button" tabIndex={0} aria-label={c.name} aria-pressed={selection?.clipId===c.id} style={{top:5+channelRows.get(t.id).rows.get(c.id)*65,left:c.start*zoom,width:Math.max(12,c.duration*zoom)}} onPointerDown={e=>startDrag(e,t,c,'move')} onPointerMove={moveDrag} onPointerUp={()=>drag.current=null} onPointerCancel={()=>drag.current=null}>
+            {t.clips.map(c=><div className={`cin-clip cin-clip--${t.type} ${selection?.clipId===c.id?'is-selected':''}`} key={c.id} data-clip-id={c.id} role="button" tabIndex={0} aria-label={c.name} aria-pressed={selection?.clipId===c.id} style={{top:5+channelRows.get(t.id).rows.get(c.id)*(t.type==='dialogue'?150:65),left:c.start*zoom,width:Math.max(12,c.duration*zoom)}} onPointerDown={e=>startDrag(e,t,c,'move')} onPointerMove={moveDrag} onPointerUp={()=>drag.current=null} onPointerCancel={()=>drag.current=null}>
               <span className="cin-edge cin-edge--left" onPointerDown={e=>startDrag(e,t,c,'start')}/>
               <div className="cin-clip-title">{c.name} · {c.start.toFixed(1)}s</div>
               {c.keys?.map(key=><span key={key.id} className="cin-key-marker" style={{left:`${key.time/c.duration*100}%`}} title={`Keyframe ${key.time.toFixed(2)}s`}>◆</span>)}
-              {t.type==='dialogue'?<textarea aria-label={tr("Dialogue clip text")} value={c.text} onPointerDown={e=>{e.stopPropagation();setSelection({trackId:t.id,clipId:c.id});}} onChange={e=>update(s=>s.tracks.find(x=>x.id===t.id).clips.find(x=>x.id===c.id).text=e.target.value,`dialogue:${c.id}`)}/>:<span>{c.duration.toFixed(1)}s</span>}
+              {t.type==='dialogue'?<DialogueInput key={c.id} value={c.text} onSelect={()=>setSelection({trackId:t.id,clipId:c.id})} onChange={value=>update(s=>{const target=s.tracks.find(x=>x.id===t.id)?.clips.find(x=>x.id===c.id);if(target)target.text=value;},`dialogue:${c.id}`)}/>:<span>{c.duration.toFixed(1)}s</span>}
               <span className="cin-edge cin-edge--right" onPointerDown={e=>startDrag(e,t,c,'end')}/>
             </div>)}
           </div>
@@ -111,7 +112,7 @@ function TimelinePanel({scene,files,project,selectedObjectId,onEdit,onProjectEdi
 }
 function TimelineCurve({value,bezier,onCurve,onBezier}) {
   return <div className="cin-key-curve"><Field label={tr("Interpolation")}><Select value={value||'linear'} options={localizeEditorOptions(CINEMATIC_CURVES)} onChange={onCurve}/></Field>
-    {value==='bezier'&&['X1','Y1','X2','Y2'].map((axis,i)=><Field key={axis} label={axis}><NumInput value={(bezier||[.25,.1,.25,1])[i]} min={i%2?undefined:0} max={i%2?undefined:1} onChange={v=>{const copy=[...(bezier||[.25,.1,.25,1])];copy[i]=v;onBezier(copy);}}/></Field>)}
+    {['X1','Y1','X2','Y2'].map((axis,i)=><Field key={axis} label={axis}><NumInput value={(bezier||[.25,.1,.25,1])[i]} min={i%2?undefined:0} max={i%2?undefined:1} onChange={v=>{const copy=[...(bezier||[.25,.1,.25,1])];copy[i]=v;onBezier(copy);}}/></Field>)}
   </div>;
 }
 function TimelineKeyframes({type,clip,onChange}) {
@@ -140,9 +141,9 @@ function TimelineClipProperties({scene,files,selection,onEdit,onSelect}) {
   const objects=exportableObjects(scene.objects||[]),objectOptions=[{value:'',label:tr("Choose object…")},...objects.filter(o=>o.components.model).map(o=>({value:o.id,label:o.name}))];
   const update=(fn,tag=null)=>onEdit(sc=>{const s=sc.sequences.find(s=>s.id===sequence.id);if(s)fn(s);},tag);
   const setSelection=value=>onSelect?.(value?{sequenceId:sequence.id,...value}:null);
-  const changeClip=(key,value)=>update(s=>{const c=s.tracks.find(t=>t.id===track.id)?.clips.find(c=>c.id===clip.id);if(!c)return;if(key==='duration')stretchCinematicClip(c,value);else c[key]=value;},'timeline:'+clip.id+':'+key);
+  const changeClip=(key,value)=>update(s=>{const c=s.tracks.find(t=>t.id===track.id)?.clips.find(c=>c.id===clip.id);if(!c)return;updateCinematicClipProperty(c,key,value);},'timeline:'+clip.id+':'+key);
   const field=(label,node)=><Field label={tr(label)}>{node}</Field>,text=key=><TextInput value={clip[key]||''} onChange={v=>changeClip(key,v)}/>,number=(key,min=0)=><NumInput value={clip[key]} min={min} step={.1} onChange={v=>changeClip(key,v)}/>,vector=key=><Vec3Input value={clip[key]} onChange={v=>changeClip(key,v)} step={.1}/>;
-  const section=(title,children)=><Section title={tr(title)} open={open[title]!==false} onToggle={()=>setOpen(o=>({...o,[title]:o[title]===false}))}>{children}</Section>;
+  const section=(title,children)=><section className="cin-property-group"><h3>{tr(title)}</h3>{children}</section>;
   return <><PanelHeader title={clip.name||'Clip'}/><div className="a-scroll cin-properties">
     {section('Timing',<>
         {field("Clip",text('name'))}{field("Start",number('start'))}{field("Duration",number('duration',.1))}
@@ -152,14 +153,14 @@ function TimelineClipProperties({scene,files,selection,onEdit,onSelect}) {
     {['portrait','sfx','voice','animation'].includes(track.type)&&section('Asset',<>        {['portrait','sfx','voice','animation'].includes(track.type)&&field("Asset",<AssetSelect value={clip.file} files={files} cat={track.type==='portrait'?'textures':track.type==='animation'?'models':'sounds'} onChange={v=>changeClip('file',v)}/>)}
 </>)}
     {['dialogue','portrait','panel'].includes(track.type)&&section('Layout and appearance',<>        {['dialogue','portrait','panel'].includes(track.type)&&<>{field("X",number('x'))}{field("Y",number('y'))}{field("Width",number('width',1))}{field("Height",number('height',1))}{field('Fade in',number('fadeIn'))}{field('Fade out',number('fadeOut'))}</>}
-        {track.type==='dialogue'&&<>{field("Speaker",text('speaker'))}{field("Font size",number('fontSize',1))}</>}
+        {track.type==='dialogue'&&<>{field('Text',<DialogueInput key={clip.id} label={tr('Dialogue text')} value={clip.text} onChange={value=>changeClip('text',value)}/>)}{field("Speaker",text('speaker'))}{field("Font size",number('fontSize',1))}</>}
         {track.type==='panel'&&field("Color",<Color255Input value={clip.color} alpha onChange={v=>changeClip('color',v)}/>)}
 </>)}
-    {['transform','camera','fade'].includes(track.type)&&section('Motion',<>        {track.type==='transform'&&<>{field("Component property",<Select value={clip.property} options={['position','rotation','scale'].map(value=>({value,label:value==='rotation'?'Rotation (radians)':value}))} onChange={v=>changeClip('property',v)}/>)}{!clip.keys?.length&&<>{field("From",vector('from'))}{field("To",vector('to'))}</>}</>}
-        {track.type==='camera'&&<>{field('Transition in',number('transitionIn'))}{!clip.keys?.length&&<>{field("From position",vector('position'))}{field("From target",vector('target'))}{field("To position",vector('toPosition'))}{field("To target",vector('toTarget'))}</>}</>}
-        {track.type==='fade'&&<>{field('Color',<Color255Input value={clip.color} onChange={v=>changeClip('color',v)}/>)}{!clip.keys?.length&&<>{field('From opacity',<NumInput value={clip.fromAlpha} min={0} max={128} onChange={v=>changeClip('fromAlpha',v)}/>)}{field('To opacity',<NumInput value={clip.toAlpha} min={0} max={128} onChange={v=>changeClip('toAlpha',v)}/>)}</>}</>}
+    {['transform','camera','fade'].includes(track.type)&&section('Motion',<>        {track.type==='transform'&&<>{field("Component property",<Select value={clip.property} options={['position','rotation','scale'].map(value=>({value,label:value==='rotation'?'Rotation (radians)':value}))} onChange={v=>changeClip('property',v)}/>)}{<>{field("From",vector('from'))}{field("To",vector('to'))}</>}</>}
+        {track.type==='camera'&&<>{field('Transition in',number('transitionIn'))}{<>{field("From position",vector('position'))}{field("From target",vector('target'))}{field("To position",vector('toPosition'))}{field("To target",vector('toTarget'))}</>}</>}
+        {track.type==='fade'&&<>{field('Color',<Color255Input value={clip.color} onChange={v=>changeClip('color',v)}/>)}{<>{field('From opacity',<NumInput value={clip.fromAlpha} min={0} max={128} onChange={v=>changeClip('fromAlpha',v)}/>)}{field('To opacity',<NumInput value={clip.toAlpha} min={0} max={128} onChange={v=>changeClip('toAlpha',v)}/>)}</>}</>}
         {['transform','camera','fade'].includes(track.type)&&<>
-          {!clip.keys?.length&&<TimelineCurve value={clip.curve} bezier={clip.bezier} onCurve={v=>changeClip('curve',v)} onBezier={v=>changeClip('bezier',v)}/>}
+          {<TimelineCurve value={clip.curve} bezier={clip.bezier} onCurve={v=>changeClip('curve',v)} onBezier={v=>changeClip('bezier',v)}/>}
           <TimelineKeyframes key={clip.id} type={track.type} clip={clip} onChange={keys=>changeClip('keys',keys)}/>
         </>}
 </>)}
@@ -167,7 +168,8 @@ function TimelineClipProperties({scene,files,selection,onEdit,onSelect}) {
         {track.type==='animation'&&<>{field('Weight',<NumInput value={clip.weight??1} min={0} max={1} step={.05} onChange={v=>changeClip('weight',v)}/>)}{field('Blend in',number('blendIn'))}{field('Blend out',number('blendOut'))}{field('Blend curve',<Select value={clip.curve||'linear'} options={localizeEditorOptions(CINEMATIC_CURVES.filter(c=>c.value!=='bezier'))} onChange={v=>changeClip('curve',v)}/>)}</>}
         {['animation','sfx','voice'].includes(track.type)&&field("Loop",<Checkbox value={clip.loop} onChange={v=>changeClip('loop',v)}/>)}
         {track.type==='mesh'&&field("Visible",<Checkbox value={clip.visible} onChange={v=>changeClip('visible',v)}/>)}
-        {track.type==='particles'&&(objects.find(o=>o.id===clip.objectId)?.components.particles?<span>{tr("Plays this emitter during the clip. Adjust its effect in Properties.")}</span>:<>{field("Instances (1–64)",<NumInput value={clip.count} min={1} max={64} integer onChange={v=>changeClip('count',v)}/>)}{field("Speed",number('speed'))}{field("Size",number('size',.001))}<span>{tr("Uses the selected Model as a pooled particle mesh.")}</span></>)}</>)}
+        {track.type==='particles'&&<>{field("Instances (1–64)",<NumInput value={clip.count} min={1} max={64} integer onChange={v=>changeClip('count',v)}/>)}{field("Speed",number('speed'))}{field("Size",number('size',.001))}<p className="a-dim">{tr('These instance controls apply to plain models. A particle emitter uses its complete settings below.')}</p></>}</>)}
+    {track.type==='particles'&&objects.find(o=>o.id===clip.objectId)?.components.particles&&section('Emitter settings',<ComponentFields compKey="particles" comp={objects.find(o=>o.id===clip.objectId).components.particles} obj={objects.find(o=>o.id===clip.objectId)} scene={scene} files={files} alwaysAdvanced onChange={(key,value)=>onEdit(sc=>{const o=findObj(sc.objects,clip.objectId);writePath(o.components.particles,key,value);o.components.particles.modules=true;if(key==='material')o.components.model.textureFile=value;},'clip-emitter:'+clip.id+':'+key)}/>)}
     <div className="a-toolbar">        <button className="a-btn a-btn--sm" onClick={()=>{let copy;update(s=>copy=duplicateCinematicClip(s,track.id,clip.id));setSelection({trackId:track.id,clipId:copy.id});}}>{tr("Duplicate clip")}</button>
         <button className="a-btn a-btn--sm" onClick={()=>{update(s=>{const t=s.tracks.find(t=>t.id===track.id);t.clips=t.clips.filter(c=>c.id!==clip.id);});setSelection(null);}}>{tr("Delete clip")}</button>
 </div>

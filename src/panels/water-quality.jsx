@@ -15,9 +15,10 @@ function WaterQualityControls({comp,obj,files,onChange,mixedFields=[]}) {
     <div className="a-row"><button disabled={busy} className="a-btn a-btn--sm" onClick={()=>change('quality',{textureSize:32,transparency:0,panning:0,waves:0,caustics:0,pattern:0},'commit')}>{tr("Ultra low")}</button>
       <button disabled={busy} className="a-btn a-btn--sm" onClick={()=>change('quality',{textureSize:512,transparency:1,panning:4,waves:4,caustics:4,pattern:4},'commit')}>{tr("Maximum")}</button></div>
     {busy&&<p className="a-skybox__hint" role="status">{tr("Preparing texture quality…")}</p>}
+    <Field fieldKey='updateRate' label={tr('Update frequency')}><Select value={comp.updateRate||60} options={[5,10,15,30,60].map(value=>({value,label:value+' Hz ('+value+' FPS)'}))} onChange={v=>change('updateRate',v,'commit')}/></Field>
     {slider('textureSize','Texture size',4,`${quality.textureSize} × ${quality.textureSize}`)}
     {slider('transparency','Transparency',1,tr(quality.transparency?'Transparent':'Opaque'))}
-    {slider('pattern','Pattern animation',4,quality.pattern&&estimate.frames>1?`${[0,4,8,12,16][quality.pattern]} FPS`:tr('Static'))}
+    {slider('pattern','Pattern animation',4,quality.pattern&&estimate.frames>1?`${Math.round(estimate.patternRate)} FPS`:tr('Static'))}
     {slider('panning','Texture movement',4,quality.panning?`${tr(WATER_QUALITY_LABELS[quality.panning])} · up to ${WATER_QUALITY_RATES[quality.panning]} Hz`:tr('Off'))}
     {slider('waves','Mesh waves',4,`${quality.waves?tr(WATER_QUALITY_LABELS[quality.waves]):tr('Off')} · ${estimate.triangles} triangles`)}
     {slider('caustics','Caustics',4,quality.caustics?tr(WATER_QUALITY_LABELS[quality.caustics]):tr('Off'))}

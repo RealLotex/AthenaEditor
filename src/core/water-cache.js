@@ -1,13 +1,13 @@
 function waterTextureForQuality(asset,value,files=[]) {
   if(!asset?.waterMotion&&!asset?.waterQualityLevels)return asset;
   const quality=normalizedWaterQuality(value?.quality),motion=asset.waterMotion||{frames:[asset],fps:0};
-  const levels=asset.waterQualityLevels||motion.levels||(asset.owned&&asset.waterRevision===3&&typeof WATER_MOTION_DATA!=='undefined'&&asset.dataUrl===WATER_MOTION_DATA.frames[0].dataUrl?WATER_MOTION_DATA.levels:{});
+  const levels=asset.waterQualityLevels||motion.levels||(asset.owned&&[3,4].includes(asset.waterRevision)&&typeof WATER_MOTION_DATA!=='undefined'&&asset.dataUrl===WATER_MOTION_DATA.frames[0].dataUrl?WATER_MOTION_DATA.levels:{});
   const size=levels?.[quality.textureSize]?quality.textureSize:asset.image?.width||asset.imageSize?.width||512;
   const source=levels?.[size]||motion.frames,count=[1,8,16,24,32][quality.pattern];
   const frames=Array.from({length:Math.min(count,source.length)},(_,i)=>source[Math.floor(i*source.length/Math.min(count,source.length))]);
   const name=size===asset.image?.width?asset.name:freeAssetName(files,asset.name.replace(/\.[^.]+$/,'')+'_'+size,'png');
   const format=textureFormatOfAsset(frames[0]),image={...(imageSize(bytesFromDataUrl(frames[0].dataUrl,64),name)||{width:size,height:size,format:'png'}),bpp:format==='T4'?4:format==='T8'?8:/16/.test(format||'')?16:32};
-  return {...asset,...frames[0],name,image,imageSize:image,waterMotion:{frames,fps:[0,4,8,12,16][quality.pattern]}};
+  return {...asset,...frames[0],name,image,imageSize:image,waterMotion:{frames,fps:quality.pattern?(motion.fps||60)*frames.length/source.length:0}};
 }
 
 // Cache complete geometry poses once, then transfer contiguous buffers in C.
@@ -18,7 +18,8 @@ function advanceCachedWaterArrays(state,dt) {
   state.u=(state.u+w.flow.x*step)%1;state.v=(state.v+w.flow.z*step)%1;
   if(state.frameCount>1){
     clock[1]=(clock[1]+step*w.waveSpeed)%(state.frameCount/state.frameRate);
-    state.textureFrame=Math.floor(clock[1]*state.frameRate)%state.frameCount;
+    if(!state.patternTick)state.patternTick=new Float64Array([0,1/w.textureUpdateRate]);state.patternTick[0]+=step;
+    if(step===0||state.patternTick[0]>=state.patternTick[1]){state.patternTick[0]%=state.patternTick[1];state.textureFrame=Math.floor(clock[1]*state.frameRate)%state.frameCount;}
   }
   const pose=Math.floor(clock[0]*c.poses/(Math.PI*2))%c.poses;
   clock[2]+=step;clock[3]+=step;
@@ -60,7 +61,7 @@ function waterPerformanceEstimate(object,files) {
   const drawing=(triangles+projectedTriangles)/512*.35,blend=w.quality.transparency?.25:0,uploads=(texture?.image?.width||512)**2/512**2*(texture?.waterMotion?.frames?.length>1?[0,.03,.06,.09,.12][w.quality.pattern]:0);
   const low=cpu+drawing+blend+uploads,high=low+(.3+w.quality.transparency*.8)*(texture?.image?.width||512)/512;
   const cacheBytes=waterGeometryCacheLayout(corners,w,!!object.components.reflection).bytes;
-  return {low,high,cpu,triangles,projectedTriangles,textureSize:texture?.image?.width||0,textureBytes:textureVRAMBytes(texture)||0,frames:texture?.waterMotion?.frames?.length||1,cacheBytes,uvRate,waveRate:w.waveHeight?w.waveUpdateRate:0};
+  return {low,high,cpu,triangles,projectedTriangles,textureSize:texture?.image?.width||0,textureBytes:textureVRAMBytes(texture)||0,frames:texture?.waterMotion?.frames?.length||1,patternRate:Math.min(w.textureUpdateRate,(texture?.waterMotion?.fps||0)*w.waveSpeed),cacheBytes,uvRate,waveRate:w.waveHeight?w.waveUpdateRate:0};
 }
 
 function waterGeometryCacheLayout(corners,w,reflection=false) {

@@ -25,7 +25,7 @@ function configureWaterPreview(root, value, files, receivers=()=>[], textureName
     texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
     const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,opacity:settings.causticStrength,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
     const mesh=new THREE.Mesh(geometry,material);mesh.renderOrder=1;mesh.frustumCulled=false;root.add(mesh);
-    root.userData.waterCaustics={mesh,base:new Float32Array(geometry.attributes.position.array),clock:1,settings,receivers,ray:new THREE.Raycaster(),point:new THREE.Vector3(),down:new THREE.Vector3(0,-1,0)};
+    root.userData.waterCaustics={mesh,base:new Float32Array(geometry.attributes.position.array),clock:1,settings,receivers,cursor:0,snapshot:[],ray:new THREE.Raycaster(),point:new THREE.Vector3(),down:new THREE.Vector3(0,-1,0)};
   }
 }
 
@@ -38,13 +38,25 @@ function advanceWaterPreview(root,dt) {
   }
   const c=root.userData.waterCaustics;if(!c)return;
   const state=root.userData.waterEntries[0];if(state)c.mesh.material.map.offset.set(state.u,state.v);
-  c.clock+=dt;if(c.clock<.1)return;c.clock%=.1;
-  root.updateMatrixWorld(true);const positions=c.mesh.geometry.attributes.position.array,targets=c.receivers();
-  for(let i=0;i<positions.length;i+=3){
-    c.point.set(c.base[i],0,c.base[i+2]).applyMatrix4(root.matrixWorld);const surface=c.point.y;
-    c.point.y+=.1;c.ray.set(c.point,c.down);c.ray.near=.001;c.ray.far=c.settings.depth+.1;
-    const hits=targets.length?c.ray.intersectObjects(targets,true):[],y=hits.length?hits[0].point.y+.02:surface-c.settings.depth+.02;
-    c.point.set(c.point.x,y,c.point.z);root.worldToLocal(c.point);positions[i]=c.point.x;positions[i+1]=c.point.y;positions[i+2]=c.point.z;
+  c.clock+=dt;if(c.clock<.1&&!c.projecting)return;c.clock%=.1;
+  root.updateMatrixWorld(true);
+  const positions=c.mesh.geometry.attributes.position.array,meshes=[];
+  for(const target of c.receivers())target.traverse(node=>{if(node.isMesh&&node.visible&&node.geometry?.attributes.position){node.updateWorldMatrix(true,false);meshes.push(node);}});
+  const changed=c.snapshot.length!==meshes.length||meshes.some((mesh,i)=>{const saved=c.snapshot[i];return saved?.mesh!==mesh||saved.geometry!==mesh.geometry||saved.version!==mesh.geometry.attributes.position.version||mesh.matrixWorld.elements.some((v,k)=>saved.matrix[k]!==v);})||!c.rootMatrix||root.matrixWorld.elements.some((v,k)=>c.rootMatrix[k]!==v);
+  if(changed){
+    c.snapshot=meshes.map(mesh=>({mesh,geometry:mesh.geometry,version:mesh.geometry.attributes.position.version,matrix:[...mesh.matrixWorld.elements]}));
+    c.rootMatrix=[...root.matrixWorld.elements];c.index=new EnvironmentOcclusionIndex(meshes);c.cursor=0;c.projecting=true;
+  }
+  if(!c.projecting)return;
+  const deadline=performance.now()+2;
+  // Only geometry/transform changes invalidate the static seafloor. Spread even
+  // that projection over frames; texture panning remains independent and smooth.
+  while(c.cursor<positions.length){
+    const i=c.cursor;c.point.set(c.base[i],0,c.base[i+2]).applyMatrix4(root.matrixWorld);const surface=c.point.y;
+    c.point.y+=.1;const distance=c.index.trace(c.point,c.down,c.settings.depth+.1),y=distance!==null?c.point.y-distance+.02:surface-c.settings.depth+.02;
+    c.point.y=y;root.worldToLocal(c.point);positions[i]=c.point.x;positions[i+1]=c.point.y;positions[i+2]=c.point.z;c.cursor+=3;
+    if(performance.now()>deadline)break;
   }
   c.mesh.geometry.attributes.position.needsUpdate=true;
+  if(c.cursor>=positions.length)c.projecting=false;
 }

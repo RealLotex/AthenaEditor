@@ -31,13 +31,13 @@ Deno.test("release constructor resets do not override shared NEAREST images and 
   assertEquals(datas.map(data=>data.shade_model),[1,1,0]);
 });
 
-Deno.test("embedded filtering applies to every material texture without recreating clone images",()=>{
+Deno.test("embedded filtering applies to all independently owned GLTF material textures",()=>{
   const {images,datas}=runMeshes([
     ["Embedded",{file:"a.glb",textureFilter:"NEAREST"}],
-    ["Clone",{file:"a.glb",textureFilter:"NEAREST",shade_model:"SHADE_FLAT"}],
+    ["Variant",{file:"a.glb",textureFilter:"NEAREST",shade_model:"SHADE_FLAT"}],
     ["Linear",{file:"b.obj",textureFile:"atlas.png",textureFilter:"LINEAR"}],
   ]);
-  assertEquals(images.map(image=>image.filter),[1,0,0]);
+  assertEquals(images.map(image=>image.filter),[1,0,0,0,0]);
   assertEquals(datas.map(data=>data.shade_model),[1,0,1]);
 });
 

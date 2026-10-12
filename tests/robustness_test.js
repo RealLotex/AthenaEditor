@@ -12,7 +12,7 @@ import { load } from "./_load.js";
 const A = await load([
   "core/util.js", "core/math.js", "core/shadowmath.js", "core/imagesize.js", "core/vram.js",
   "core/skybox.js",
-  "core/components.js", "core/project.js", "core/validate.js", "core/recovery-codec.js", "core/storage.js",
+  "core/particle-modules.js", "core/components.js", "core/project.js", "core/validate.js", "core/recovery-codec.js", "core/storage.js",
 ]);
 
 // ── a diagnostic's one-click fix ───────────────────────────────────────

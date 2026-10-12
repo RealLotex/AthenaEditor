@@ -1,0 +1,16 @@
+import {load,shutdown} from '../tests/_load.js';
+const vendor=await Deno.readTextFile('vendor/three.js'),module={exports:{}};new Function('module','exports',vendor)(module,module.exports);globalThis.THREE=module.exports;
+try{
+  const A=await load(),previous=await new Deno.Command('git',{args:['show','26a5b47:src/viewport/water.js']}).output();
+  const build=source=>new Function('THREE','normalizedWater','waterTextureForQuality','waterFrameAssets','makeTexture','advanceWaterArrays','WATER_QUALITY_GRIDS','EnvironmentOcclusionIndex',source+';return {configureWaterPreview,advanceWaterPreview};')(THREE,A.normalizedWater,A.waterTextureForQuality,A.waterFrameAssets,()=>new THREE.Texture(),A.advanceWaterArrays,A.WATER_QUALITY_GRIDS,A.EnvironmentOcclusionIndex);
+  const old=build(new TextDecoder().decode(previous.stdout)),next=build(await Deno.readTextFile('src/viewport/water.js'));
+  const terrain=A.terrainBrush(A.makeTerrain(32,32),{x:0,z:0},{mode:'hills',size:9,strength:.5}),buffers=A.terrainPreviewBuffers(terrain),groundGeometry=new THREE.BufferGeometry();groundGeometry.setAttribute('position',new THREE.BufferAttribute(buffers.positions,3));groundGeometry.computeVertexNormals();
+  const ground=new THREE.Mesh(groundGeometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));ground.updateMatrixWorld(true);
+  const settings={caustics:true,depth:5,causticTexture:'pattern.png',waveHeight:.04,flow:{x:.02,z:.01},updateRate:60,quality:{textureSize:512,panning:4,waves:4,caustics:4,pattern:4,transparency:1}};
+  const run=(api,enabled)=>{const root=new THREE.Group();root.position.y=2;root.scale.set(32,1,32);root.add(new THREE.Mesh(new THREE.PlaneGeometry(1,1,16,16).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:new THREE.Texture()})));root.updateMatrixWorld(true);api.configureWaterPreview(root,{...settings,caustics:enabled,quality:{...settings.quality,caustics:enabled?4:0}},[{name:'pattern.png',cat:'textures',dataUrl:'test'}],()=>[ground]);const samples=[];for(let frame=0;frame<180;frame++){const start=performance.now();api.advanceWaterPreview(root,1/60);samples.push(performance.now()-start);}return {firstFrame:samples[0],steadyMean:samples.slice(60).reduce((sum,v)=>sum+v,0)/120,max:Math.max(...samples),projectionComplete:!root.userData.waterCaustics?.projecting};};
+  const trials=[];for(let i=0;i<3;i++)trials.push({old:run(old,true),next:run(next,true),withoutCaustics:run(next,false)});
+  const directStart=performance.now();A.terrainPreviewBuffers(terrain,'Terrain');const direct=performance.now()-directStart;
+  const heartbeat=[];let last=performance.now();const timer=setInterval(()=>{const now=performance.now();heartbeat.push(now-last);last=now;},5);const start=performance.now();await A.prepareTerrainPreview(terrain,'Terrain');const worker=performance.now()-start;clearInterval(timer);A.disposeTerrainPreviewWorker();
+  const report={scope:'CPU preview update only, Deno + vendored Three.js, 32x32 terrain, Ultra settings. Excludes browser GPU/presentation.',trials,terrain:{directMS:direct,workerWallMS:worker,maxHeartbeatGapMS:Math.max(...heartbeat),heartbeatSamples:heartbeat.length}};
+  await Deno.writeTextFile('.verification/oct12-editor-performance.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+}finally{await shutdown();}

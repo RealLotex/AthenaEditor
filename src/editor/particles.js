@@ -21,5 +21,23 @@ function addParticleObject(project,scene,preset,assets,external=[]) {
   object.components.particles={...makeComponent('particles'),preset};
   if(preset==='splash')Object.assign(object.components.particles,{loop:false,lifetime:.8,speed:4,spread:1.5,count:20});
   if(preset==='fountain')Object.assign(object.components.particles,{lifetime:1.5,speed:6,spread:.6,rate:16});
+  const defaults=normalizedParticles(object.components.particles);
+  Object.assign(object.components.particles,{lifetimeMin:object.components.particles.lifetime??defaults.lifetimeMin,lifetimeMax:object.components.particles.lifetime??defaults.lifetimeMax,speedMin:object.components.particles.speed??defaults.speedMin,speedMax:object.components.particles.speed??defaults.speedMax,sizeMin:object.components.particles.size??defaults.sizeMin,sizeMax:object.components.particles.size??defaults.sizeMax,gravityModifier:preset==='bubbles'?0:1});
+  if(preset==='splash')Object.assign(object.components.particles,{rate:0,duration:.04,bursts:[{time:0,count:20,cycles:1,interval:.1}]});
   scene.objects.push(object);return object;
+}
+
+function particleMeshAssetForSettings(settings,files,ownerId) {
+  if(settings.renderMode!=='mesh')return null;
+  const source=files.find(f=>f.cat==='models'&&f.name===settings.meshFile);
+  if(!source?.content||!/\.obj$/i.test(source.name))throw Error('Mesh particles require an imported OBJ.');
+  const base=readMeshOBJ(source.content);if(base.faces.length>256)throw Error('Particle meshes support up to 256 triangles per instance.');
+  const mesh={positions:[],uvs:[],normals:[],faces:[]};
+  for(let i=0;i<settings.count;i++)for(const face of base.faces){const corners=[];for(const c of face){const v=mesh.positions.push(base.positions[c.v])-1,uv=mesh.uvs.push(base.uvs[c.uv]||[0,0])-1,n=mesh.normals.push(base.normals[c.n]||[0,1,0])-1;corners.push({v,uv,n});}mesh.faces.push(corners);}
+  return {...textMeshAsset('particle_'+ident(ownerId)+'_pool.obj',writeMeshOBJ(mesh)),particleCorners:base.faces.length*3};
+}
+
+function particlePreviewAssets(model,value,files,ownerId) {
+  const settings=normalizedParticles(value),pool=particleMeshAssetForSettings(settings,files,ownerId);
+  return pool?{model:{...model,file:pool.name},files:[...files,pool]}:{model,files};
 }

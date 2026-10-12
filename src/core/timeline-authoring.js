@@ -66,6 +66,15 @@ function stretchCinematicClip(clip,duration) {
   for(const key of ['fadeIn','fadeOut','transitionIn','blendIn','blendOut'])if(clip[key])clip[key]*=ratio;
   clip.duration=duration;
 }
+function updateCinematicClipProperty(clip,key,value) {
+  if(key==='duration'){stretchCinematicClip(clip,value);return;}
+  clip[key]=value;
+  if(!clip.keys?.length)return;
+  const first=clip.keys[0],last=clip.keys[clip.keys.length-1];
+  if(key==='from'||key==='fromAlpha')first.value=deepClone(value);
+  if(key==='to'||key==='toAlpha')last.value=deepClone(value);
+  for(const [field,frame,part] of [['position',first,'position'],['target',first,'target'],['toPosition',last,'position'],['toTarget',last,'target']])if(key===field)frame.value[part]=deepClone(value);
+}
 
 function cloneCinematicSequence(sequence) {
   const copy=deepClone(sequence);copy.id=uid();

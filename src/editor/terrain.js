@@ -246,7 +246,7 @@ function addEditorTerrain(project, scene, width, depth, atlas, external=[]) {
   scene.objects.push(obj);return obj;
 }
 
-function applyEditorTerrain(project, id, terrain, external=[], atlas=null) {
+function applyEditorTerrain(project, id, terrain, external=[], atlas=null, prepared=null) {
   checkTerrain(terrain);
   const obj=findObj(activeScene(project).objects,id);
   if(!obj?._terrain||!obj.components.model)throw Error("Select the terrain again before editing it.");
@@ -259,7 +259,7 @@ function applyEditorTerrain(project, id, terrain, external=[], atlas=null) {
   for(const pf of project.prefabs||[])walk([pf],o=>{if(o.components.model?.file===source?.name)uses++;});
   // Duplicates/prefabs share their starting mesh until their first own edit.
   const name=source?.owned&&source.editKind==="terrain"&&uses===1 ? source.name : freeAssetName(files,obj.name+"_terrain","obj");
-  putProjectAsset(project,{...textMeshAsset(name,writeMeshOBJ(terrainMesh(terrain),obj.name)),
+  putProjectAsset(project,{...textMeshAsset(name,prepared?.content||writeMeshOBJ(terrainMesh(terrain),obj.name)),
     editKind:"terrain",terrainMeshVersion:TERRAIN_MESH_VERSION,libraryFolder:"Generated/Terrain",terrainOwner:obj.id});
   obj.components.model.file=name;obj._terrain=deepClone(terrain);
   delete obj._lightingBake;

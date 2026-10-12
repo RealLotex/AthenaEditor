@@ -1,0 +1,39 @@
+To make it practical, here are the 20 most critical parameters across the entire Particle System. Master these, and you can build 90% of all visual effects (VFX) like fire, explosions, rain, and magic trails.
+
+Global & Core Control (Main Module)
+
+• Looping / Duration: Controls if the system plays infinitely or acts as a single, one-shot effect (like a grenade explosion).
+• Start Lifetime: Dictates how long a particle exists. Short values create tight sparks; long values create drifting smoke or slow embers.
+• Start Speed: The initial punch or velocity. Set to 0 for static environmental fog, or high numbers for rocket thrusters.
+• Start Size: The starting scale. Combining this with a Random Between Two Constants creates highly natural variation in your particles.
+• Simulation Space: Setting this to World makes particles stay behind when the player moves (great for exhaust smoke). Setting it to Local keeps particles attached to the moving object (great for a glowing sword).
+• Max Particles: The ceiling cap for total active particles. Crucial for optimizing performance and preventing mobile lag.
+
+Density & Positioning (Emission & Shape)
+
+• Rate over Time: How dense the particle flow is per second. It turns a tiny leak into a massive waterfall.
+• Bursts: Spawns a massive batch of particles all at the exact same millisecond. Vital for impact dust, muzzle flashes, and bursts of debris.
+• Shape: The geometric blueprint where particles are born. Switching from Sphere to Cone instantly turns a generic glow into a directed flashlight beam or magic spell.
+
+Movement & Forces
+
+• Velocity over Lifetime: Dictates direction after spawning. Use this to create rising smoke, swirling vortexes, or complex wind drafts.
+• Gravity Modifier: Pulls particles downward (positive values for water droplets/debris) or pushes them upward (negative values for rising heat rings).
+
+Visual Progression (Over Lifetime)
+
+• Color over Lifetime: Drives the gradient transition. This lets a particle start as a blinding white flame, transition to a dark orange ember, and fade out to an invisible grey ash.
+• Size over Lifetime: Shrinks or expands particles over time. Essential for making explosions puff outwards and dissipate into nothing.
+• Rotation over Lifetime: Spins the particle textures so they don't look completely static, adding organic texture to smoke clouds and swirling magical runes.
+
+World Interaction & Behavior
+
+• Collision Type (World/Planes): Turns on physics. Toggle this to World to make rain splash off a roof or make bouncy sparks ricohet off a dungeon floor.
+• Sub Emitters: Spawns a new particle system based on a trigger. For example, a rocket projectile dies (Death), and immediately spawns an explosion system.
+• Texture Sheet Animation: Sections a grid texture into sequential frames. Essential for playing flipbook-style animations of realistic flipbook fire, magic seals, or blood splatters.
+
+Graphics & Presentation (Renderer)
+
+• Render Mode: Changes how particles face the world. Billboard keeps them facing the camera, while Mesh swaps 2D textures out for actual 3D models (like falling rocks or leaves).
+• Material: The actual texture asset applied to the particle. This dictates whether your particle looks like a sharp glowing laser, a soft smoke cloud, or a sharp cartoon line.
+• Sorting Fudge: The priority rank of the system's transparency layers. Use this if your particle effect is clipping or rendering weirdly behind water, glass, or other visual effects.

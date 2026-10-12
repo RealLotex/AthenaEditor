@@ -1,0 +1,44 @@
+{
+  "passed": true,
+  "records": [
+    {
+      "tag": "SAMPLE",
+      "frame": 30,
+      "sourceActive": 4,
+      "childActive": 0,
+      "collisions": 0,
+      "sourceY": 0.7737499957364056,
+      "meshActive": 3,
+      "meshCorners": 36,
+      "meshW": 1,
+      "hudX": -20,
+      "health": 1
+    },
+    {
+      "tag": "SAMPLE",
+      "frame": 60,
+      "sourceActive": 4,
+      "childActive": 8,
+      "collisions": 4,
+      "sourceY": 0.17124393391590442,
+      "meshActive": 3,
+      "meshCorners": 36,
+      "meshW": 1,
+      "hudX": 59.9999,
+      "health": 0.65
+    },
+    {
+      "tag": "DONE",
+      "frame": 150,
+      "sourceActive": 0,
+      "childActive": 0,
+      "collisions": 4,
+      "sourceY": 0.0010000000474974513,
+      "meshActive": 0,
+      "meshCorners": 36,
+      "meshW": 1,
+      "hudX": 60,
+      "health": 0.65
+    }
+  ]
+}

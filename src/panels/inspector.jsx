@@ -51,7 +51,7 @@ function Inspector({
   }
   if (selectedUI) {
     return (
-      <UIElementInspector
+      <UIElementInspector scene={scene}
         key={selectedUI.id}
         el={selectedUI}
         files={files}

@@ -1,5 +1,15 @@
 // Editor-only phrases: never applied to project names, files, scripts or dialogue.
 const EDITOR_TRANSLATIONS={
+  "Dialogue text": ["Texto de diálogo", "Texto do diálogo"],
+  "Guided tours…": ["Tours guiados…", "Visitas guiadas…"],
+  "Panorama resolution": ["Resolución del panorama", "Resolução do panorama"],
+  "Update frequency": ["Frecuencia de actualización", "Frequência de atualização"],
+  "Gameplay binding": ["Vínculo con gameplay", "Vínculo com gameplay"],
+  "Scene variable": ["Variable de escena", "Variável da cena"],
+  "HUD animation": ["Animación de HUD", "Animação do HUD"],
+  "lines": ["líneas", "linhas"],
+  "1 line": ["1 línea", "1 linha"],
+  "Editing": ["Editando", "Editando"],
   "Lower backdrop": ["Fondo inferior", "Fundo inferior"],
   "Lower sky backdrop": ["Fondo del hemisferio inferior", "Fundo do hemisfério inferior"],
   "Solid color": ["Color sólido", "Cor sólida"],

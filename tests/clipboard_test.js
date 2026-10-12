@@ -3,7 +3,7 @@ import { load } from "./_load.js";
 const A = await load([
   "core/util.js",
   "core/math.js",
-  "core/components.js",
+  "core/particle-modules.js", "core/components.js",
   "core/project.js",
   "editor/mesh.js",
   "editor/assets.js",

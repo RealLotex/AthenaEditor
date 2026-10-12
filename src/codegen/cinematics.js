@@ -62,7 +62,7 @@ function emitCinematics(e,ir) {
   e.w(`const _cinematicPools = {${cine.pools.map(p=>`"${jsStr(p.clip.id)}":${p.vn}`).join(',')}};`);
   const dialogueLines={};for(const s of cine.sequences)for(const t of s.tracks)if(t.type==='dialogue')for(const c of t.clips)dialogueLines[c.id]=cinematicDialogueLines(c);
   e.w(`const _cinematicDialogueLines = ${JSON.stringify(dialogueLines)};`);
-  e.w(`const _cinematicFont = ${ir.project.display?.frameCounter!==false||ir.project.display?.debugHUD ? 'font' : 'new Font("default")'};`);
+  e.w(`const _cinematicFont = ${ir.project.display?.frameCounter!==false||ir.project.display?.debugHUD ? 'font' : ir.ui.some(u=>['Text','Button'].includes(u.el.type)&&(!u.el.fontFile||u.el.fontFile==='default'))?'_hudDefaultFont':'new Font("default")'};`);
   e.w(...cinematicLerp.toString().split('\n'));
   for(const helper of [cinematicCurve,cinematicValueLerp,cinematicKeyframeValue,cinematicClipOpacity])e.w(...helper.toString().split('\n'));
   const hasMix=Object.keys(cine.mixedData).length>0;
